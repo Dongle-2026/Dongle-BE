@@ -1,0 +1,122 @@
+# ============================================
+# 유스레터 - 프로덕션 Docker Compose
+# 사용법: docker-compose -f docker-compose.prod.yml up -d
+# 전체 서비스 (DB + Redis + Spring Boot + AI Service + Next.js)
+# ============================================
+
+services:
+  # ── 인프라 ──
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: youthletter-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      TZ: Asia/Seoul
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - youthletter-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: youthletter-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --maxmemory 512mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - youthletter-net
+
+  # ── Spring Boot (Main API) ──
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: youthletter-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME}
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET}
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - youthletter-net
+
+  # ── Node.js AI Service (김혜린 담당) ──
+  # ai-service:
+  #   build:
+  #     context: ../youthletter-ai-service
+  #     dockerfile: Dockerfile
+  #   container_name: youthletter-ai-service
+  #   environment:
+  #     PORT: 3000
+  #     OPENAI_API_KEY: ${OPENAI_API_KEY}
+  #     DATABASE_URL: postgresql://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+  #   networks:
+  #     - youthletter-net
+
+  # ── Next.js Frontend (안소윤 담당) ──
+  # frontend:
+  #   build:
+  #     context: ../youthletter-frontend
+  #     dockerfile: Dockerfile
+  #   container_name: youthletter-frontend
+  #   environment:
+  #     NEXT_PUBLIC_API_URL: http://backend:8080
+  #   ports:
+  #     - "3001:3001"
+  #   depends_on:
+  #     - backend
+  #   restart: unless-stopped
+  #   networks:
+  #     - youthletter-net
+
+volumes:
+  postgres_data:
+    name: youthletter_postgres_data_prod
+  redis_data:
+    name: youthletter_redis_data_prod
+
+networks:
+  youthletter-net:
+    driver: bridge

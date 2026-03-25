@@ -1,0 +1,94 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.4.4'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.youthletter'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // ── Spring Boot Core ──
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // ── Security (JWT + OAuth2) ──
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
+    // ── Database (PostgreSQL + JPA + QueryDSL) ──
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    runtimeOnly 'org.postgresql:postgresql'
+
+    // QueryDSL (Jakarta 버전 — Spring Boot 3.x 호환)
+    implementation 'com.querydsl:querydsl-jpa:5.1.0:jakarta'
+    annotationProcessor 'com.querydsl:querydsl-apt:5.1.0:jakarta'
+    annotationProcessor 'jakarta.annotation:jakarta.annotation-api'
+    annotationProcessor 'jakarta.persistence:jakarta.persistence-api'
+
+    // pgvector Java 바인딩
+    implementation 'com.pgvector:pgvector:0.1.6'
+
+    // ── Redis ──
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+    // ── WebClient (AI Service 호출, 외부 API) ──
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+    // ── Swagger (springdoc-openapi v2 — Spring Boot 3.x 전용) ──
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.5'
+
+    // ── 크롤링 ──
+    implementation 'org.jsoup:jsoup:1.18.3'
+
+    // ── Lombok ──
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // ── 개발 편의 ──
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+    // ── 테스트 ──
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// ── QueryDSL Q클래스 생성 경로 설정 ──
+def querydslDir = "$buildDir/generated/querydsl"
+
+sourceSets {
+    main.java.srcDirs += [ querydslDir ]
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.generatedSourceOutputDirectory = file(querydslDir)
+}
+
+// ── clean 시 Q클래스도 삭제 ──
+clean {
+    delete file(querydslDir)
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

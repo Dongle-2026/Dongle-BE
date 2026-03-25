@@ -1,0 +1,47 @@
+# ============================================
+# 유스레터 - 로컬 개발용 Docker Compose
+# 사용법: docker-compose -f docker-compose.dev.yml up -d
+# DB/Redis만 Docker로, 앱 서버는 IntelliJ에서 직접 실행
+# ============================================
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16  # 일반 postgres가 아닌 pgvector 이미지!
+    container_name: youthletter-postgres
+    environment:
+      POSTGRES_DB: youthletter
+      POSTGRES_USER: youthletter
+      POSTGRES_PASSWORD: youthletter1234
+      TZ: Asia/Seoul
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U youthletter -d youthletter"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: youthletter-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    name: youthletter_postgres_data
+  redis_data:
+    name: youthletter_redis_data

@@ -1,0 +1,111 @@
+# ============================================
+# 유스레터 Backend CI
+# PR 생성/업데이트 시 자동 실행
+# 빌드 + 테스트 + Swagger 명세 검증
+# ============================================
+
+name: Backend CI
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - '**.java'
+      - '**.gradle'
+      - 'src/**'
+      - 'docker/postgres/init.sql'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    # ── 실제 PostgreSQL + Redis로 통합 테스트 ──
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: youthletter_test
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test1234
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U test -d youthletter_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      # Gradle 캐싱 (빌드 시간 2~3분 단축)
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      # DB 초기화 (init.sql 실행)
+      - name: Initialize test database
+        run: |
+          PGPASSWORD=test1234 psql -h localhost -U test -d youthletter_test \
+            -f docker/postgres/init.sql
+        env:
+          PGPASSWORD: test1234
+
+      # 빌드 (테스트 제외)
+      - name: Build with Gradle
+        run: ./gradlew build -x test --no-daemon
+
+      # 테스트 실행
+      - name: Run tests
+        run: ./gradlew test --no-daemon
+        env:
+          SPRING_PROFILES_ACTIVE: test
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: youthletter_test
+          DB_USERNAME: test
+          DB_PASSWORD: test1234
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          JWT_SECRET: ci-test-secret-key-at-least-256-bits-long-for-hs256-algorithm
+
+      # 테스트 리포트
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report
+          path: build/reports/tests/
+          retention-days: 7
+
+      # 빌드 결과물
+      - name: Upload build artifact
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-jar
+          path: build/libs/*.jar
+          retention-days: 3

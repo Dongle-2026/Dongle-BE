@@ -1,0 +1,150 @@
+spring:
+  application:
+    name: youthletter-backend
+
+  profiles:
+    active: local  # 기본 프로필 (IntelliJ 실행 시)
+
+  # ── JPA 공통 설정 ──
+  jpa:
+    open-in-view: false  # OSIV 비활성화 (성능 + 명시적 트랜잭션 관리)
+    properties:
+      hibernate:
+        format_sql: true
+        default_batch_fetch_size: 100  # N+1 방지 기본 배치 사이즈
+
+  # ── Jackson 직렬화 ──
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false  # ISO-8601 형식
+    default-property-inclusion: non_null
+
+# ── Swagger ──
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+  default-consumes-media-type: application/json
+  default-produces-media-type: application/json
+
+# ── 서버 설정 ──
+server:
+  port: 8080
+  servlet:
+    context-path: /
+
+---
+# ============================================
+# LOCAL 프로필 (IntelliJ에서 개발 시)
+# ============================================
+spring:
+  config:
+    activate:
+      on-profile: local
+
+  # ── PostgreSQL ──
+  datasource:
+    url: jdbc:postgresql://localhost:5432/youthletter
+    username: ${DB_USERNAME:youthletter}
+    password: ${DB_PASSWORD:youthletter1234}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 5
+      connection-timeout: 3000
+
+  # ── JPA (local) ──
+  jpa:
+    hibernate:
+      ddl-auto: validate  # init.sql로 스키마 관리, Hibernate는 검증만
+    show-sql: true
+
+  # ── Redis ──
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  # ── OAuth2 (카카오, 구글) ──
+  security:
+    oauth2:
+      client:
+        registration:
+          kakao:
+            client-id: ${KAKAO_CLIENT_ID:your-kakao-client-id}
+            client-secret: ${KAKAO_CLIENT_SECRET:your-kakao-client-secret}
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            authorization-grant-type: authorization_code
+            client-authentication-method: client_secret_post
+            scope: profile_nickname, account_email
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:your-google-client-id}
+            client-secret: ${GOOGLE_CLIENT_SECRET:your-google-client-secret}
+            redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
+            scope: profile, email
+        provider:
+          kakao:
+            authorization-uri: https://kauth.kakao.com/oauth/authorize
+            token-uri: https://kauth.kakao.com/oauth/token
+            user-info-uri: https://kapi.kakao.com/v2/user/me
+            user-name-attribute: id
+
+# ── JWT ──
+jwt:
+  secret: ${JWT_SECRET:youth-letter-local-dev-secret-key-at-least-256-bits-long-for-hs256}
+  access-token-expiration: 900000      # 15분 (ms)
+  refresh-token-expiration: 604800000  # 7일 (ms)
+
+# ── AI Service (Node.js) 내부 호출 ──
+ai-service:
+  base-url: http://localhost:3000
+
+# ── 로깅 ──
+logging:
+  level:
+    com.youthletter: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE  # 바인드 파라미터 출력
+
+---
+# ============================================
+# PROD 프로필
+# ============================================
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 10
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration: 900000
+  refresh-token-expiration: 604800000
+
+ai-service:
+  base-url: http://ai-service:3000  # Docker 네트워크 내 서비스명
+
+logging:
+  level:
+    com.youthletter: INFO
+    org.hibernate.SQL: WARN
