@@ -47,7 +47,7 @@ docker-compose -f docker-compose.dev.yml up -d
 
 ### 4단계: 확인
 - 헬스체크: http://localhost:8080/actuator/health
-- Swagger UI: http://localhost:8080/swagger-ui.html
+- Swagger UI: http://localhost:8080/swagger-ui/index.html
 - API 명세: http://localhost:8080/v3/api-docs
 
 ## 프로젝트 구조

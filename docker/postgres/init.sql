@@ -1,13 +1,13 @@
 -- ============================================
 -- 유스레터 PostgreSQL 초기화 스크립트
+-- 파일 위치: docker/postgres/init.sql
 -- Docker 컨테이너 최초 실행 시 자동 적용
--- 경로: docker/postgres/init.sql
 -- ============================================
 
 -- Extensions
-CREATE EXTENSION IF NOT EXISTS vector;      -- pgvector (벡터 유사도 검색)
-CREATE EXTENSION IF NOT EXISTS ltree;       -- 계층 구조 (용어 분류)
-CREATE EXTENSION IF NOT EXISTS pg_trgm;     -- 유사 문자열 검색 (자동완성)
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS ltree;
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- ============================================
 -- 1. User/Auth 도메인
@@ -242,7 +242,8 @@ CREATE TABLE reading_history (
     user_id               BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     article_id            BIGINT NOT NULL REFERENCES news_articles(id) ON DELETE CASCADE,
     read_duration_seconds INTEGER,
-    read_at               TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    read_at               TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE TABLE term_lookup_log (
@@ -256,45 +257,36 @@ CREATE TABLE term_lookup_log (
 -- ============================================
 -- 인덱스
 -- ============================================
-
--- User/Auth
 CREATE INDEX idx_users_deleted_at ON users(deleted_at) WHERE deleted_at IS NOT NULL;
 CREATE INDEX idx_oauth_provider ON oauth_accounts(provider, provider_id);
 
--- News
 CREATE INDEX idx_articles_category_published ON news_articles(category, published_at DESC);
 CREATE INDEX idx_articles_crawled ON news_articles(crawled_at DESC);
 CREATE INDEX idx_summaries_article_valid ON news_summaries(article_id) WHERE valid_to IS NULL;
 CREATE INDEX idx_highlights_article ON article_term_highlights(article_id);
 
--- Terms
 CREATE INDEX idx_terms_path_gist ON financial_terms USING GIST(path);
 CREATE INDEX idx_terms_search_gin ON financial_terms USING GIN(search_vector);
 CREATE INDEX idx_terms_name_trgm ON financial_terms USING GIN(name gin_trgm_ops);
 CREATE INDEX idx_terms_embedding_hnsw ON financial_terms
     USING hnsw(embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 
--- Policies
 CREATE INDEX idx_policies_age_range ON policies(age_min, age_max);
 CREATE INDEX idx_policies_region ON policies(region_code);
 CREATE INDEX idx_policies_end_date ON policies(end_date) WHERE end_date IS NOT NULL;
 CREATE INDEX idx_policies_embedding_hnsw ON policies
     USING hnsw(embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
 
--- Spending
 CREATE INDEX idx_spending_events_user_date ON spending_events(user_id, spent_at DESC);
 CREATE INDEX idx_spending_events_spending_id ON spending_events(spending_id, created_at);
 CREATE INDEX idx_snapshots_user_month ON spending_snapshots(user_id, snapshot_month DESC);
 
--- AI Agent
 CREATE INDEX idx_sessions_user ON chat_sessions(user_id, updated_at DESC);
 CREATE INDEX idx_messages_session ON chat_messages(session_id, created_at);
 
--- Activity
 CREATE INDEX idx_reading_user_date ON reading_history(user_id, read_at DESC);
 CREATE INDEX idx_termlookup_user ON term_lookup_log(user_id, looked_up_at DESC);
 
--- Guides
 CREATE INDEX idx_guides_type ON guides(guide_type);
 CREATE INDEX idx_guides_embedding_hnsw ON guides
     USING hnsw(embedding vector_cosine_ops) WITH (m = 16, ef_construction = 64);
@@ -356,7 +348,6 @@ ALTER TABLE term_lookup_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE policy_bookmarks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE policy_notifications ENABLE ROW LEVEL SECURITY;
 
--- 애플리케이션용 롤 생성 (superuser가 아닌 제한된 권한)
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'youthletter_app') THEN
@@ -368,7 +359,6 @@ GRANT USAGE ON SCHEMA public TO youthletter_app;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO youthletter_app;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO youthletter_app;
 
--- RLS 정책 (youthletter_app 롤에만 적용)
 CREATE POLICY user_isolation_spending_events ON spending_events
     TO youthletter_app
     USING (user_id = current_setting('app.current_user_id', true)::bigint);
@@ -411,7 +401,6 @@ INSERT INTO user_profiles (user_id, employment_status, annual_income, is_married
 VALUES
     (1, 'STUDENT', 0, FALSE, 1, 'UNIVERSITY');
 
--- 샘플 금융 용어 (ltree 계층 구조)
 INSERT INTO financial_terms (name, path, definition, simple_definition, difficulty_level) VALUES
     ('주식', 'finance.stock', '기업의 자본을 구성하는 균등한 비율의 단위로, 주주의 지분을 나타내는 유가증권', '회사의 일부를 사는 거예요. 회사가 잘되면 내 주식 가치도 올라가요!', 1),
     ('ETF', 'finance.stock.etf', 'Exchange Traded Fund의 약자로, 특정 지수를 추종하는 인덱스 펀드를 거래소에 상장시켜 주식처럼 거래할 수 있게 한 상품', '여러 주식을 한 번에 묶어서 사고파는 장바구니 같은 상품이에요', 2),
@@ -424,18 +413,14 @@ INSERT INTO financial_terms (name, path, definition, simple_definition, difficul
     ('인플레이션', 'finance.economy.inflation', '물가 수준이 지속적으로 상승하는 현상', '물건 값이 계속 오르는 현상이에요. 같은 돈으로 살 수 있는 게 줄어들어요', 2),
     ('적금', 'finance.savings', '매월 일정 금액을 정해진 기간 동안 납입하고 만기 시 원금과 이자를 받는 금융 상품', '매달 정해진 돈을 꼬박꼬박 넣으면, 나중에 이자까지 붙여서 돌려받는 통장이에요', 1);
 
--- 용어 관계 (유사/반대)
 INSERT INTO term_relations (term_id, related_term_id, relation_type) VALUES
-    (2, 1, 'PARENT'),         -- ETF → 주식 (상위 개념)
-    (3, 1, 'SEE_ALSO'),       -- 배당 → 주식 (관련)
-    (4, 5, 'SEE_ALSO'),       -- 생명보험 ↔ 실손보험
-    (6, 7, 'SEE_ALSO');       -- 신용대출 ↔ 전세대출
+    (2, 1, 'PARENT'),
+    (3, 1, 'SEE_ALSO'),
+    (4, 5, 'SEE_ALSO'),
+    (6, 7, 'SEE_ALSO');
 
--- 샘플 정책
 INSERT INTO policies (title, description, summary, organization, region_code, age_min, age_max, income_criteria, occupation_criteria, start_date, end_date, application_url)
 VALUES
     ('청년 월세 지원', '청년의 주거비 부담 경감을 위해 월 최대 20만원의 월세를 지원합니다.', '만 19~34세 무주택 청년에게 월 최대 20만원 월세 지원', '국토교통부', NULL, 19, 34, 'BELOW_MEDIAN', '["EMPLOYED", "UNEMPLOYED", "STUDENT"]', '2026-01-01', '2026-12-31', 'https://www.myhome.go.kr'),
     ('청년내일저축계좌', '매월 10만원을 저축하면 정부가 10~30만원을 추가 적립하는 자산형성 지원사업입니다.', '매월 10만원 저축 시 정부가 최대 30만원 추가 적립', '보건복지부', NULL, 19, 34, 'BELOW_MEDIAN', '["EMPLOYED"]', '2026-03-01', '2026-06-30', 'https://www.bokjiro.go.kr'),
-    ('부산 청년 취업지원금', '부산 거주 미취업 청년에게 구직활동 지원금 월 50만원을 3개월간 지급합니다.', '부산 거주 미취업 청년 대상 월 50만원 × 3개월 구직지원금', '부산광역시', '26', 19, 34, 'BELOW_200PCT', '["UNEMPLOYED"]', '2026-04-01', '2026-09-30', 'https://www.busan.go.kr');
-
-RAISE NOTICE '✅ 유스레터 데이터베이스 초기화 완료!';
+    ('부산 청년 취업지원금', '부산 거주 미취업 청년에게 구직활동 지원금 월 50만원을 3개월간 지급합니다.', '부산 거주 미취업 청년 대상 월 50만원 x 3개월 구직지원금', '부산광역시', '26', 19, 34, 'BELOW_200PCT', '["UNEMPLOYED"]', '2026-04-01', '2026-09-30', 'https://www.busan.go.kr');

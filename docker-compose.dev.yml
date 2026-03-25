@@ -9,9 +9,9 @@ services:
     image: pgvector/pgvector:pg16  # 일반 postgres가 아닌 pgvector 이미지!
     container_name: youthletter-postgres
     environment:
-      POSTGRES_DB: youthletter
       POSTGRES_USER: youthletter
       POSTGRES_PASSWORD: youthletter1234
+      POSTGRES_DB: youthletter
       TZ: Asia/Seoul
     ports:
       - "5432:5432"

@@ -52,7 +52,7 @@ jobs:
       - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
+          java-version: '17'
           distribution: 'temurin'
 
       # Gradle 캐싱 (빌드 시간 2~3분 단축)
