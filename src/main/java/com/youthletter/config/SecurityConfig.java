@@ -1,5 +1,9 @@
 package com.youthletter.config;
 
+import com.youthletter.global.auth.jwt.JwtAuthenticationFilter;
+import com.youthletter.global.auth.oauth.CustomOAuth2UserService;
+import com.youthletter.global.auth.oauth.OAuth2AuthenticationFailureHandler;
+import com.youthletter.global.auth.oauth.OAuth2AuthenticationSuccessHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -10,14 +14,17 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    // TODO: JwtAuthenticationFilter 구현 후 주입
-    // private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final CustomOAuth2UserService customOAuth2UserService;
+    private final OAuth2AuthenticationSuccessHandler oAuth2SuccessHandler;
+    private final OAuth2AuthenticationFailureHandler oAuth2FailureHandler;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -36,20 +43,30 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // 인증 없이 접근 가능
                 .requestMatchers(
-                    "/api/auth/**",           // 로그인, 회원가입
+                    "/api/auth/**",           // 로그인, 토큰 재발급
                     "/api/news/**",           // 뉴스 목록/상세 (비로그인 허용)
                     "/api/terms/**",          // 용어 사전 (비로그인 허용)
                     "/api/guides/**",         // 가이드 (비로그인 허용)
+                    "/oauth2/**",             // OAuth2 리다이렉트
+                    "/login/oauth2/**",       // OAuth2 콜백
                     "/swagger-ui/**",         // Swagger UI
                     "/v3/api-docs/**",        // OpenAPI 명세
                     "/actuator/health"        // 헬스체크
                 ).permitAll()
                 // 나머지는 인증 필요
                 .anyRequest().authenticated()
-            );
+            )
 
-            // TODO: JWT 필터 등록
-            // .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+            // OAuth2 로그인 설정
+            .oauth2Login(oauth2 -> oauth2
+                .userInfoEndpoint(userInfo -> userInfo
+                    .userService(customOAuth2UserService))
+                .successHandler(oAuth2SuccessHandler)
+                .failureHandler(oAuth2FailureHandler)
+            )
+
+            // JWT 필터 등록 (UsernamePasswordAuthenticationFilter 앞에)
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -71,6 +88,8 @@ public class SecurityConfig {
 
         var source = new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/api/**", config);
+        source.registerCorsConfiguration("/oauth2/**", config);
+        source.registerCorsConfiguration("/login/oauth2/**", config);
         return source;
     }
 }

@@ -98,6 +98,10 @@ jwt:
   access-token-expiration: 900000      # 15분 (ms)
   refresh-token-expiration: 604800000  # 7일 (ms)
 
+# ── OAuth2 프론트엔드 리다이렉트 ──
+oauth2:
+  redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:3001/auth/callback}
+
 # ── AI Service (Node.js) 내부 호출 ──
 ai-service:
   base-url: http://localhost:3000
@@ -141,6 +145,9 @@ jwt:
   secret: ${JWT_SECRET}
   access-token-expiration: 900000
   refresh-token-expiration: 604800000
+
+oauth2:
+  redirect-uri: ${OAUTH2_REDIRECT_URI:https://youthletter.com/auth/callback}
 
 ai-service:
   base-url: http://ai-service:3000  # Docker 네트워크 내 서비스명
