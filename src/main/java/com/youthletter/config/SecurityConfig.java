@@ -51,7 +51,8 @@ public class SecurityConfig {
                     "/login/oauth2/**",       // OAuth2 콜백
                     "/swagger-ui/**",         // Swagger UI
                     "/v3/api-docs/**",        // OpenAPI 명세
-                    "/actuator/health"        // 헬스체크
+                    "/actuator/health",       // 헬스체크
+                    "/api/admin/**"           // 관리자 API (개발용)
                 ).permitAll()
                 // 나머지는 인증 필요
                 .anyRequest().authenticated()

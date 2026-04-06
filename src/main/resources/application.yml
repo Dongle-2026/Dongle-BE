@@ -13,6 +13,12 @@ spring:
         format_sql: true
         default_batch_fetch_size: 100  # N+1 방지 기본 배치 사이즈
 
+  # ── 스케줄링 ──
+  task:
+    scheduling:
+      pool:
+        size: 3
+
   # ── Jackson 직렬화 ──
   jackson:
     serialization:
@@ -105,6 +111,7 @@ oauth2:
 # ── AI Service (Node.js) 내부 호출 ──
 ai-service:
   base-url: http://localhost:3000
+  use-stub: true   # 혜린이 API 완성 후 false로 변경
 
 # ── 로깅 ──
 logging:

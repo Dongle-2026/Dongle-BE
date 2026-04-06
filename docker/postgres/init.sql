@@ -53,6 +53,21 @@ CREATE TABLE user_profiles (
 -- ============================================
 -- 2. News 도메인
 -- ============================================
+CREATE TABLE news (
+    id           BIGSERIAL PRIMARY KEY,
+    title        TEXT NOT NULL,
+    content      TEXT NOT NULL,
+    summary      TEXT,
+    original_url TEXT NOT NULL UNIQUE,
+    source       VARCHAR(100),
+    category     VARCHAR(100),
+    published_at TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    embedding    VECTOR(1536)
+);
+
+CREATE INDEX idx_news_embedding ON news USING ivfflat (embedding vector_cosine_ops);
+
 CREATE TABLE news_articles (
     id            BIGSERIAL PRIMARY KEY,
     source_url    VARCHAR(500) NOT NULL UNIQUE,
