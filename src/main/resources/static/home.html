@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>유스레터 — 청년 금융 AI 플랫폼</title>
+  <style>
+    :root {
+      --yellow: #FFD600;
+      --yellow-dark: #F0C800;
+      --black: #111111;
+      --dark: #1a1a2e;
+      --gray: #f5f5f5;
+      --gray2: #e8e8e8;
+      --text: #222;
+      --sub: #888;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fff; color: var(--text); }
+    a { text-decoration: none; color: inherit; }
+
+    /* ── 헤더 ── */
+    header {
+      position: sticky; top: 0; z-index: 100;
+      background: #fff;
+      border-bottom: 1px solid var(--gray2);
+      padding: 0 40px;
+      height: 60px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .logo {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 20px; font-weight: 900; letter-spacing: -0.5px;
+    }
+    .logo-box {
+      width: 36px; height: 36px;
+      background: var(--yellow);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    nav { display: flex; align-items: center; gap: 32px; }
+    nav a { font-size: 15px; font-weight: 500; color: var(--sub); transition: color .15s; }
+    nav a:hover, nav a.active { color: var(--black); }
+    .btn-start {
+      background: var(--yellow); color: var(--black);
+      padding: 9px 20px; border-radius: 20px;
+      font-size: 14px; font-weight: 700; border: none; cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-start:hover { background: var(--yellow-dark); }
+    #user-info { display: flex; align-items: center; gap: 12px; }
+    #nickname-display { font-size: 14px; font-weight: 600; color: var(--black); }
+
+    /* ── 히어로 ── */
+    .hero {
+      background: var(--yellow);
+      padding: 44px 40px 0;
+      display: flex; align-items: flex-end; justify-content: space-between;
+      min-height: 160px;
+      overflow: hidden;
+    }
+    .hero-text h1 {
+      font-size: 28px; font-weight: 900; line-height: 1.35;
+      color: var(--black); letter-spacing: -0.5px;
+    }
+    .hero-text p { font-size: 15px; color: #555; margin-top: 6px; }
+    .hero-bee {
+      font-size: 90px; line-height: 1;
+      transform: scaleX(-1);
+      margin-bottom: -8px;
+    }
+
+    /* ── 컨텐츠 영역 ── */
+    .content { max-width: 1100px; margin: 0 auto; padding: 40px 20px; }
+
+    /* ── 섹션 헤더 ── */
+    .section-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .section-title {
+      font-size: 18px; font-weight: 800; color: var(--black);
+    }
+    .tag-group { display: flex; gap: 8px; flex-wrap: wrap; }
+    .tag {
+      background: var(--gray); color: var(--sub);
+      padding: 5px 12px; border-radius: 14px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      border: 2px solid transparent; transition: all .15s;
+    }
+    .tag:hover, .tag.active {
+      background: var(--black); color: var(--yellow); border-color: var(--black);
+    }
+
+    /* ── 뉴스 그리드 ── */
+    .news-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    @media (max-width: 768px) { .news-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 480px) { .news-grid { grid-template-columns: 1fr; } }
+
+    /* ── 뉴스 카드 ── */
+    .card {
+      border-radius: var(--radius); overflow: hidden;
+      cursor: pointer; transition: transform .18s, box-shadow .18s;
+      position: relative;
+      background: var(--dark);
+      aspect-ratio: 3/4;
+      display: flex; flex-direction: column; justify-content: flex-end;
+    }
+    .card:hover { transform: translateY(-4px); box-shadow: 0 16px 40px rgba(0,0,0,.18); }
+    .card-bg {
+      position: absolute; inset: 0;
+      background-size: cover; background-position: center;
+    }
+    .card-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(to top, rgba(0,0,0,.85) 40%, rgba(0,0,0,.2) 100%);
+    }
+    .card-body {
+      position: relative; z-index: 2;
+      padding: 16px;
+    }
+    .card-category {
+      display: inline-block;
+      background: var(--yellow); color: var(--black);
+      padding: 3px 8px; border-radius: 6px;
+      font-size: 11px; font-weight: 700; margin-bottom: 8px;
+    }
+    .card-title {
+      font-size: 15px; font-weight: 700; color: #fff;
+      line-height: 1.45;
+      display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .card-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 12px;
+    }
+    .card-date { font-size: 12px; color: rgba(255,255,255,.6); }
+    .card-actions { display: flex; align-items: center; gap: 6px; }
+    .btn-bookmark {
+      background: none; border: none; cursor: pointer;
+      font-size: 18px; transition: transform .15s;
+      line-height: 1;
+    }
+    .btn-bookmark:hover { transform: scale(1.2); }
+    .btn-bookmark.active { color: #ff4757; }
+
+    /* ── 로딩/빈 상태 ── */
+    .skeleton {
+      border-radius: var(--radius); overflow: hidden;
+      aspect-ratio: 3/4;
+      background: linear-gradient(90deg, #e0e0e0 25%, #f0f0f0 50%, #e0e0e0 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.4s infinite;
+    }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+
+    .empty-state {
+      grid-column: 1/-1; text-align: center; padding: 60px 20px;
+      color: var(--sub);
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-state p { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+    .empty-state small { font-size: 13px; }
+
+    /* ── 토스트 ── */
+    #toast {
+      position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+      background: var(--black); color: #fff;
+      padding: 12px 24px; border-radius: 24px;
+      font-size: 14px; font-weight: 600;
+      opacity: 0; pointer-events: none; transition: opacity .25s;
+      z-index: 999;
+    }
+    #toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<!-- 헤더 -->
+<header>
+  <div class="logo">
+    <div class="logo-box">🐝</div>
+    유스레터
+  </div>
+  <nav>
+    <a href="home.html" class="active">홈</a>
+    <a href="#">읽어보기</a>
+    <a href="#">찾아보기</a>
+  </nav>
+  <div id="user-info">
+    <span id="nickname-display" style="display:none"></span>
+    <button class="btn-start" id="header-btn" onclick="handleHeaderBtn()">시작하기</button>
+  </div>
+</header>
+
+<!-- 히어로 -->
+<section class="hero">
+  <div class="hero-text">
+    <h1 id="hero-title">오늘의 브리핑을<br>확인해보세요</h1>
+    <p>청년을 위한 금융 뉴스, 한눈에 모아봤어요</p>
+  </div>
+  <div class="hero-bee">🐝</div>
+</section>
+
+<!-- 본문 -->
+<main class="content">
+  <div class="section-header">
+    <h2 class="section-title">☰ 오늘의 소식 모아보기</h2>
+    <div class="tag-group">
+      <span class="tag active" data-cat="">전체</span>
+      <span class="tag" data-cat="ECONOMY">경제</span>
+      <span class="tag" data-cat="STOCK">투자</span>
+      <span class="tag" data-cat="INSURANCE">보험</span>
+      <span class="tag" data-cat="LOAN">대출</span>
+      <span class="tag" data-cat="POLICY">정책</span>
+    </div>
+  </div>
+
+  <div class="news-grid" id="news-grid">
+    <!-- 스켈레톤 -->
+    <div class="skeleton"></div>
+    <div class="skeleton"></div>
+    <div class="skeleton"></div>
+    <div class="skeleton"></div>
+    <div class="skeleton"></div>
+    <div class="skeleton"></div>
+  </div>
+</main>
+
+<div id="toast"></div>
+
+<script>
+  const BASE = 'http://localhost:8080';
+  let allArticles = [];
+  let currentCat = '';
+  let bookmarks = new Set(JSON.parse(localStorage.getItem('bookmarks') || '[]'));
+
+  // ── 카드 색상 (이미지 대체용) ──
+  const GRADIENTS = [
+    'linear-gradient(135deg,#1a1a2e,#16213e)',
+    'linear-gradient(135deg,#0f3460,#533483)',
+    'linear-gradient(135deg,#1a1a2e,#e94560)',
+    'linear-gradient(135deg,#2d3436,#636e72)',
+    'linear-gradient(135deg,#2c3e50,#3498db)',
+    'linear-gradient(135deg,#1e3c72,#2a5298)',
+    'linear-gradient(135deg,#134e5e,#71b280)',
+    'linear-gradient(135deg,#373b44,#4286f4)',
+    'linear-gradient(135deg,#3a1c71,#d76d77)',
+  ];
+
+  // ── 날짜 포맷 ──
+  function fmtDate(dt) {
+    if (!dt) return '';
+    const d = new Date(dt);
+    return `${d.getMonth()+1}.${d.getDate()}`;
+  }
+
+  // ── 카드 렌더 ──
+  function renderCard(article, idx) {
+    const grad = GRADIENTS[idx % GRADIENTS.length];
+    const isBookmarked = bookmarks.has(article.id);
+    return `
+      <div class="card" onclick="goDetail(${article.id})">
+        <div class="card-bg" style="background:${grad}"></div>
+        <div class="card-overlay"></div>
+        <div class="card-body">
+          <span class="card-category">${labelCat(article.category)}</span>
+          <p class="card-title">${article.title}</p>
+          <div class="card-footer">
+            <span class="card-date">${fmtDate(article.publishedAt)}</span>
+            <div class="card-actions">
+              <button class="btn-bookmark ${isBookmarked?'active':''}"
+                onclick="toggleBm(event,${article.id})"
+                title="북마크">
+                ${isBookmarked ? '❤️' : '🤍'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function labelCat(cat) {
+    const m = {ECONOMY:'경제',STOCK:'투자',INSURANCE:'보험',LOAN:'대출',POLICY:'정책',YOUTH:'청년'};
+    return m[cat] || cat || '금융';
+  }
+
+  // ── 그리드 렌더 ──
+  function renderGrid(articles) {
+    const grid = document.getElementById('news-grid');
+    if (!articles.length) {
+      grid.innerHTML = `
+        <div class="empty-state">
+          <div class="icon">📰</div>
+          <p>아직 오늘 뉴스가 없어요</p>
+          <small>크롤링 후 새로고침 해주세요 → <a href="test.html" style="color:#FFD600">테스트 콘솔</a></small>
+        </div>`;
+      return;
+    }
+    grid.innerHTML = articles.map((a,i) => renderCard(a,i)).join('');
+  }
+
+  // ── API 호출 ──
+  async function loadNews() {
+    try {
+      const headers = {};
+      const at = localStorage.getItem('accessToken');
+      if (at) headers['Authorization'] = 'Bearer ' + at;
+
+      const res = await fetch(BASE + '/api/news/today', { headers });
+      const json = await res.json();
+      allArticles = json.data || [];
+    } catch(e) {
+      allArticles = MOCK_NEWS;
+    }
+    renderGrid(filter(allArticles, currentCat));
+  }
+
+  function filter(articles, cat) {
+    return cat ? articles.filter(a => a.category === cat) : articles;
+  }
+
+  // ── 카테고리 필터 ──
+  document.querySelectorAll('.tag').forEach(tag => {
+    tag.addEventListener('click', () => {
+      document.querySelectorAll('.tag').forEach(t => t.classList.remove('active'));
+      tag.classList.add('active');
+      currentCat = tag.dataset.cat;
+      renderGrid(filter(allArticles, currentCat));
+    });
+  });
+
+  // ── 북마크 토글 ──
+  async function toggleBm(e, id) {
+    e.stopPropagation();
+    const at = localStorage.getItem('accessToken');
+    if (!at) { showToast('로그인이 필요해요'); return; }
+
+    try {
+      const res = await fetch(BASE + '/api/news/' + id + '/bookmark', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + at }
+      });
+      const json = await res.json();
+      const added = json.data?.bookmarked;
+      if (added) { bookmarks.add(id); showToast('북마크에 추가했어요 ❤️'); }
+      else        { bookmarks.delete(id); showToast('북마크에서 제거했어요'); }
+      localStorage.setItem('bookmarks', JSON.stringify([...bookmarks]));
+      renderGrid(filter(allArticles, currentCat));
+    } catch(e) { showToast('잠시 후 다시 시도해주세요'); }
+  }
+
+  // ── 상세 이동 ──
+  function goDetail(id) {
+    window.location.href = 'news-detail.html?id=' + id;
+  }
+
+  // ── 헤더 버튼 ──
+  function handleHeaderBtn() {
+    const at = localStorage.getItem('accessToken');
+    if (at) { window.location.href = 'test.html'; }
+    else    { window.location.href = 'test.html'; }
+  }
+
+  // ── 사용자 상태 ──
+  function initUser() {
+    const at = localStorage.getItem('accessToken');
+    if (!at) return;
+    fetch(BASE + '/api/users/me', { headers: { 'Authorization': 'Bearer ' + at } })
+      .then(r => r.json())
+      .then(json => {
+        if (json.data?.nickname) {
+          document.getElementById('nickname-display').textContent = json.data.nickname + '님';
+          document.getElementById('nickname-display').style.display = 'inline';
+          document.getElementById('hero-title').textContent = json.data.nickname + '님, 오늘의 브리핑을\n확인해보세요';
+          document.getElementById('header-btn').textContent = '내 콘솔';
+        }
+      }).catch(() => {});
+  }
+
+  // ── 토스트 ──
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2000);
+  }
+
+  // ── 모의 데이터 (API 없을 때) ──
+  const MOCK_NEWS = [
+    { id:1, title:'부산시, 청년 로컬크리에이터 키운다... 최대 6000만원 지원', category:'POLICY', publishedAt:'2026-04-10T09:00:00', sourceName:'한국경제' },
+    { id:2, title:'청년 월세 지원 4월 신청 시작... 월 20만원 최대 12개월', category:'POLICY', publishedAt:'2026-04-10T08:30:00', sourceName:'한국경제' },
+    { id:3, title:'ETF 투자, 이것만 알고 시작하세요... 수수료 비교 총정리', category:'STOCK', publishedAt:'2026-04-10T08:00:00', sourceName:'한국경제' },
+    { id:4, title:'청년내일저축계좌 신청 방법과 자격요건 완벽 정리', category:'POLICY', publishedAt:'2026-04-09T17:00:00', sourceName:'한국경제' },
+    { id:5, title:'금리 인하 시대, 내 적금 전략은 어떻게 바꿔야 할까', category:'ECONOMY', publishedAt:'2026-04-09T16:00:00', sourceName:'한국경제' },
+    { id:6, title:'실손보험 리모델링 완전 가이드... 중복 보장 이렇게 정리', category:'INSURANCE', publishedAt:'2026-04-09T15:00:00', sourceName:'한국경제' },
+    { id:7, title:'신용점수 올리는 현실적인 방법 5가지', category:'LOAN', publishedAt:'2026-04-09T14:00:00', sourceName:'한국경제' },
+    { id:8, title:'청년 주택드림 청약통장, 혜택과 가입 조건 총정리', category:'POLICY', publishedAt:'2026-04-09T13:00:00', sourceName:'한국경제' },
+    { id:9, title:'배당주 투자 입문: 월급 외 현금흐름 만드는 법', category:'STOCK', publishedAt:'2026-04-09T12:00:00', sourceName:'한국경제' },
+    { id:10, title:'전세대출 금리 비교 총정리... 은행별 최저 금리는?', category:'LOAN', publishedAt:'2026-04-09T11:00:00', sourceName:'한국경제' },
+    { id:11, title:'ISA 계좌 200만원 비과세 혜택 제대로 활용하는 법', category:'ECONOMY', publishedAt:'2026-04-09T10:00:00', sourceName:'한국경제' },
+    { id:12, title:'인플레이션 시대 내 월급 지키는 소비 습관 만들기', category:'ECONOMY', publishedAt:'2026-04-09T09:00:00', sourceName:'한국경제' },
+  ];
+
+  // ── 초기화 ──
+  initUser();
+  loadNews();
+</script>
+</body>
+</html>

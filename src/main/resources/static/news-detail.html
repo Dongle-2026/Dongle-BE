@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>뉴스 상세 — 유스레터</title>
+  <style>
+    :root {
+      --yellow: #FFD600;
+      --yellow-light: #FFFAE0;
+      --black: #111111;
+      --dark: #1a1a2e;
+      --gray: #f5f5f5;
+      --gray2: #e8e8e8;
+      --text: #222;
+      --sub: #888;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #fff; color: var(--text); }
+    a { text-decoration: none; color: inherit; }
+
+    /* ── 헤더 ── */
+    header {
+      position: sticky; top: 0; z-index: 100;
+      background: #fff; border-bottom: 1px solid var(--gray2);
+      padding: 0 40px; height: 60px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .logo { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 900; letter-spacing: -0.5px; }
+    .logo-box { width: 36px; height: 36px; background: var(--yellow); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    nav { display: flex; align-items: center; gap: 32px; }
+    nav a { font-size: 15px; font-weight: 500; color: var(--sub); transition: color .15s; }
+    nav a:hover { color: var(--black); }
+    .btn-start { background: var(--yellow); color: var(--black); padding: 9px 20px; border-radius: 20px; font-size: 14px; font-weight: 700; border: none; cursor: pointer; }
+
+    /* ── 브레드크럼 ── */
+    .breadcrumb {
+      max-width: 1100px; margin: 0 auto;
+      padding: 16px 20px 0;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .back-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 15px; font-weight: 600; color: var(--sub);
+      background: none; border: none; cursor: pointer;
+      padding: 6px 10px; border-radius: 8px; transition: background .15s;
+    }
+    .back-btn:hover { background: var(--gray); color: var(--black); }
+
+    /* ── 레이아웃 ── */
+    .layout {
+      max-width: 1100px; margin: 0 auto;
+      padding: 24px 20px 60px;
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 32px;
+    }
+    @media (max-width: 860px) {
+      .layout { grid-template-columns: 1fr; }
+      .sidebar { order: -1; }
+    }
+
+    /* ── 메인 콘텐츠 ── */
+    .article {}
+
+    .article-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--yellow); color: var(--black);
+      padding: 5px 12px; border-radius: 20px;
+      font-size: 13px; font-weight: 700; margin-bottom: 16px;
+    }
+
+    .article-hero {
+      width: 100%; aspect-ratio: 16/9;
+      border-radius: var(--radius); overflow: hidden;
+      margin-bottom: 24px;
+      background: linear-gradient(135deg, #1a1a2e, #0f3460);
+      display: flex; align-items: center; justify-content: center;
+      color: rgba(255,255,255,.15); font-size: 80px;
+    }
+
+    .article-title {
+      font-size: 28px; font-weight: 900; line-height: 1.4;
+      color: var(--black); letter-spacing: -0.5px;
+      margin-bottom: 14px;
+    }
+
+    .article-meta {
+      display: flex; align-items: center; gap: 16px;
+      padding-bottom: 20px; border-bottom: 1px solid var(--gray2);
+      margin-bottom: 24px;
+    }
+    .article-meta span { font-size: 13px; color: var(--sub); }
+    .meta-dot { color: var(--gray2); }
+
+    /* ── AI 요약 (핀트봇) ── */
+    .pintbot-summary {
+      background: var(--yellow-light);
+      border: 1.5px solid var(--yellow);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      margin-bottom: 24px;
+    }
+    .pintbot-header {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 14px;
+    }
+    .pintbot-icon { font-size: 24px; }
+    .pintbot-label { font-size: 15px; font-weight: 800; color: var(--black); }
+    .pintbot-sublabel { font-size: 12px; color: var(--sub); margin-left: auto; }
+    .pintbot-text {
+      font-size: 14px; line-height: 1.7; color: #333;
+      white-space: pre-line;
+    }
+
+    /* ── 본문 ── */
+    .article-body {
+      font-size: 16px; line-height: 1.85; color: #333;
+    }
+    .article-body p { margin-bottom: 18px; }
+
+    /* ── 액션 버튼 ── */
+    .article-actions {
+      display: flex; gap: 10px; flex-wrap: wrap;
+      margin: 28px 0;
+      padding: 20px 0; border-top: 1px solid var(--gray2);
+    }
+    .action-btn {
+      display: flex; align-items: center; gap: 8px;
+      padding: 11px 18px; border-radius: 10px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      border: 1.5px solid var(--gray2); background: #fff;
+      transition: all .15s;
+    }
+    .action-btn:hover { border-color: var(--black); background: var(--gray); }
+    .action-btn.primary { background: var(--yellow); border-color: var(--yellow); color: var(--black); }
+    .action-btn.primary:hover { background: var(--yellow-dark, #F0C800); }
+    .action-btn span { font-size: 18px; }
+
+    /* ── 관련 용어 ── */
+    .terms-section { margin: 24px 0; }
+    .terms-title { font-size: 15px; font-weight: 700; margin-bottom: 12px; color: var(--black); }
+    .terms-list { display: flex; gap: 8px; flex-wrap: wrap; }
+    .term-chip {
+      background: var(--gray); padding: 7px 14px;
+      border-radius: 20px; font-size: 13px; font-weight: 600;
+      cursor: pointer; border: 1.5px solid var(--gray2);
+      transition: all .15s;
+    }
+    .term-chip:hover { background: var(--black); color: var(--yellow); border-color: var(--black); }
+
+    /* ── 사이드바 ── */
+    .sidebar {}
+
+    .sidebar-card {
+      background: var(--gray);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .sidebar-card-title {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 14px; font-weight: 800; color: var(--black);
+      margin-bottom: 14px;
+    }
+    .sidebar-card-title .badge {
+      background: var(--yellow); color: var(--black);
+      padding: 2px 8px; border-radius: 6px; font-size: 12px;
+    }
+
+    .qa-question {
+      font-size: 13px; font-weight: 700; color: var(--dark);
+      margin-bottom: 10px;
+      padding: 10px 12px;
+      background: #fff; border-radius: 8px;
+      border-left: 3px solid var(--yellow);
+    }
+    .qa-list { list-style: none; }
+    .qa-list li {
+      display: flex; align-items: flex-start; gap: 10px;
+      font-size: 13px; color: #444; line-height: 1.5;
+      padding: 7px 0; border-bottom: 1px solid var(--gray2);
+    }
+    .qa-list li:last-child { border-bottom: none; }
+    .qa-num {
+      min-width: 22px; height: 22px;
+      background: var(--black); color: var(--yellow);
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 800; flex-shrink: 0;
+    }
+
+    .bookmark-card {
+      background: var(--black); border-radius: var(--radius); padding: 20px;
+      color: #fff; text-align: center;
+    }
+    .bookmark-card .icon { font-size: 32px; margin-bottom: 10px; }
+    .bookmark-card p { font-size: 14px; line-height: 1.6; color: rgba(255,255,255,.8); margin-bottom: 14px; }
+    .btn-bm-add {
+      width: 100%; padding: 12px;
+      background: var(--yellow); color: var(--black);
+      border: none; border-radius: 8px;
+      font-size: 14px; font-weight: 700; cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-bm-add:hover { background: #F0C800; }
+    .btn-bm-add.bookmarked { background: #ff4757; color: #fff; }
+
+    /* ── 관련 콘텐츠 ── */
+    .related-section {
+      max-width: 1100px; margin: 0 auto;
+      padding: 0 20px 60px;
+    }
+    .related-section h2 {
+      font-size: 20px; font-weight: 800; margin-bottom: 20px;
+      padding-top: 24px; border-top: 2px solid var(--gray2);
+    }
+    .related-grid {
+      display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px;
+    }
+    @media (max-width: 768px) { .related-grid { grid-template-columns: repeat(2, 1fr); } }
+
+    .related-card {
+      border-radius: 10px; overflow: hidden; cursor: pointer;
+      transition: transform .18s; position: relative;
+      aspect-ratio: 4/5;
+      background: var(--dark);
+    }
+    .related-card:hover { transform: translateY(-3px); }
+    .related-card .overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,.8) 40%, transparent 100%); }
+    .related-card .info { position: absolute; bottom: 0; left: 0; right: 0; padding: 12px; }
+    .related-card .cat { font-size: 10px; font-weight: 700; background: var(--yellow); color: var(--black); padding: 2px 6px; border-radius: 4px; margin-bottom: 6px; display: inline-block; }
+    .related-card .ttl { font-size: 12px; font-weight: 600; color: #fff; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+    /* ── 용어 팝오버 ── */
+    #term-popover {
+      position: fixed; z-index: 200;
+      background: var(--dark); color: #fff;
+      padding: 14px 18px; border-radius: 12px;
+      max-width: 260px; font-size: 13px; line-height: 1.6;
+      box-shadow: 0 8px 32px rgba(0,0,0,.3);
+      display: none;
+    }
+    #term-popover .term-name { font-weight: 800; color: var(--yellow); margin-bottom: 6px; }
+    #term-popover .term-def  { color: rgba(255,255,255,.85); }
+
+    /* ── 토스트 ── */
+    #toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); background: var(--black); color: #fff; padding: 12px 24px; border-radius: 24px; font-size: 14px; font-weight: 600; opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 999; }
+    #toast.show { opacity: 1; }
+
+    /* ── 스켈레톤 ── */
+    .skel { background: linear-gradient(90deg,#e0e0e0 25%,#f0f0f0 50%,#e0e0e0 75%); background-size:200% 100%; animation: shimmer 1.4s infinite; border-radius: 8px; }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+    .skel-title { height: 36px; margin-bottom: 12px; }
+    .skel-text  { height: 16px; margin-bottom: 10px; }
+    .skel-text.w80 { width: 80%; }
+    .skel-text.w60 { width: 60%; }
+  </style>
+</head>
+<body>
+
+<!-- 헤더 -->
+<header>
+  <a href="home.html" class="logo">
+    <div class="logo-box">🐝</div>
+    유스레터
+  </a>
+  <nav>
+    <a href="home.html">홈</a>
+    <a href="#">읽어보기</a>
+    <a href="#">찾아보기</a>
+  </nav>
+  <button class="btn-start" onclick="location.href='home.html'">홈으로</button>
+</header>
+
+<!-- 브레드크럼 -->
+<div class="breadcrumb">
+  <button class="back-btn" onclick="history.back()">← 홈</button>
+</div>
+
+<!-- 본문 레이아웃 -->
+<div class="layout">
+  <!-- 기사 본문 -->
+  <article class="article" id="article">
+    <!-- 로딩 스켈레톤 -->
+    <div class="skel skel-title" style="width:60%;margin-bottom:16px"></div>
+    <div class="skel" style="width:100%;aspect-ratio:16/9;border-radius:14px;margin-bottom:24px"></div>
+    <div class="skel skel-title"></div>
+    <div class="skel skel-text"></div>
+    <div class="skel skel-text w80"></div>
+    <div class="skel skel-text w60"></div>
+  </article>
+
+  <!-- 사이드바 -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-card">
+      <div class="sidebar-card-title">
+        <span>💡</span> 여기서 잠깐
+        <span class="badge">학습</span>
+      </div>
+      <div class="qa-question">Q. 어떻게 신청하면 될까요?</div>
+      <ul class="qa-list">
+        <li><span class="qa-num">1</span><span>신청 자격 확인하기</span></li>
+        <li><span class="qa-num">2</span><span>온라인 신청 또는 방문 접수</span></li>
+        <li><span class="qa-num">3</span><span>서류 준비 및 제출</span></li>
+        <li><span class="qa-num">4</span><span>심사 후 지원금 지급</span></li>
+      </ul>
+    </div>
+
+    <div class="bookmark-card" id="bookmark-card">
+      <div class="icon">🤍</div>
+      <p>이 뉴스가 마음에 드셨나요?<br>북마크로 저장해두세요</p>
+      <button class="btn-bm-add" id="bm-btn" onclick="toggleBookmark()">북마크 추가</button>
+    </div>
+  </aside>
+</div>
+
+<!-- 관련 콘텐츠 -->
+<section class="related-section">
+  <h2>관련 콘텐츠</h2>
+  <div class="related-grid" id="related-grid">
+    <div class="skel" style="aspect-ratio:4/5;border-radius:10px"></div>
+    <div class="skel" style="aspect-ratio:4/5;border-radius:10px"></div>
+    <div class="skel" style="aspect-ratio:4/5;border-radius:10px"></div>
+    <div class="skel" style="aspect-ratio:4/5;border-radius:10px"></div>
+  </div>
+</section>
+
+<!-- 용어 팝오버 -->
+<div id="term-popover">
+  <div class="term-name" id="pop-name"></div>
+  <div class="term-def" id="pop-def"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  const BASE = 'http://localhost:8080';
+  const params = new URLSearchParams(location.search);
+  const newsId = params.get('id') || 1;
+  let isBookmarked = false;
+
+  // ── 날짜/카테고리 포맷 ──
+  function fmtDate(dt) {
+    if (!dt) return '';
+    const d = new Date(dt);
+    return `${d.getFullYear()}. ${d.getMonth()+1}. ${d.getDate()}`;
+  }
+  function labelCat(cat) {
+    return { ECONOMY:'경제',STOCK:'투자',INSURANCE:'보험',LOAN:'대출',POLICY:'정책',YOUTH:'청년금융' }[cat] || cat || '금융';
+  }
+
+  // ── 그라디언트 (이미지 대체) ──
+  const GRADS = [
+    'linear-gradient(135deg,#1a1a2e,#0f3460)',
+    'linear-gradient(135deg,#2c3e50,#3498db)',
+    'linear-gradient(135deg,#1e3c72,#2a5298)',
+    'linear-gradient(135deg,#134e5e,#71b280)',
+    'linear-gradient(135deg,#373b44,#4286f4)',
+  ];
+
+  // ── 기사 렌더 ──
+  function renderArticle(d) {
+    const cat = labelCat(d.category);
+    const summary = d.summary || '뉴스 AI 요약을 준비 중입니다.\n크롤링 완료 후 자동으로 요약이 생성됩니다.\n현재는 원문을 확인해 주세요.';
+
+    // 용어 하이라이트 처리
+    let content = d.content || '';
+    if (d.termHighlights && d.termHighlights.length) {
+      // 역순 치환 (인덱스 밀림 방지)
+      const sorted = [...d.termHighlights].sort((a,b) => b.positionStart - a.positionStart);
+      for (const h of sorted) {
+        const before = content.slice(0, h.positionStart);
+        const term   = content.slice(h.positionStart, h.positionEnd);
+        const after  = content.slice(h.positionEnd);
+        content = before
+          + `<mark class="term-highlight"
+               data-def="${escHtml(h.simpleDefinition)}"
+               style="background:rgba(255,214,0,.35);cursor:pointer;border-radius:3px;padding:0 2px"
+               onmouseenter="showPop(event,'${escHtml(h.termName)}','${escHtml(h.simpleDefinition)}')"
+               onmouseleave="hidePop()">${term}</mark>`
+          + after;
+      }
+    }
+
+    // 본문 단락 분리
+    const paragraphs = content
+      .split(/\n+/)
+      .filter(p => p.trim())
+      .map(p => `<p>${p}</p>`)
+      .join('');
+
+    // 관련 용어 칩
+    const termChips = d.termHighlights && d.termHighlights.length
+      ? d.termHighlights.map(h =>
+          `<span class="term-chip" onclick="showToast('${h.termName}: ${h.simpleDefinition}')">${h.termName}</span>`
+        ).join('')
+      : '<span class="term-chip">금융용어</span><span class="term-chip">청년정책</span><span class="term-chip">지원금</span>';
+
+    document.getElementById('article').innerHTML = `
+      <div class="article-badge">📰 오늘의 브리핑</div>
+
+      <div class="article-hero" style="background:${GRADS[newsId % GRADS.length]}">
+        🏙️
+      </div>
+
+      <h1 class="article-title">${d.title}</h1>
+
+      <div class="article-meta">
+        <span>${d.sourceName || '한국경제'}</span>
+        <span class="meta-dot">·</span>
+        <span>${labelCat(d.category)}</span>
+        <span class="meta-dot">·</span>
+        <span>${fmtDate(d.publishedAt)}</span>
+      </div>
+
+      <div class="pintbot-summary">
+        <div class="pintbot-header">
+          <span class="pintbot-icon">🐝</span>
+          <span class="pintbot-label">핀트봇 3줄 요약</span>
+          <span class="pintbot-sublabel">${d.modelVersion ? 'AI 요약' : 'stub 모드'}</span>
+        </div>
+        <div class="pintbot-text">${summary}</div>
+      </div>
+
+      <div class="terms-section">
+        <div class="terms-title">📌 이 기사의 주요 용어</div>
+        <div class="terms-list">${termChips}</div>
+      </div>
+
+      <div class="article-actions">
+        <button class="action-btn primary" onclick="readArticle()">
+          <span>✅</span> 읽음 처리
+        </button>
+        <button class="action-btn" onclick="toggleBookmark()">
+          <span id="bm-icon-action">🤍</span> 북마크
+        </button>
+        <a class="action-btn" href="${d.sourceUrl || '#'}" target="_blank" rel="noopener">
+          <span>🔗</span> 원문 보기
+        </a>
+      </div>
+
+      <div class="article-body">${paragraphs || '<p>뉴스 본문이 없습니다. 크롤링 후 다시 확인해 주세요.</p>'}</div>
+    `;
+
+    document.title = d.title + ' — 유스레터';
+  }
+
+  function escHtml(str) {
+    if (!str) return '';
+    return str.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // ── 사이드바 Q&A 업데이트 ──
+  function updateSidebar(d) {
+    // summary를 줄 단위로 분리해서 Q&A 형식으로
+    const lines = (d.summary || '').split(/\n/).filter(l => l.trim());
+    if (lines.length > 1) {
+      const items = lines.map((line, i) =>
+        `<li><span class="qa-num">${i+1}</span><span>${line.trim()}</span></li>`
+      ).join('');
+      document.querySelector('.qa-list').innerHTML = items;
+      document.querySelector('.qa-question').textContent = 'Q. 이 기사를 3줄로 요약하면?';
+    }
+  }
+
+  // ── 관련 뉴스 렌더 ──
+  function renderRelated(articles, currentId) {
+    const list = articles.filter(a => a.id != currentId).slice(0, 4);
+    if (!list.length) { document.getElementById('related-grid').innerHTML = '<p style="color:#888;grid-column:1/-1">관련 뉴스가 없습니다.</p>'; return; }
+
+    document.getElementById('related-grid').innerHTML = list.map((a, i) => `
+      <div class="related-card" onclick="location.href='news-detail.html?id=${a.id}'"
+           style="background:${GRADS[i % GRADS.length]}">
+        <div class="overlay"></div>
+        <div class="info">
+          <span class="cat">${labelCat(a.category)}</span>
+          <p class="ttl">${a.title}</p>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  // ── 읽음 처리 ──
+  async function readArticle() {
+    const at = localStorage.getItem('accessToken');
+    if (!at) { showToast('로그인 후 이용해주세요'); return; }
+    try {
+      await fetch(BASE + '/api/news/' + newsId + '/read', {
+        method: 'POST', headers: { 'Authorization': 'Bearer ' + at }
+      });
+      showToast('읽음 처리 완료 ✅');
+    } catch(e) { showToast('잠시 후 다시 시도해주세요'); }
+  }
+
+  // ── 북마크 토글 ──
+  async function toggleBookmark() {
+    const at = localStorage.getItem('accessToken');
+    if (!at) { showToast('로그인 후 북마크를 사용할 수 있어요'); return; }
+    try {
+      const res = await fetch(BASE + '/api/news/' + newsId + '/bookmark', {
+        method: 'POST', headers: { 'Authorization': 'Bearer ' + at }
+      });
+      const json = await res.json();
+      isBookmarked = json.data?.bookmarked ?? !isBookmarked;
+      updateBmUI();
+      showToast(isBookmarked ? '북마크에 추가했어요 ❤️' : '북마크에서 제거했어요');
+    } catch(e) { showToast('잠시 후 다시 시도해주세요'); }
+  }
+
+  function updateBmUI() {
+    const btn = document.getElementById('bm-btn');
+    const icon = document.getElementById('bm-icon-action');
+    const cardIcon = document.querySelector('.bookmark-card .icon');
+    if (btn) {
+      btn.textContent = isBookmarked ? '북마크 해제' : '북마크 추가';
+      btn.classList.toggle('bookmarked', isBookmarked);
+    }
+    if (icon) icon.textContent = isBookmarked ? '❤️' : '🤍';
+    if (cardIcon) cardIcon.textContent = isBookmarked ? '❤️' : '🤍';
+  }
+
+  // ── 용어 팝오버 ──
+  function showPop(e, name, def) {
+    const pop = document.getElementById('term-popover');
+    document.getElementById('pop-name').textContent = name;
+    document.getElementById('pop-def').textContent = def;
+    pop.style.display = 'block';
+    pop.style.left = Math.min(e.clientX + 12, window.innerWidth - 280) + 'px';
+    pop.style.top  = (e.clientY - pop.offsetHeight - 8) + 'px';
+  }
+  function hidePop() {
+    document.getElementById('term-popover').style.display = 'none';
+  }
+
+  // ── 토스트 ──
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  // ── 모의 데이터 ──
+  const MOCK = {
+    id: 1,
+    title: '부산시, \'청년 로컬크리에이터\' 키운다... 최대 6000만원 지원',
+    category: 'POLICY',
+    publishedAt: '2026-04-10T09:00:00',
+    sourceName: '한국경제',
+    sourceUrl: '#',
+    summary: '부산시가 청년 창업자를 위한 대규모 지원 프로그램을 시작합니다.\n만 19~39세 청년이라면 누구나 신청할 수 있으며 최대 6000만원을 지원받을 수 있습니다.\n온라인 신청은 4월 15일부터 시작되니 서두르세요.',
+    content: `부산시는 2026년부터 청년 로컬크리에이터 육성 사업을 본격적으로 추진한다고 밝혔습니다. 이번 사업은 지역 기반 창업 생태계를 활성화하고 청년들의 경제적 자립을 돕기 위해 마련됐습니다.
+
+지원 대상은 부산에 거주하거나 창업을 희망하는 만 19세~39세 청년으로, 1인당 최대 6000만원의 사업화 자금이 지원됩니다. 또한 창업 컨설팅, 멘토링, 네트워킹 기회도 함께 제공될 예정입니다.
+
+신청 기간은 오는 4월 15일부터 5월 15일까지이며, 부산시 청년정책과 홈페이지를 통해 온라인으로 접수할 수 있습니다. 선정된 청년에게는 최대 24개월간 지원이 이루어집니다.
+
+부산시 관계자는 "청년들이 아이디어를 현실로 만들 수 있도록 행정적·재정적 지원을 아끼지 않겠다"며 "지역 경제의 새로운 활력이 되길 기대한다"고 말했습니다.
+
+이번 사업은 올해 처음 시행되는 만큼 부산시는 첫해 100명을 선발하고, 내년에는 규모를 두 배로 늘릴 계획입니다.`,
+    termHighlights: [
+      { termId: 1, termName: '청년', simpleDefinition: '만 19세에서 39세 사이의 젊은 세대를 뜻해요. 청년 정책에서는 나이 기준이 중요해요!', positionStart: 0, positionEnd: 2 },
+    ]
+  };
+
+  const MOCK_LIST = [
+    { id:2, title:'청년 월세 지원 4월 신청 시작', category:'POLICY' },
+    { id:3, title:'ETF 투자, 이것만 알고 시작하세요', category:'STOCK' },
+    { id:4, title:'청년내일저축계좌 신청 방법 총정리', category:'POLICY' },
+    { id:5, title:'금리 인하 시대, 내 적금 전략은', category:'ECONOMY' },
+  ];
+
+  // ── 메인 로드 ──
+  async function loadDetail() {
+    try {
+      const at = localStorage.getItem('accessToken');
+      const headers = at ? { 'Authorization': 'Bearer ' + at } : {};
+
+      const [detailRes, listRes] = await Promise.all([
+        fetch(BASE + '/api/news/' + newsId, { headers }),
+        fetch(BASE + '/api/news/today',     { headers }),
+      ]);
+
+      const detail = await detailRes.json();
+      const list   = await listRes.json();
+
+      const article = detail.data;
+      const related = list.data || [];
+
+      if (article) {
+        renderArticle(article);
+        updateSidebar(article);
+        renderRelated(related, newsId);
+        // 읽음 자동 기록
+        if (at) {
+          fetch(BASE + '/api/news/' + newsId + '/read?durationSeconds=0', {
+            method: 'POST', headers: { 'Authorization': 'Bearer ' + at }
+          }).catch(() => {});
+        }
+      } else {
+        renderArticle(MOCK);
+        updateSidebar(MOCK);
+        renderRelated(MOCK_LIST, newsId);
+      }
+    } catch(e) {
+      renderArticle(MOCK);
+      updateSidebar(MOCK);
+      renderRelated(MOCK_LIST, newsId);
+    }
+  }
+
+  loadDetail();
+</script>
+</body>
+</html>
