@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>유스레터 API 테스트</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; }
+    .container { max-width: 960px; margin: 0 auto; padding: 20px; }
+
+    /* Header */
+    header { background: #1a1a2e; color: white; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; }
+    header h1 { font-size: 18px; font-weight: 700; }
+    #token-status { font-size: 13px; padding: 6px 14px; border-radius: 20px; background: #dc3545; color: white; }
+    #token-status.logged-in { background: #28a745; }
+
+    /* Sections */
+    .section { background: white; border-radius: 8px; padding: 20px; margin-top: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+    .section h2 { font-size: 15px; font-weight: 700; color: #1a1a2e; margin-bottom: 16px; padding-bottom: 10px; border-bottom: 2px solid #f0f0f0; }
+
+    /* Grid */
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .card { border: 1px solid #e8e8e8; border-radius: 6px; padding: 14px; }
+    .card h3 { font-size: 13px; font-weight: 600; color: #555; margin-bottom: 10px; }
+
+    /* Form */
+    input, textarea { width: 100%; padding: 8px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; margin-bottom: 8px; }
+    textarea { height: 80px; resize: vertical; font-family: monospace; }
+    label { font-size: 12px; color: #777; display: block; margin-bottom: 3px; }
+
+    /* Buttons */
+    .btn { display: inline-block; padding: 8px 16px; border: none; border-radius: 4px; font-size: 13px; font-weight: 600; cursor: pointer; width: 100%; margin-top: 4px; transition: opacity .15s; }
+    .btn:hover { opacity: .85; }
+    .btn-primary { background: #4361ee; color: white; }
+    .btn-success { background: #28a745; color: white; }
+    .btn-danger  { background: #dc3545; color: white; }
+    .btn-warning { background: #ffc107; color: #333; }
+    .btn-kakao   { background: #FEE500; color: #191919; }
+    .btn-google  { background: #4285F4; color: white; }
+    .btn-outline { background: white; color: #4361ee; border: 1px solid #4361ee; }
+
+    /* Response */
+    #response-box { background: #1e1e1e; color: #d4d4d4; border-radius: 6px; padding: 14px; font-family: 'Courier New', monospace; font-size: 12px; white-space: pre-wrap; word-break: break-all; min-height: 100px; max-height: 400px; overflow-y: auto; margin-top: 16px; }
+    #response-box .ok   { color: #4ec9b0; }
+    #response-box .err  { color: #f14c4c; }
+
+    /* Token display */
+    #token-display { font-size: 11px; word-break: break-all; color: #555; background: #f8f8f8; padding: 8px; border-radius: 4px; margin-top: 8px; }
+
+    .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 10px; margin-left: 8px; }
+    .tag-get    { background: #e3f2fd; color: #1565c0; }
+    .tag-post   { background: #e8f5e9; color: #2e7d32; }
+    .tag-patch  { background: #fff8e1; color: #f57f17; }
+    .tag-put    { background: #f3e5f5; color: #7b1fa2; }
+    .tag-delete { background: #fce4ec; color: #c62828; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>유스레터 API 테스트 콘솔</h1>
+  <span id="token-status">미인증</span>
+</header>
+
+<div class="container">
+
+  <!-- 현재 토큰 -->
+  <div class="section">
+    <h2>현재 토큰</h2>
+    <div id="token-display">저장된 토큰 없음</div>
+    <button class="btn btn-danger" style="margin-top:8px;width:auto;padding:6px 14px;" onclick="clearTokens()">토큰 삭제 (로그아웃)</button>
+  </div>
+
+  <!-- Auth -->
+  <div class="section">
+    <h2>모듈 1. Auth (인증)</h2>
+    <div class="grid">
+
+      <!-- 이메일 회원가입 -->
+      <div class="card">
+        <h3>AUTH-01 이메일 회원가입 <span class="tag tag-post">POST</span></h3>
+        <label>이메일</label>
+        <input id="signup-email" type="email" placeholder="test@example.com" value="test2@example.com">
+        <label>비밀번호 (8자 이상)</label>
+        <input id="signup-pw" type="password" placeholder="password123" value="password123">
+        <label>이름</label>
+        <input id="signup-name" placeholder="홍길동" value="홍길동">
+        <label>닉네임 (2~30자)</label>
+        <input id="signup-nickname" placeholder="길동이" value="길동이">
+        <button class="btn btn-primary" onclick="signup()">회원가입</button>
+      </div>
+
+      <!-- 이메일 로그인 -->
+      <div class="card">
+        <h3>AUTH-02 이메일 로그인 <span class="tag tag-post">POST</span></h3>
+        <label>이메일</label>
+        <input id="login-email" type="email" placeholder="test@example.com" value="test2@example.com">
+        <label>비밀번호</label>
+        <input id="login-pw" type="password" placeholder="password123" value="password123">
+        <button class="btn btn-success" onclick="login()">로그인</button>
+
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid #f0f0f0;">
+          <h3>소셜 로그인</h3>
+          <button class="btn btn-kakao" style="margin-top:4px;" onclick="oauthLogin('kakao')">카카오 로그인</button>
+          <button class="btn btn-google" style="margin-top:4px;" onclick="oauthLogin('google')">구글 로그인</button>
+        </div>
+      </div>
+
+      <!-- 토큰 재발급 -->
+      <div class="card">
+        <h3>AUTH-05 토큰 재발급 <span class="tag tag-post">POST</span></h3>
+        <p style="font-size:12px;color:#777;margin-bottom:8px;">저장된 Refresh Token으로 재발급</p>
+        <button class="btn btn-warning" onclick="reissue()">토큰 재발급</button>
+      </div>
+
+      <!-- 로그아웃 / 회원탈퇴 -->
+      <div class="card">
+        <h3>AUTH-06 로그아웃 <span class="tag tag-post">POST</span> / AUTH-07 탈퇴 <span class="tag tag-delete">DELETE</span></h3>
+        <button class="btn btn-outline" onclick="logout()">로그아웃</button>
+        <button class="btn btn-danger" style="margin-top:8px;" onclick="withdraw()">회원 탈퇴</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- User Profile -->
+  <div class="section">
+    <h2>모듈 2. User Profile (사용자 프로필)</h2>
+    <div class="grid">
+
+      <!-- 내 프로필 조회 -->
+      <div class="card">
+        <h3>USER-01 내 프로필 조회 <span class="tag tag-get">GET</span></h3>
+        <button class="btn btn-primary" onclick="getProfile()">프로필 조회</button>
+      </div>
+
+      <!-- 프로필 수정 -->
+      <div class="card">
+        <h3>USER-02 프로필 수정 <span class="tag tag-patch">PATCH</span></h3>
+        <label>닉네임</label>
+        <input id="update-nickname" placeholder="새닉네임">
+        <button class="btn btn-warning" onclick="updateProfile()">닉네임 수정</button>
+      </div>
+
+      <!-- 관심 카테고리 -->
+      <div class="card">
+        <h3>USER-03 관심 카테고리 설정 <span class="tag tag-put">PUT</span></h3>
+        <label>카테고리 (체크박스)</label>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;margin-top:4px;">
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#333;"><input type="checkbox" class="cat" value="경제"> 경제</label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#333;"><input type="checkbox" class="cat" value="투자"> 투자</label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#333;"><input type="checkbox" class="cat" value="보험"> 보험</label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#333;"><input type="checkbox" class="cat" value="대출"> 대출</label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#333;"><input type="checkbox" class="cat" value="정책"> 정책</label>
+          <label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;color:#333;"><input type="checkbox" class="cat" value="청년금융"> 청년금융</label>
+        </div>
+        <button class="btn btn-primary" onclick="updateCategories()">카테고리 저장</button>
+      </div>
+
+      <!-- 정책 추천 프로필 -->
+      <div class="card">
+        <h3>USER-04 정책 추천 프로필 <span class="tag tag-put">PUT</span></h3>
+        <label>생년월일</label>
+        <input id="policy-birth" type="date" value="2000-01-15">
+        <label>거주 지역 코드</label>
+        <input id="policy-region" placeholder="예: 26 (부산)" value="26">
+        <label>직업 (STUDENT / EMPLOYED / UNEMPLOYED)</label>
+        <input id="policy-occupation" placeholder="STUDENT" value="STUDENT">
+        <label>소득 구간 (LOW / BELOW_MEDIAN / BELOW_200PCT)</label>
+        <input id="policy-income" placeholder="LOW" value="LOW">
+        <button class="btn btn-primary" onclick="updatePolicyProfile()">정책 프로필 저장</button>
+      </div>
+
+      <!-- 학습 현황 -->
+      <div class="card">
+        <h3>USER-05 학습 진행 현황 <span class="tag tag-get">GET</span></h3>
+        <button class="btn btn-primary" onclick="getLearningStats()">학습 현황 조회</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- News -->
+  <div class="section">
+    <h2>모듈 3. News (뉴스)</h2>
+    <div class="grid">
+
+      <div class="card">
+        <h3>NEWS-01 뉴스 목록 <span class="tag tag-get">GET</span></h3>
+        <label>카테고리 (빈칸=전체)</label>
+        <input id="news-category" placeholder="ECONOMY / STOCK / INSURANCE ...">
+        <button class="btn btn-primary" onclick="getNewsList()">목록 조회</button>
+      </div>
+
+      <div class="card">
+        <h3>NEWS-06 오늘의 뉴스 <span class="tag tag-get">GET</span></h3>
+        <p style="font-size:12px;color:#777;margin-bottom:8px;">로그인 시 관심 카테고리 우선 정렬, 최대 12건</p>
+        <button class="btn btn-primary" onclick="api('GET','/api/news/today')">오늘 브리핑</button>
+      </div>
+
+      <div class="card">
+        <h3>NEWS-02 뉴스 상세 <span class="tag tag-get">GET</span></h3>
+        <label>기사 ID</label>
+        <input id="news-detail-id" placeholder="1" value="1">
+        <button class="btn btn-primary" onclick="getNewsDetail()">상세 조회</button>
+      </div>
+
+      <div class="card">
+        <h3>NEWS-03 읽음 처리 <span class="tag tag-post">POST</span></h3>
+        <label>기사 ID</label>
+        <input id="news-read-id" placeholder="1" value="1">
+        <label>읽은 시간(초, 선택)</label>
+        <input id="news-read-sec" placeholder="30" value="30">
+        <button class="btn btn-success" onclick="markNewsRead()">읽음 처리</button>
+      </div>
+
+      <div class="card">
+        <h3>NEWS-04 북마크 토글 <span class="tag tag-post">POST</span></h3>
+        <label>기사 ID</label>
+        <input id="news-bm-id" placeholder="1" value="1">
+        <button class="btn btn-warning" onclick="toggleNewsBookmark()">북마크 토글</button>
+      </div>
+
+      <div class="card">
+        <h3>NEWS-05 내 북마크 목록 <span class="tag tag-get">GET</span></h3>
+        <button class="btn btn-primary" onclick="api('GET','/api/users/me/bookmarks')">북마크 조회</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Term -->
+  <div class="section">
+    <h2>모듈 4. Term (용어 사전)</h2>
+    <div class="grid">
+
+      <div class="card">
+        <h3>TERM-02 용어 목록 <span class="tag tag-get">GET</span></h3>
+        <button class="btn btn-primary" onclick="api('GET','/api/terms')">전체 목록</button>
+      </div>
+
+      <div class="card">
+        <h3>TERM-01 용어 상세 <span class="tag tag-get">GET</span></h3>
+        <label>용어 ID</label>
+        <input id="term-id" placeholder="1" value="1">
+        <button class="btn btn-primary" onclick="getTerm()">상세 조회</button>
+      </div>
+
+      <div class="card">
+        <h3>TERM-05 용어 검색 <span class="tag tag-get">GET</span></h3>
+        <label>검색어</label>
+        <input id="term-search-q" placeholder="주식" value="주식">
+        <button class="btn btn-primary" onclick="searchTerms()">검색</button>
+        <button class="btn btn-outline" style="margin-top:4px;" onclick="autocompleteTerms()">자동완성</button>
+      </div>
+
+      <div class="card">
+        <h3>TERM-03 학습 완료 처리 <span class="tag tag-post">POST</span></h3>
+        <label>용어 ID</label>
+        <input id="term-learn-id" placeholder="1" value="1">
+        <button class="btn btn-success" onclick="learnTerm()">학습 완료</button>
+      </div>
+
+      <div class="card">
+        <h3>TERM-04 내가 학습한 용어 <span class="tag tag-get">GET</span></h3>
+        <button class="btn btn-primary" onclick="api('GET','/api/users/me/learned-terms')">학습 용어 목록</button>
+      </div>
+
+      <div class="card">
+        <h3>카테고리별 용어 <span class="tag tag-get">GET</span></h3>
+        <label>ltree 경로</label>
+        <input id="term-path" placeholder="finance.stock" value="finance">
+        <button class="btn btn-primary" onclick="getTermsByCategory()">조회</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Admin -->
+  <div class="section">
+    <h2>모듈 9. Admin</h2>
+    <div class="grid">
+      <div class="card">
+        <h3>NEWS-08 수동 크롤링 <span class="tag tag-post">POST</span></h3>
+        <button class="btn btn-danger" onclick="api('POST','/api/admin/crawl/trigger')">크롤링 실행</button>
+      </div>
+      <div class="card">
+        <h3>NEWS-09 크롤링 상태 <span class="tag tag-get">GET</span></h3>
+        <button class="btn btn-primary" onclick="api('GET','/api/admin/crawl/status')">상태 조회</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 응답 -->
+  <div class="section">
+    <h2>API 응답</h2>
+    <div id="response-box">응답이 여기에 표시됩니다.</div>
+  </div>
+
+</div>
+
+<script>
+  const BASE = 'http://localhost:8080';
+
+  // ── 토큰 관리 ──────────────────────────────────────────
+  function getAccessToken()  { return localStorage.getItem('accessToken'); }
+  function getRefreshToken() { return localStorage.getItem('refreshToken'); }
+
+  function saveTokens(access, refresh) {
+    localStorage.setItem('accessToken', access);
+    localStorage.setItem('refreshToken', refresh);
+    updateTokenUI();
+  }
+
+  function clearTokens() {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    updateTokenUI();
+    showResponse({ message: '토큰이 삭제됐습니다.' });
+  }
+
+  function updateTokenUI() {
+    const at = getAccessToken();
+    const status = document.getElementById('token-status');
+    const display = document.getElementById('token-display');
+    if (at) {
+      status.textContent = '인증됨';
+      status.className = 'logged-in';
+      display.innerHTML =
+        '<b>Access Token:</b><br>' + at + '<br><br>' +
+        '<b>Refresh Token:</b><br>' + getRefreshToken();
+    } else {
+      status.textContent = '미인증';
+      status.className = '';
+      display.textContent = '저장된 토큰 없음';
+    }
+  }
+
+  // ── API 공통 헬퍼 ───────────────────────────────────────
+  async function api(method, path, body) {
+    const headers = { 'Content-Type': 'application/json' };
+    const at = getAccessToken();
+    if (at) headers['Authorization'] = 'Bearer ' + at;
+
+    const opts = { method, headers };
+    if (body) opts.body = JSON.stringify(body);
+
+    try {
+      const res = await fetch(BASE + path, opts);
+      const json = await res.json();
+      showResponse(json, res.ok);
+      return json;
+    } catch(e) {
+      showResponse({ error: e.message }, false);
+    }
+  }
+
+  function showResponse(data, ok = true) {
+    const box = document.getElementById('response-box');
+    const cls = ok ? 'ok' : 'err';
+    box.innerHTML = '<span class="' + cls + '">' + JSON.stringify(data, null, 2) + '</span>';
+  }
+
+  // ── OAuth2 콜백 처리 (페이지 로드 시) ───────────────────
+  (function handleOAuthCallback() {
+    const params = new URLSearchParams(window.location.search);
+    const at = params.get('accessToken');
+    const rt = params.get('refreshToken');
+    if (at && rt) {
+      saveTokens(at, rt);
+      // URL에서 토큰 파라미터 제거
+      window.history.replaceState({}, '', '/test.html');
+      showResponse({ message: 'OAuth2 로그인 성공!', accessToken: at.substring(0,30) + '...' });
+    }
+  })();
+
+  updateTokenUI();
+
+  // ── Auth ────────────────────────────────────────────────
+  async function signup() {
+    const res = await api('POST', '/api/auth/signup', {
+      email:    document.getElementById('signup-email').value,
+      password: document.getElementById('signup-pw').value,
+      name:     document.getElementById('signup-name').value,
+      nickname: document.getElementById('signup-nickname').value,
+    });
+    if (res && res.data) saveTokens(res.data.accessToken, res.data.refreshToken);
+  }
+
+  async function login() {
+    const res = await api('POST', '/api/auth/login', {
+      email:    document.getElementById('login-email').value,
+      password: document.getElementById('login-pw').value,
+    });
+    if (res && res.data) saveTokens(res.data.accessToken, res.data.refreshToken);
+  }
+
+  function oauthLogin(provider) {
+    window.location.href = BASE + '/oauth2/authorization/' + provider;
+  }
+
+  async function reissue() {
+    const rt = getRefreshToken();
+    if (!rt) { showResponse({ error: 'Refresh Token 없음' }, false); return; }
+    const res = await api('POST', '/api/auth/reissue', { refreshToken: rt });
+    if (res && res.data) saveTokens(res.data.accessToken, res.data.refreshToken);
+  }
+
+  async function logout() {
+    await api('POST', '/api/auth/logout');
+    clearTokens();
+  }
+
+  async function withdraw() {
+    if (!confirm('정말 탈퇴하시겠습니까?')) return;
+    await api('DELETE', '/api/auth/withdraw');
+    clearTokens();
+  }
+
+  // ── User Profile ────────────────────────────────────────
+  function getProfile()      { api('GET',   '/api/users/me'); }
+  function getLearningStats(){ api('GET',   '/api/users/me/learning-stats'); }
+
+  function updateProfile() {
+    api('PATCH', '/api/users/me', {
+      nickname: document.getElementById('update-nickname').value || undefined
+    });
+  }
+
+  function updateCategories() {
+    const checked = [...document.querySelectorAll('.cat:checked')].map(el => el.value);
+    api('PUT', '/api/users/me/categories', { categories: checked });
+  }
+
+  function updatePolicyProfile() {
+    api('PUT', '/api/users/me/policy-profile', {
+      birthDate:  document.getElementById('policy-birth').value || null,
+      regionCode: document.getElementById('policy-region').value || null,
+      occupation: document.getElementById('policy-occupation').value || null,
+      incomeLevel:document.getElementById('policy-income').value || null,
+    });
+  }
+
+  // ── News ────────────────────────────────────────────────
+  function getNewsList() {
+    const cat = document.getElementById('news-category').value;
+    const qs = cat ? '?category=' + cat : '';
+    api('GET', '/api/news' + qs);
+  }
+
+  function getNewsDetail() {
+    api('GET', '/api/news/' + document.getElementById('news-detail-id').value);
+  }
+
+  function markNewsRead() {
+    const id  = document.getElementById('news-read-id').value;
+    const sec = document.getElementById('news-read-sec').value;
+    api('POST', '/api/news/' + id + '/read?durationSeconds=' + (sec || ''));
+  }
+
+  function toggleNewsBookmark() {
+    api('POST', '/api/news/' + document.getElementById('news-bm-id').value + '/bookmark');
+  }
+
+  // ── Term ────────────────────────────────────────────────
+  function getTerm() {
+    api('GET', '/api/terms/' + document.getElementById('term-id').value);
+  }
+
+  function searchTerms() {
+    api('GET', '/api/terms/search?query=' + document.getElementById('term-search-q').value);
+  }
+
+  function autocompleteTerms() {
+    api('GET', '/api/terms/autocomplete?query=' + document.getElementById('term-search-q').value);
+  }
+
+  function learnTerm() {
+    api('POST', '/api/terms/' + document.getElementById('term-learn-id').value + '/learn');
+  }
+
+  function getTermsByCategory() {
+    api('GET', '/api/terms/category?path=' + document.getElementById('term-path').value);
+  }
+</script>
+</body>
+</html>

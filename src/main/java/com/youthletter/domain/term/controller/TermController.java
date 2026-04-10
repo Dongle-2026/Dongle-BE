@@ -1,13 +1,22 @@
 package com.youthletter.domain.term.controller;
 
+import com.youthletter.domain.term.dto.TermListResponse;
 import com.youthletter.domain.term.entity.FinancialTerm;
 import com.youthletter.domain.term.repository.FinancialTermRepository;
+import com.youthletter.domain.term.service.TermService;
+import com.youthletter.global.auth.jwt.CustomUserPrincipal;
 import com.youthletter.global.exception.BusinessException;
 import com.youthletter.global.exception.ErrorCode;
 import com.youthletter.global.response.GlobalResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,43 +28,63 @@ import java.util.List;
 public class TermController {
 
     private final FinancialTermRepository termRepository;
+    private final TermService termService;
+
+    @Operation(summary = "용어 전체 목록", description = "난이도순 정렬, 페이지네이션")
+    @GetMapping
+    public ResponseEntity<GlobalResponse<Page<TermListResponse>>> getTermList(
+            @PageableDefault(size = 20, sort = "difficultyLevel", direction = Sort.Direction.ASC)
+            Pageable pageable) {
+        Page<TermListResponse> result = termRepository.findAll(pageable)
+                .map(TermListResponse::from);
+        return ResponseEntity.ok(GlobalResponse.ok(result));
+    }
 
     @Operation(summary = "용어 상세 조회")
     @GetMapping("/{termId}")
-    public GlobalResponse<FinancialTerm> getTerm(@PathVariable Long termId) {
+    public ResponseEntity<GlobalResponse<FinancialTerm>> getTerm(@PathVariable Long termId) {
         FinancialTerm term = termRepository.findById(termId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TERM_NOT_FOUND));
-        return GlobalResponse.ok(term);
+        return ResponseEntity.ok(GlobalResponse.ok(term));
     }
 
-    @Operation(summary = "용어 검색 (전문 검색)", description = "tsvector 기반 한국어 검색")
+    @Operation(summary = "용어 학습 완료 처리", description = "학습 이력을 저장합니다")
+    @PostMapping("/{termId}/learn")
+    public ResponseEntity<GlobalResponse<Void>> learnTerm(
+            @AuthenticationPrincipal CustomUserPrincipal principal,
+            @PathVariable Long termId) {
+        termService.learnTerm(principal.getUserId(), termId);
+        return ResponseEntity.ok(GlobalResponse.ok("용어 학습 완료", null));
+    }
+
+    @Operation(summary = "용어 검색 (전문 검색)", description = "tsvector 기반")
     @GetMapping("/search")
-    public GlobalResponse<List<FinancialTerm>> searchTerms(
+    public ResponseEntity<GlobalResponse<List<FinancialTerm>>> searchTerms(
             @RequestParam String query,
             @RequestParam(defaultValue = "10") int limit) {
-        return GlobalResponse.ok(termRepository.searchByText(query, limit));
+        return ResponseEntity.ok(GlobalResponse.ok(termRepository.searchByText(query, limit)));
     }
 
-    @Operation(summary = "용어 자동완성", description = "pg_trgm 기반 유사 문자열 매칭")
+    @Operation(summary = "용어 자동완성", description = "pg_trgm 기반 유사 문자열")
     @GetMapping("/autocomplete")
-    public GlobalResponse<List<FinancialTerm>> autocomplete(
+    public ResponseEntity<GlobalResponse<List<FinancialTerm>>> autocomplete(
             @RequestParam String query,
             @RequestParam(defaultValue = "5") int limit) {
-        return GlobalResponse.ok(termRepository.findBySimilarName(query, limit));
+        return ResponseEntity.ok(GlobalResponse.ok(termRepository.findBySimilarName(query, limit)));
     }
 
-    @Operation(summary = "카테고리별 용어 조회", description = "ltree 경로 기반 하위 용어 전체 조회")
+    @Operation(summary = "카테고리별 용어 조회", description = "ltree 경로 기반 하위 용어")
     @GetMapping("/category")
-    public GlobalResponse<List<FinancialTerm>> getByCategory(
+    public ResponseEntity<GlobalResponse<List<FinancialTerm>>> getByCategory(
             @RequestParam String path) {
-        return GlobalResponse.ok(termRepository.findByPathDescendants(path));
+        return ResponseEntity.ok(GlobalResponse.ok(termRepository.findByPathDescendants(path)));
     }
 
     @Operation(summary = "난이도별 용어 조회")
     @GetMapping("/level")
-    public GlobalResponse<List<FinancialTerm>> getByLevel(
+    public ResponseEntity<GlobalResponse<List<FinancialTerm>>> getByLevel(
             @RequestParam(defaultValue = "3") Integer maxLevel) {
-        return GlobalResponse.ok(
-                termRepository.findByDifficultyLevelLessThanEqualOrderByNameAsc(maxLevel));
+        return ResponseEntity.ok(GlobalResponse.ok(
+                termRepository.findByDifficultyLevelLessThanEqualOrderByNameAsc(maxLevel)));
     }
 }

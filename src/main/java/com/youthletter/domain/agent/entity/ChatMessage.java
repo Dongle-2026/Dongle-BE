@@ -1,11 +1,13 @@
 package com.youthletter.domain.agent.entity;
 
 import com.youthletter.global.util.BaseEntity;
+import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Type;
 
 @Entity
 @Table(name = "chat_messages")
@@ -34,6 +36,7 @@ public class ChatMessage extends BaseEntity {
      * RAG Agent가 호출한 도구 기록 (JSON)
      * 예: [{"tool": "news_search", "query": "ETF 수수료", "results": 3}]
      */
+    @Type(JsonType.class)
     @Column(name = "tool_calls", columnDefinition = "jsonb")
     private String toolCalls;
 
@@ -41,6 +44,7 @@ public class ChatMessage extends BaseEntity {
      * 응답의 출처 정보 (JSON)
      * 예: [{"type": "news", "id": 123, "title": "ETF 투자 가이드"}]
      */
+    @Type(JsonType.class)
     @Column(columnDefinition = "jsonb")
     private String sources;
 

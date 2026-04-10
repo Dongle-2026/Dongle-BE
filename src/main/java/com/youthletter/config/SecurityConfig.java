@@ -44,16 +44,26 @@ public class SecurityConfig {
                 // 인증 없이 접근 가능
                 .requestMatchers(
                     "/api/auth/**",           // 로그인, 토큰 재발급
-                    "/api/news/**",           // 뉴스 목록/상세 (비로그인 허용)
-                    "/api/terms/**",          // 용어 사전 (비로그인 허용)
+                    "/api/news",              // 뉴스 목록 (비로그인 허용)
+                    "/api/news/today",        // 오늘 브리핑 (비로그인 허용, 로그인 시 개인화)
+                    "/api/news/{id}",         // 뉴스 상세 (비로그인 허용)
+                    "/api/terms",             // 용어 목록 (비로그인 허용)
+                    "/api/terms/search",      // 용어 검색 (비로그인 허용)
+                    "/api/terms/autocomplete",// 자동완성 (비로그인 허용)
+                    "/api/terms/category",    // 카테고리별 용어 (비로그인 허용)
+                    "/api/terms/level",       // 난이도별 용어 (비로그인 허용)
+                    "/api/terms/{id}",        // 용어 상세 (비로그인 허용)
                     "/api/guides/**",         // 가이드 (비로그인 허용)
                     "/oauth2/**",             // OAuth2 리다이렉트
                     "/login/oauth2/**",       // OAuth2 콜백
                     "/swagger-ui/**",         // Swagger UI
                     "/v3/api-docs/**",        // OpenAPI 명세
                     "/actuator/health",       // 헬스체크
-                    "/api/admin/**"           // 관리자 API (개발용)
+                    "/*.html",                // 정적 테스트 페이지
+                    "/favicon.ico"
                 ).permitAll()
+                // 관리자 API — ADMIN 역할 필요
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 // 나머지는 인증 필요
                 .anyRequest().authenticated()
             )

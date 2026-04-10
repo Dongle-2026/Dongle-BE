@@ -4,7 +4,11 @@ import com.youthletter.domain.news.entity.NewsArticle;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface NewsArticleRepository extends JpaRepository<NewsArticle, Long> {
@@ -26,4 +30,11 @@ public interface NewsArticleRepository extends JpaRepository<NewsArticle, Long> 
     boolean existsBySourceUrl(String sourceUrl);
 
     Optional<NewsArticle> findBySourceUrl(String sourceUrl);
+
+    /**
+     * 오늘 수집된 뉴스 (최대 limit건) — 홈 브리핑용
+     * crawledAt >= 오늘 자정 기준
+     */
+    @Query("SELECT a FROM NewsArticle a WHERE a.crawledAt >= :startOfDay ORDER BY a.publishedAt DESC")
+    List<NewsArticle> findTodayArticles(@Param("startOfDay") LocalDateTime startOfDay, Pageable pageable);
 }

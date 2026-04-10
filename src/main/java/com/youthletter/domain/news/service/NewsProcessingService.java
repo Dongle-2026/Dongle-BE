@@ -13,7 +13,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -24,6 +26,20 @@ public class NewsProcessingService {
     private final HankyungCrawlerService crawlerService;
     private final AiServiceClient aiServiceClient;
     private final NewsRepository newsRepository;
+
+    public record CrawlStatus(
+            LocalDateTime lastRunAt,
+            int savedCount,
+            int failedCount,
+            String status   // NEVER_RUN | RUNNING | SUCCESS | FAILED
+    ) {}
+
+    private final AtomicReference<CrawlStatus> lastStatus =
+            new AtomicReference<>(new CrawlStatus(null, 0, 0, "NEVER_RUN"));
+
+    public CrawlStatus getLastStatus() {
+        return lastStatus.get();
+    }
 
     /**
      * 6시간마다 자동 실행: 크롤링 -> AI 처리 -> DB 저장
@@ -40,8 +56,11 @@ public class NewsProcessingService {
      */
     @Transactional
     public int processAll() {
+        lastStatus.set(new CrawlStatus(LocalDateTime.now(), 0, 0, "RUNNING"));
+
         List<CrawledArticleDto> articles = crawlerService.crawl();
         int savedCount = 0;
+        int failedCount = 0;
 
         for (CrawledArticleDto article : articles) {
             try {
@@ -50,17 +69,10 @@ public class NewsProcessingService {
                     continue;
                 }
 
-                // 1) AI Service 호출 (요약 + NER + 임베딩)
                 AiProcessResponse aiResponse = aiServiceClient.process(
-                        new AiProcessRequest(
-                                article.url(),
-                                article.title(),
-                                article.content(),
-                                article.category()
-                        )
-                );
+                        new AiProcessRequest(article.url(), article.title(),
+                                article.content(), article.category()));
 
-                // 2) News 엔티티 저장
                 News news = News.builder()
                         .title(article.title())
                         .content(article.content())
@@ -73,7 +85,6 @@ public class NewsProcessingService {
 
                 News saved = newsRepository.save(news);
 
-                // 3) 임베딩 저장 (네이티브 쿼리)
                 if (aiResponse.embedding() != null && !aiResponse.embedding().isEmpty()) {
                     String embeddingStr = aiResponse.embedding().stream()
                             .map(String::valueOf)
@@ -85,10 +96,13 @@ public class NewsProcessingService {
                 savedCount++;
             } catch (Exception e) {
                 log.error("[Pipeline] 기사 처리 실패: {} - {}", article.url(), e.getMessage());
+                failedCount++;
             }
         }
 
-        log.info("[Pipeline] 파이프라인 완료 — 총 {}건 저장", savedCount);
+        log.info("[Pipeline] 파이프라인 완료 — 총 {}건 저장, {}건 실패", savedCount, failedCount);
+        lastStatus.set(new CrawlStatus(LocalDateTime.now(), savedCount, failedCount,
+                failedCount == 0 ? "SUCCESS" : "PARTIAL"));
         return savedCount;
     }
 }

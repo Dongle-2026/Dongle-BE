@@ -18,6 +18,7 @@ CREATE TABLE users (
     password_hash   VARCHAR(255),
     name            VARCHAR(50)  NOT NULL,
     nickname        VARCHAR(30)  NOT NULL UNIQUE,
+    role            VARCHAR(20)  NOT NULL DEFAULT 'USER',
     birth_date      DATE,
     gender          VARCHAR(10),
     region_code     VARCHAR(10),
@@ -146,6 +147,14 @@ CREATE TABLE policies (
     embedding           VECTOR(1536),
     created_at          TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE news_bookmarks (
+    id          BIGSERIAL PRIMARY KEY,
+    user_id     BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    article_id  BIGINT NOT NULL REFERENCES news_articles(id) ON DELETE CASCADE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE(user_id, article_id)
 );
 
 CREATE TABLE policy_bookmarks (
@@ -362,6 +371,7 @@ ALTER TABLE reading_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE term_lookup_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE policy_bookmarks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE policy_notifications ENABLE ROW LEVEL SECURITY;
+ALTER TABLE news_bookmarks ENABLE ROW LEVEL SECURITY;
 
 DO $$
 BEGIN
@@ -401,6 +411,9 @@ CREATE POLICY user_isolation_term_lookup ON term_lookup_log
 CREATE POLICY user_isolation_policy_bookmarks ON policy_bookmarks
     TO youthletter_app
     USING (user_id = current_setting('app.current_user_id', true)::bigint);
+CREATE POLICY user_isolation_news_bookmarks ON news_bookmarks
+    TO youthletter_app
+    USING (user_id = current_setting('app.current_user_id', true)::bigint);
 CREATE POLICY user_isolation_policy_notifications ON policy_notifications
     TO youthletter_app
     USING (user_id = current_setting('app.current_user_id', true)::bigint);
@@ -408,9 +421,10 @@ CREATE POLICY user_isolation_policy_notifications ON policy_notifications
 -- ============================================
 -- 시드 데이터 (개발용)
 -- ============================================
-INSERT INTO users (email, password_hash, name, nickname, birth_date, gender, region_code, occupation, income_level, interests)
+INSERT INTO users (email, password_hash, name, nickname, role, birth_date, gender, region_code, occupation, income_level, interests)
 VALUES
-    ('test@youthletter.com', '$2a$10$dummyhashfordev000000000000000000000000000000', '테스트유저', '테스트닉네임', '2000-01-15', 'MALE', '26', 'STUDENT', 'LOW', '["주식", "청년정책"]');
+    ('test@youthletter.com',  '$2a$10$dummyhashfordev000000000000000000000000000000', '테스트유저',  '테스트닉네임', 'USER',  '2000-01-15', 'MALE', '26', 'STUDENT', 'LOW', '["주식", "청년정책"]'),
+    ('admin@youthletter.com', '$2a$10$dummyhashfordev000000000000000000000000000000', '관리자',      '관리자닉네임', 'ADMIN', '1990-01-01', 'MALE', '11', 'EMPLOYED', 'ABOVE_MEDIAN', '[]');
 
 INSERT INTO user_profiles (user_id, employment_status, annual_income, is_married, household_members, education_level)
 VALUES

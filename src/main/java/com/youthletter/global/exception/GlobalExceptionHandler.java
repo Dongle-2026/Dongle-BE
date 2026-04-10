@@ -2,7 +2,9 @@ package com.youthletter.global.exception;
 
 import com.youthletter.global.response.GlobalResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -37,6 +39,17 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .badRequest()
                 .body(GlobalResponse.error(4000, errorMessage));
+    }
+
+    /**
+     * 접근 권한 없음 (ROLE_ADMIN 필요한 엔드포인트 접근 시)
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    protected ResponseEntity<GlobalResponse<Void>> handleAccessDeniedException(AccessDeniedException e) {
+        log.warn("AccessDenied: {}", e.getMessage());
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(GlobalResponse.error(4004, "접근 권한이 없습니다"));
     }
 
     /**

@@ -8,6 +8,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.SQLRestriction;
+import org.hibernate.annotations.Type;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -36,6 +37,10 @@ public class User extends BaseTimeEntity {
     @Column(nullable = false, unique = true, length = 30)
     private String nickname;
 
+    /** USER | ADMIN */
+    @Column(nullable = false, length = 20)
+    private String role = "USER";
+
     @Column(name = "birth_date")
     private LocalDate birthDate;
 
@@ -51,6 +56,7 @@ public class User extends BaseTimeEntity {
     @Column(name = "income_level", length = 20)
     private String incomeLevel;
 
+    @Type(JsonType.class)
     @Column(columnDefinition = "jsonb")
     private String interests;  // JSON 문자열 ["주식", "보험"]
 
@@ -59,12 +65,13 @@ public class User extends BaseTimeEntity {
 
     @Builder
     public User(String email, String passwordHash, String name, String nickname,
-                LocalDate birthDate, String gender, String regionCode,
+                String role, LocalDate birthDate, String gender, String regionCode,
                 String occupation, String incomeLevel, String interests) {
         this.email = email;
         this.passwordHash = passwordHash;
         this.name = name;
         this.nickname = nickname;
+        this.role = role != null ? role : "USER";
         this.birthDate = birthDate;
         this.gender = gender;
         this.regionCode = regionCode;
@@ -81,7 +88,7 @@ public class User extends BaseTimeEntity {
     }
 
     /**
-     * 프로필 업데이트
+     * 프로필 업데이트 (닉네임, 관심사 등)
      */
     public void updateProfile(String nickname, String regionCode, String occupation,
                               String incomeLevel, String interests) {
@@ -90,5 +97,16 @@ public class User extends BaseTimeEntity {
         if (occupation != null) this.occupation = occupation;
         if (incomeLevel != null) this.incomeLevel = incomeLevel;
         if (interests != null) this.interests = interests;
+    }
+
+    /**
+     * 정책 추천용 프로필 업데이트 (나이, 지역, 취업 여부, 소득 구간)
+     */
+    public void updatePolicyInfo(LocalDate birthDate, String regionCode,
+                                 String occupation, String incomeLevel) {
+        if (birthDate != null) this.birthDate = birthDate;
+        if (regionCode != null) this.regionCode = regionCode;
+        if (occupation != null) this.occupation = occupation;
+        if (incomeLevel != null) this.incomeLevel = incomeLevel;
     }
 }

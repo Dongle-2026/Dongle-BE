@@ -32,8 +32,10 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
         Long userId = ((Number) oAuth2User.getAttribute("userId")).longValue();
         String email = oAuth2User.getAttribute("email");
+        String role  = oAuth2User.getAttribute("role");
+        if (role == null) role = "USER";
 
-        String accessToken = jwtTokenProvider.createAccessToken(userId, email);
+        String accessToken  = jwtTokenProvider.createAccessToken(userId, email, role);
         String refreshToken = jwtTokenProvider.createRefreshToken(userId);
 
         log.info("OAuth2 로그인 성공: userId={}, email={}", userId, email);

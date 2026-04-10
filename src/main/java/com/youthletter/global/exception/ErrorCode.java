@@ -25,6 +25,8 @@ public enum ErrorCode {
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, 4100, "사용자를 찾을 수 없습니다"),
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, 4101, "이미 가입된 이메일입니다"),
     DUPLICATE_NICKNAME(HttpStatus.CONFLICT, 4102, "이미 사용 중인 닉네임입니다"),
+    INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, 4103, "이메일 또는 비밀번호가 올바르지 않습니다"),
+    OAUTH_ONLY_ACCOUNT(HttpStatus.BAD_REQUEST, 4104, "소셜 로그인 전용 계정입니다. 비밀번호 로그인을 사용할 수 없습니다"),
 
     // ── 뉴스 (42xx) ──
     ARTICLE_NOT_FOUND(HttpStatus.NOT_FOUND, 4200, "뉴스 기사를 찾을 수 없습니다"),

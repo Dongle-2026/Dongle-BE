@@ -1,10 +1,12 @@
 package com.youthletter.domain.user.entity;
 
+import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Type;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
@@ -40,6 +42,7 @@ public class UserProfile {
     @Column(name = "education_level", length = 20)
     private String educationLevel;
 
+    @Type(JsonType.class)
     @Column(name = "additional_criteria", columnDefinition = "jsonb")
     private String additionalCriteria;
 

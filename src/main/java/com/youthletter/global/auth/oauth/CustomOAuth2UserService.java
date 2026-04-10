@@ -39,11 +39,12 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 
         User user = processOAuthUser(provider, userInfo);
 
-        // OAuth2User에 userId를 포함시켜서 SuccessHandler에서 꺼내 쓸 수 있도록
+        // OAuth2User에 userId/email/role을 포함시켜서 SuccessHandler에서 꺼내 쓸 수 있도록
         Map<String, Object> attributes = Map.of(
                 "userId", user.getId(),
                 "email", user.getEmail(),
-                "name", user.getName()
+                "name", user.getName(),
+                "role",  user.getRole() != null ? user.getRole() : "USER"
         );
 
         return new DefaultOAuth2User(
