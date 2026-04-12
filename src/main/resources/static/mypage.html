@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>마이페이지 — 유스레터</title>
+  <style>
+    :root {
+      --yellow: #FFD600;
+      --yellow-dark: #F0C800;
+      --yellow-light: #FFFAE0;
+      --black: #111111;
+      --dark: #1a1a2e;
+      --gray: #f5f5f5;
+      --gray2: #e8e8e8;
+      --text: #222;
+      --sub: #888;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f7f7f8; color: var(--text); }
+    a { text-decoration: none; color: inherit; }
+
+    /* ── 헤더 ── */
+    header {
+      position: sticky; top: 0; z-index: 100;
+      background: #fff; border-bottom: 1px solid var(--gray2);
+      padding: 0 40px; height: 60px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .logo { display: flex; align-items: center; gap: 8px; font-size: 20px; font-weight: 900; letter-spacing: -0.5px; cursor: pointer; }
+    .logo-box { width: 36px; height: 36px; background: var(--yellow); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    nav { display: flex; align-items: center; gap: 32px; }
+    nav a { font-size: 15px; font-weight: 500; color: var(--sub); transition: color .15s; }
+    nav a:hover, nav a.active { color: var(--black); }
+    .btn-logout { background: none; border: 1.5px solid var(--gray2); color: var(--sub); padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all .15s; }
+    .btn-logout:hover { border-color: var(--black); color: var(--black); }
+
+    /* ── 페이지 레이아웃 ── */
+    .page { max-width: 900px; margin: 0 auto; padding: 40px 20px 80px; }
+
+    /* ── 카드 공통 ── */
+    .card {
+      background: #fff; border-radius: var(--radius);
+      padding: 28px; margin-bottom: 20px;
+      border: 1px solid var(--gray2);
+    }
+    .card-title {
+      font-size: 15px; font-weight: 800; color: var(--black);
+      margin-bottom: 20px;
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    /* ── 프로필 카드 ── */
+    .profile-card {
+      background: var(--dark); border-radius: var(--radius);
+      padding: 32px 28px; margin-bottom: 20px;
+      display: flex; align-items: center; gap: 24px;
+      position: relative; overflow: hidden;
+    }
+    .profile-card::before {
+      content: '🐝';
+      position: absolute; right: 28px; top: 50%; transform: translateY(-50%);
+      font-size: 80px; opacity: .08;
+    }
+    .profile-avatar {
+      width: 72px; height: 72px;
+      background: var(--yellow); border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px; font-weight: 900; color: var(--black);
+      flex-shrink: 0;
+    }
+    .profile-info { flex: 1; }
+    .profile-name { font-size: 22px; font-weight: 900; color: #fff; margin-bottom: 4px; }
+    .profile-email { font-size: 13px; color: rgba(255,255,255,.55); margin-bottom: 10px; }
+    .profile-badges { display: flex; gap: 8px; flex-wrap: wrap; }
+    .badge {
+      padding: 4px 10px; border-radius: 12px;
+      font-size: 12px; font-weight: 700;
+    }
+    .badge-yellow { background: var(--yellow); color: var(--black); }
+    .badge-outline { border: 1px solid rgba(255,255,255,.25); color: rgba(255,255,255,.7); }
+    .btn-edit-profile {
+      background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.2);
+      color: #fff; padding: 10px 18px; border-radius: 10px;
+      font-size: 13px; font-weight: 700; cursor: pointer;
+      transition: background .15s; flex-shrink: 0;
+    }
+    .btn-edit-profile:hover { background: rgba(255,255,255,.2); }
+
+    /* ── 학습 통계 ── */
+    .stats-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 600px) { .stats-grid { grid-template-columns: 1fr; } }
+    .stat-card {
+      background: #fff; border-radius: var(--radius);
+      padding: 22px 20px; border: 1px solid var(--gray2);
+      text-align: center;
+    }
+    .stat-icon { font-size: 28px; margin-bottom: 10px; }
+    .stat-value { font-size: 32px; font-weight: 900; color: var(--black); line-height: 1; margin-bottom: 6px; }
+    .stat-label { font-size: 13px; color: var(--sub); font-weight: 500; }
+    .stat-card.highlight { background: var(--yellow); border-color: var(--yellow); }
+    .stat-card.highlight .stat-value, .stat-card.highlight .stat-label { color: var(--black); }
+
+    /* ── 관심 카테고리 ── */
+    .cat-grid { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+    .cat-chip {
+      padding: 9px 18px; border-radius: 20px;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      border: 2px solid var(--gray2); background: var(--gray);
+      color: var(--sub); transition: all .15s; user-select: none;
+    }
+    .cat-chip.selected { background: var(--black); color: var(--yellow); border-color: var(--black); }
+    .cat-hint { font-size: 12px; color: var(--sub); margin-top: 12px; }
+    .btn-save-cat {
+      margin-top: 16px;
+      background: var(--yellow); color: var(--black);
+      padding: 12px 24px; border-radius: 10px;
+      font-size: 14px; font-weight: 700; border: none; cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-save-cat:hover { background: var(--yellow-dark); }
+    .btn-save-cat:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* ── 북마크 목록 ── */
+    .bookmark-list { display: flex; flex-direction: column; gap: 12px; }
+    .bookmark-item {
+      display: flex; align-items: center; gap: 14px;
+      padding: 14px 16px; border-radius: 10px;
+      background: var(--gray); cursor: pointer;
+      transition: background .15s; border: 1.5px solid transparent;
+    }
+    .bookmark-item:hover { background: var(--gray2); border-color: var(--gray2); }
+    .bookmark-cat-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--yellow); flex-shrink: 0;
+    }
+    .bookmark-info { flex: 1; min-width: 0; }
+    .bookmark-title {
+      font-size: 14px; font-weight: 700; color: var(--black);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-bottom: 4px;
+    }
+    .bookmark-meta { font-size: 12px; color: var(--sub); }
+    .bookmark-cat-badge {
+      padding: 3px 8px; border-radius: 6px;
+      background: var(--yellow); color: var(--black);
+      font-size: 11px; font-weight: 700; flex-shrink: 0;
+    }
+    .empty-bm {
+      text-align: center; padding: 40px 20px;
+      color: var(--sub);
+    }
+    .empty-bm .icon { font-size: 40px; margin-bottom: 10px; }
+    .empty-bm p { font-size: 14px; font-weight: 600; }
+    .load-more-btn {
+      width: 100%; margin-top: 14px;
+      padding: 12px; border-radius: 10px;
+      border: 1.5px solid var(--gray2); background: #fff;
+      font-size: 14px; font-weight: 600; color: var(--sub);
+      cursor: pointer; transition: all .15s;
+    }
+    .load-more-btn:hover { border-color: var(--black); color: var(--black); }
+
+    /* ── 닉네임 수정 모달 ── */
+    .modal-backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,.5);
+      z-index: 200; display: none; align-items: center; justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      background: #fff; border-radius: var(--radius);
+      padding: 32px; width: 100%; max-width: 400px; margin: 20px;
+    }
+    .modal h3 { font-size: 18px; font-weight: 800; margin-bottom: 20px; }
+    .modal input {
+      width: 100%; padding: 13px 16px;
+      border: 1.5px solid var(--gray2); border-radius: 10px;
+      font-size: 15px; font-family: inherit;
+      outline: none; transition: border-color .15s;
+    }
+    .modal input:focus { border-color: var(--black); }
+    .modal-btns { display: flex; gap: 10px; margin-top: 16px; }
+    .btn-cancel { flex: 1; padding: 12px; border-radius: 10px; border: 1.5px solid var(--gray2); background: #fff; font-size: 14px; font-weight: 700; cursor: pointer; }
+    .btn-confirm { flex: 2; padding: 12px; border-radius: 10px; border: none; background: var(--yellow); color: var(--black); font-size: 14px; font-weight: 700; cursor: pointer; }
+    .btn-confirm:hover { background: var(--yellow-dark); }
+
+    /* ── 스켈레톤 ── */
+    .skel { background: linear-gradient(90deg,#e0e0e0 25%,#f0f0f0 50%,#e0e0e0 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 8px; }
+    @keyframes shimmer { to { background-position: -200% 0; } }
+
+    /* ── 토스트 ── */
+    #toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%); background: var(--black); color: #fff; padding: 12px 24px; border-radius: 24px; font-size: 14px; font-weight: 600; opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 999; }
+    #toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<!-- 헤더 -->
+<header>
+  <div class="logo" onclick="location.href='home.html'">
+    <div class="logo-box">🐝</div>
+    유스레터
+  </div>
+  <nav>
+    <a href="home.html">홈</a>
+    <a href="#">읽어보기</a>
+    <a href="#">찾아보기</a>
+    <a href="mypage.html" class="active">마이페이지</a>
+  </nav>
+  <button class="btn-logout" onclick="logout()">로그아웃</button>
+</header>
+
+<!-- 본문 -->
+<main class="page">
+
+  <!-- 프로필 카드 -->
+  <div class="profile-card" id="profile-card">
+    <div class="profile-avatar" id="profile-avatar">?</div>
+    <div class="profile-info">
+      <div class="profile-name" id="profile-name">로딩 중...</div>
+      <div class="profile-email" id="profile-email"></div>
+      <div class="profile-badges" id="profile-badges"></div>
+    </div>
+    <button class="btn-edit-profile" onclick="openEditModal()">닉네임 수정</button>
+  </div>
+
+  <!-- 학습 통계 -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-icon">📰</div>
+      <div class="stat-value" id="stat-news">-</div>
+      <div class="stat-label">읽은 뉴스</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">📖</div>
+      <div class="stat-value" id="stat-terms">-</div>
+      <div class="stat-label">학습한 용어</div>
+    </div>
+    <div class="stat-card highlight">
+      <div class="stat-icon">🔥</div>
+      <div class="stat-value" id="stat-days">-</div>
+      <div class="stat-label">연속 학습일</div>
+    </div>
+  </div>
+
+  <!-- 관심 카테고리 -->
+  <div class="card">
+    <div class="card-title">관심 카테고리</div>
+    <div class="cat-grid" id="cat-grid">
+      <div class="cat-chip" data-cat="ECONOMY">경제</div>
+      <div class="cat-chip" data-cat="STOCK">투자</div>
+      <div class="cat-chip" data-cat="INSURANCE">보험</div>
+      <div class="cat-chip" data-cat="LOAN">대출</div>
+      <div class="cat-chip" data-cat="POLICY">정책</div>
+      <div class="cat-chip" data-cat="YOUTH">청년금융</div>
+    </div>
+    <div class="cat-hint">최대 6개 선택 가능 · 홈 화면 뉴스 우선 정렬에 반영됩니다</div>
+    <button class="btn-save-cat" id="btn-save-cat" onclick="saveCategories()">카테고리 저장</button>
+  </div>
+
+  <!-- 북마크 뉴스 -->
+  <div class="card">
+    <div class="card-title">북마크한 뉴스 <span id="bm-count" style="font-size:13px;color:var(--sub);font-weight:500"></span></div>
+    <div class="bookmark-list" id="bookmark-list">
+      <!-- 스켈레톤 -->
+      <div class="skel" style="height:64px;border-radius:10px"></div>
+      <div class="skel" style="height:64px;border-radius:10px"></div>
+      <div class="skel" style="height:64px;border-radius:10px"></div>
+    </div>
+    <button class="load-more-btn" id="load-more-btn" style="display:none" onclick="loadMoreBookmarks()">더보기</button>
+  </div>
+
+</main>
+
+<!-- 닉네임 수정 모달 -->
+<div class="modal-backdrop" id="modal-backdrop" onclick="closeEditModal(event)">
+  <div class="modal">
+    <h3>닉네임 수정</h3>
+    <input type="text" id="nickname-input" placeholder="새 닉네임을 입력하세요" maxlength="30">
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">취소</button>
+      <button class="btn-confirm" onclick="saveNickname()">저장</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  const BASE = 'http://localhost:8080';
+  let bmPage = 0;
+  let bmHasMore = false;
+  let selectedCats = new Set();
+
+  function getToken() {
+    return localStorage.getItem('accessToken');
+  }
+
+  function authHeaders() {
+    return { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' };
+  }
+
+  // ── 날짜 포맷 ──
+  function fmtDate(dt) {
+    if (!dt) return '';
+    const d = new Date(dt);
+    return `${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()}`;
+  }
+
+  function labelCat(cat) {
+    return { ECONOMY:'경제', STOCK:'투자', INSURANCE:'보험', LOAN:'대출', POLICY:'정책', YOUTH:'청년금융' }[cat] || cat || '금융';
+  }
+
+  // ── 로그인 체크 ──
+  function checkAuth() {
+    if (!getToken()) {
+      alert('로그인이 필요한 페이지입니다.');
+      location.href = 'test.html';
+    }
+  }
+
+  // ── 프로필 로드 ──
+  async function loadProfile() {
+    try {
+      const res = await fetch(BASE + '/api/users/me', { headers: { 'Authorization': 'Bearer ' + getToken() } });
+      const json = await res.json();
+      const p = json.data;
+      if (!p) return;
+
+      const initial = (p.nickname || p.name || '?').charAt(0).toUpperCase();
+      document.getElementById('profile-avatar').textContent = initial;
+      document.getElementById('profile-name').textContent = p.nickname || p.name;
+      document.getElementById('profile-email').textContent = p.email || '';
+
+      const badges = [];
+      if (p.occupation) badges.push(`<span class="badge badge-outline">${p.occupation}</span>`);
+      if (p.regionCode) badges.push(`<span class="badge badge-outline">${p.regionCode}</span>`);
+      if (p.interests && p.interests.length) {
+        badges.push(`<span class="badge badge-yellow">${p.interests.slice(0,2).join(' · ')}${p.interests.length > 2 ? ' +' + (p.interests.length - 2) : ''}</span>`);
+        // 관심 카테고리 칩 초기 선택
+        p.interests.forEach(cat => selectedCats.add(cat));
+        updateCatUI();
+      }
+      document.getElementById('profile-badges').innerHTML = badges.join('');
+
+      document.getElementById('nickname-input').value = p.nickname || '';
+    } catch(e) {
+      showToast('프로필을 불러오지 못했어요');
+    }
+  }
+
+  // ── 학습 통계 로드 ──
+  async function loadStats() {
+    try {
+      const res = await fetch(BASE + '/api/users/me/learning-stats', { headers: { 'Authorization': 'Bearer ' + getToken() } });
+      const json = await res.json();
+      const s = json.data;
+      if (!s) return;
+
+      document.getElementById('stat-news').textContent  = s.readNewsCount ?? 0;
+      document.getElementById('stat-terms').textContent = s.learnedTermCount ?? 0;
+      document.getElementById('stat-days').textContent  = s.consecutiveLearningDays ?? 0;
+    } catch(e) {
+      document.getElementById('stat-news').textContent  = '0';
+      document.getElementById('stat-terms').textContent = '0';
+      document.getElementById('stat-days').textContent  = '0';
+    }
+  }
+
+  // ── 북마크 로드 ──
+  async function loadBookmarks(page = 0) {
+    try {
+      const res = await fetch(`${BASE}/api/users/me/bookmarks?page=${page}&size=10`, {
+        headers: { 'Authorization': 'Bearer ' + getToken() }
+      });
+      const json = await res.json();
+      const pageData = json.data;
+      if (!pageData) return;
+
+      const items = pageData.content || [];
+      bmHasMore = !pageData.last;
+      bmPage = page;
+
+      if (page === 0) {
+        const total = pageData.totalElements || 0;
+        document.getElementById('bm-count').textContent = total ? `${total}개` : '';
+        renderBookmarks(items, false);
+      } else {
+        renderBookmarks(items, true);
+      }
+
+      document.getElementById('load-more-btn').style.display = bmHasMore ? 'block' : 'none';
+    } catch(e) {
+      if (page === 0) renderBookmarks([], false);
+    }
+  }
+
+  function renderBookmarks(items, append) {
+    const list = document.getElementById('bookmark-list');
+
+    if (!append) {
+      if (!items.length) {
+        list.innerHTML = `
+          <div class="empty-bm">
+            <div class="icon">🤍</div>
+            <p>아직 북마크한 뉴스가 없어요</p>
+          </div>`;
+        return;
+      }
+      list.innerHTML = '';
+    }
+
+    items.forEach(item => {
+      const el = document.createElement('div');
+      el.className = 'bookmark-item';
+      el.onclick = () => location.href = `news-detail.html?id=${item.articleId}`;
+      el.innerHTML = `
+        <div class="bookmark-cat-dot"></div>
+        <div class="bookmark-info">
+          <div class="bookmark-title">${item.title}</div>
+          <div class="bookmark-meta">${item.sourceName || '한국경제'} · ${fmtDate(item.publishedAt)}</div>
+        </div>
+        <span class="bookmark-cat-badge">${labelCat(item.category)}</span>
+      `;
+      list.appendChild(el);
+    });
+  }
+
+  function loadMoreBookmarks() {
+    loadBookmarks(bmPage + 1);
+  }
+
+  // ── 관심 카테고리 ──
+  function updateCatUI() {
+    document.querySelectorAll('.cat-chip').forEach(chip => {
+      chip.classList.toggle('selected', selectedCats.has(chip.dataset.cat));
+    });
+  }
+
+  document.querySelectorAll('.cat-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const cat = chip.dataset.cat;
+      if (selectedCats.has(cat)) {
+        selectedCats.delete(cat);
+      } else {
+        if (selectedCats.size >= 6) { showToast('최대 6개까지 선택 가능해요'); return; }
+        selectedCats.add(cat);
+      }
+      updateCatUI();
+    });
+  });
+
+  async function saveCategories() {
+    const btn = document.getElementById('btn-save-cat');
+    btn.disabled = true;
+    btn.textContent = '저장 중...';
+    try {
+      const res = await fetch(BASE + '/api/users/me/categories', {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: JSON.stringify({ categories: [...selectedCats] })
+      });
+      if (res.ok) {
+        showToast('관심 카테고리가 저장됐어요');
+      } else {
+        showToast('저장에 실패했어요. 다시 시도해주세요');
+      }
+    } catch(e) {
+      showToast('저장에 실패했어요');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '카테고리 저장';
+    }
+  }
+
+  // ── 닉네임 수정 모달 ──
+  function openEditModal() {
+    document.getElementById('modal-backdrop').classList.add('open');
+    document.getElementById('nickname-input').focus();
+  }
+
+  function closeModal() {
+    document.getElementById('modal-backdrop').classList.remove('open');
+  }
+
+  function closeEditModal(e) {
+    if (e.target === document.getElementById('modal-backdrop')) closeModal();
+  }
+
+  async function saveNickname() {
+    const nickname = document.getElementById('nickname-input').value.trim();
+    if (!nickname) { showToast('닉네임을 입력해주세요'); return; }
+
+    try {
+      const res = await fetch(BASE + '/api/users/me', {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify({ nickname })
+      });
+      const json = await res.json();
+      if (res.ok && json.data) {
+        document.getElementById('profile-name').textContent = json.data.nickname;
+        document.getElementById('profile-avatar').textContent = json.data.nickname.charAt(0).toUpperCase();
+        showToast('닉네임이 변경됐어요');
+        closeModal();
+      } else {
+        showToast('변경에 실패했어요');
+      }
+    } catch(e) {
+      showToast('변경에 실패했어요');
+    }
+  }
+
+  // ── 로그아웃 ──
+  async function logout() {
+    try {
+      const at = getToken();
+      await fetch(BASE + '/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + at }
+      });
+    } catch(e) {}
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+    localStorage.removeItem('bookmarks');
+    location.href = 'test.html';
+  }
+
+  // ── 토스트 ──
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2200);
+  }
+
+  // ── 초기화 ──
+  checkAuth();
+  loadProfile();
+  loadStats();
+  loadBookmarks(0);
+</script>
+</body>
+</html>
