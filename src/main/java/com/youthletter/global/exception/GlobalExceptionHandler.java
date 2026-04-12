@@ -8,6 +8,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.stream.Collectors;
 
@@ -39,6 +40,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .badRequest()
                 .body(GlobalResponse.error(4000, errorMessage));
+    }
+
+    /**
+     * 정적 리소스 없음 (favicon.ico 등) — ERROR 로그 없이 404 반환
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    protected ResponseEntity<GlobalResponse<Void>> handleNoResource(NoResourceFoundException e) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(GlobalResponse.error(404, e.getMessage()));
     }
 
     /**

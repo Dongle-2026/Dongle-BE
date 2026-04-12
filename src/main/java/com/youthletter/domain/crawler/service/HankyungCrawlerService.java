@@ -17,7 +17,7 @@ import java.util.List;
 public class HankyungCrawlerService {
 
     private static final String BASE_URL = "https://www.hankyung.com";
-    private static final String FINANCE_URL = BASE_URL + "/finance";
+    private static final String FINANCE_URL = BASE_URL + "/economy";
 
     private static final List<String> CONTENT_SELECTORS = List.of(
             "div#articletxt",

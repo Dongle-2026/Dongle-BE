@@ -5,8 +5,10 @@ import com.youthletter.domain.crawler.service.HankyungCrawlerService;
 import com.youthletter.domain.news.client.AiServiceClient;
 import com.youthletter.domain.news.client.dto.AiProcessRequest;
 import com.youthletter.domain.news.client.dto.AiProcessResponse;
-import com.youthletter.domain.news.entity.News;
-import com.youthletter.domain.news.repository.NewsRepository;
+import com.youthletter.domain.news.entity.NewsArticle;
+import com.youthletter.domain.news.entity.NewsSummary;
+import com.youthletter.domain.news.repository.NewsArticleRepository;
+import com.youthletter.domain.news.repository.NewsSummaryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -16,7 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -25,7 +26,8 @@ public class NewsProcessingService {
 
     private final HankyungCrawlerService crawlerService;
     private final AiServiceClient aiServiceClient;
-    private final NewsRepository newsRepository;
+    private final NewsArticleRepository newsArticleRepository;
+    private final NewsSummaryRepository newsSummaryRepository;
 
     public record CrawlStatus(
             LocalDateTime lastRunAt,
@@ -64,7 +66,7 @@ public class NewsProcessingService {
 
         for (CrawledArticleDto article : articles) {
             try {
-                if (newsRepository.existsByOriginalUrl(article.url())) {
+                if (newsArticleRepository.existsBySourceUrl(article.url())) {
                     log.debug("[Pipeline] 이미 저장된 기사 스킵: {}", article.url());
                     continue;
                 }
@@ -73,23 +75,26 @@ public class NewsProcessingService {
                         new AiProcessRequest(article.url(), article.title(),
                                 article.content(), article.category()));
 
-                News news = News.builder()
-                        .title(article.title())
-                        .content(article.content())
-                        .summary(aiResponse.summary())
-                        .originalUrl(article.url())
-                        .source("한국경제")
-                        .category(article.category())
-                        .publishedAt(article.publishedAt())
-                        .build();
+                NewsArticle saved = newsArticleRepository.save(
+                        NewsArticle.builder()
+                                .sourceUrl(article.url())
+                                .sourceName("한국경제")
+                                .title(article.title())
+                                .content(article.content())
+                                .category(article.category())
+                                .publishedAt(article.publishedAt())
+                                .build()
+                );
 
-                News saved = newsRepository.save(news);
-
-                if (aiResponse.embedding() != null && !aiResponse.embedding().isEmpty()) {
-                    String embeddingStr = aiResponse.embedding().stream()
-                            .map(String::valueOf)
-                            .collect(Collectors.joining(",", "[", "]"));
-                    newsRepository.updateEmbedding(saved.getId(), embeddingStr);
+                if (aiResponse.summary() != null && !aiResponse.summary().isBlank()) {
+                    newsSummaryRepository.save(
+                            NewsSummary.builder()
+                                    .article(saved)
+                                    .summaryText(aiResponse.summary())
+                                    .summaryVersion(1)
+                                    .modelVersion("stub")
+                                    .build()
+                    );
                 }
 
                 log.info("[Pipeline] 저장 완료: {}", saved.getTitle());
