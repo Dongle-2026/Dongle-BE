@@ -58,7 +58,8 @@ public class SecurityConfig {
                     "/actuator/health",
                     "/*.html",
                     "/favicon.ico",
-                    "/error"
+                    "/error",
+                    "/login.html"
                 ).permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()

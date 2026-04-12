@@ -407,8 +407,7 @@
   // ── 로그인 체크 ──
   function checkAuth() {
     if (!getToken()) {
-      alert('로그인이 필요한 페이지입니다.');
-      location.href = 'test.html';
+      location.href = 'login.html';
     }
   }
 
@@ -666,7 +665,7 @@
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('bookmarks');
-    location.href = 'test.html';
+    location.href = 'login.html';
   }
 
   // ── 토스트 ──
