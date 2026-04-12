@@ -78,7 +78,10 @@ public class UserService {
     }
 
     private int computeConsecutiveLearningDays(Long userId) {
-        List<LocalDate> dates = readingHistoryRepository.findDistinctReadDatesByUserId(userId);
+        List<LocalDate> dates = readingHistoryRepository.findDistinctReadDatesByUserId(userId)
+                .stream()
+                .map(java.sql.Date::toLocalDate)
+                .toList();
         if (dates.isEmpty()) return 0;
 
         LocalDate today = LocalDate.now();

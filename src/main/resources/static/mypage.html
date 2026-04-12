@@ -62,6 +62,7 @@
       content: '🐝';
       position: absolute; right: 28px; top: 50%; transform: translateY(-50%);
       font-size: 80px; opacity: .08;
+      pointer-events: none;
     }
     .profile-avatar {
       width: 72px; height: 72px;
@@ -165,28 +166,50 @@
     }
     .load-more-btn:hover { border-color: var(--black); color: var(--black); }
 
-    /* ── 닉네임 수정 모달 ── */
+    /* ── 프로필 수정 모달 ── */
     .modal-backdrop {
       position: fixed; inset: 0; background: rgba(0,0,0,.5);
       z-index: 200; display: none; align-items: center; justify-content: center;
+      overflow-y: auto; padding: 20px;
     }
     .modal-backdrop.open { display: flex; }
     .modal {
       background: #fff; border-radius: var(--radius);
-      padding: 32px; width: 100%; max-width: 400px; margin: 20px;
+      padding: 32px; width: 100%; max-width: 480px;
+      margin: auto;
     }
-    .modal h3 { font-size: 18px; font-weight: 800; margin-bottom: 20px; }
-    .modal input {
-      width: 100%; padding: 13px 16px;
+    .modal h3 { font-size: 20px; font-weight: 900; margin-bottom: 24px; color: var(--black); }
+    .form-section { margin-bottom: 20px; }
+    .form-section-title {
+      font-size: 12px; font-weight: 700; color: var(--sub);
+      text-transform: uppercase; letter-spacing: .5px;
+      margin-bottom: 12px; padding-bottom: 8px;
+      border-bottom: 1px solid var(--gray2);
+    }
+    .form-row { margin-bottom: 14px; }
+    .form-label { display: block; font-size: 13px; font-weight: 700; color: var(--black); margin-bottom: 6px; }
+    .form-label .required { color: #e74c3c; margin-left: 2px; }
+    .form-hint { font-size: 11px; color: var(--sub); margin-top: 4px; }
+    .form-input, .form-select {
+      width: 100%; padding: 12px 14px;
       border: 1.5px solid var(--gray2); border-radius: 10px;
-      font-size: 15px; font-family: inherit;
-      outline: none; transition: border-color .15s;
+      font-size: 14px; font-family: inherit; color: var(--text);
+      outline: none; transition: border-color .15s; background: #fff;
+      appearance: none; -webkit-appearance: none;
     }
-    .modal input:focus { border-color: var(--black); }
-    .modal-btns { display: flex; gap: 10px; margin-top: 16px; }
-    .btn-cancel { flex: 1; padding: 12px; border-radius: 10px; border: 1.5px solid var(--gray2); background: #fff; font-size: 14px; font-weight: 700; cursor: pointer; }
-    .btn-confirm { flex: 2; padding: 12px; border-radius: 10px; border: none; background: var(--yellow); color: var(--black); font-size: 14px; font-weight: 700; cursor: pointer; }
+    .form-input:focus, .form-select:focus { border-color: var(--black); }
+    .select-wrap { position: relative; }
+    .select-wrap::after {
+      content: '▾'; position: absolute; right: 14px; top: 50%;
+      transform: translateY(-50%); pointer-events: none;
+      color: var(--sub); font-size: 13px;
+    }
+    .modal-btns { display: flex; gap: 10px; margin-top: 24px; }
+    .btn-cancel { flex: 1; padding: 13px; border-radius: 10px; border: 1.5px solid var(--gray2); background: #fff; font-size: 14px; font-weight: 700; cursor: pointer; color: var(--sub); }
+    .btn-cancel:hover { border-color: var(--black); color: var(--black); }
+    .btn-confirm { flex: 2; padding: 13px; border-radius: 10px; border: none; background: var(--yellow); color: var(--black); font-size: 14px; font-weight: 700; cursor: pointer; }
     .btn-confirm:hover { background: var(--yellow-dark); }
+    .btn-confirm:disabled { opacity: .5; cursor: not-allowed; }
 
     /* ── 스켈레톤 ── */
     .skel { background: linear-gradient(90deg,#e0e0e0 25%,#f0f0f0 50%,#e0e0e0 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; border-radius: 8px; }
@@ -225,7 +248,7 @@
       <div class="profile-email" id="profile-email"></div>
       <div class="profile-badges" id="profile-badges"></div>
     </div>
-    <button class="btn-edit-profile" onclick="openEditModal()">닉네임 수정</button>
+    <button class="btn-edit-profile" onclick="openEditModal()">프로필 수정</button>
   </div>
 
   <!-- 학습 통계 -->
@@ -276,14 +299,80 @@
 
 </main>
 
-<!-- 닉네임 수정 모달 -->
+<!-- 프로필 수정 모달 -->
 <div class="modal-backdrop" id="modal-backdrop" onclick="closeEditModal(event)">
   <div class="modal">
-    <h3>닉네임 수정</h3>
-    <input type="text" id="nickname-input" placeholder="새 닉네임을 입력하세요" maxlength="30">
+    <h3>프로필 수정</h3>
+
+    <!-- 기본 정보 -->
+    <div class="form-section">
+      <div class="form-section-title">기본 정보</div>
+      <div class="form-row">
+        <label class="form-label">닉네임 <span class="required">*</span></label>
+        <input type="text" class="form-input" id="f-nickname" placeholder="2~30자" maxlength="30">
+        <div class="form-hint">2자 이상 30자 이하</div>
+      </div>
+    </div>
+
+    <!-- 정책 추천 프로필 -->
+    <div class="form-section">
+      <div class="form-section-title">정책 추천 정보</div>
+      <div class="form-row">
+        <label class="form-label">생년월일</label>
+        <input type="date" class="form-input" id="f-birthdate">
+      </div>
+      <div class="form-row">
+        <label class="form-label">거주 지역</label>
+        <div class="select-wrap">
+          <select class="form-select" id="f-region">
+            <option value="">선택 안 함</option>
+            <option value="서울">서울특별시</option>
+            <option value="부산">부산광역시</option>
+            <option value="대구">대구광역시</option>
+            <option value="인천">인천광역시</option>
+            <option value="광주">광주광역시</option>
+            <option value="대전">대전광역시</option>
+            <option value="울산">울산광역시</option>
+            <option value="세종">세종특별자치시</option>
+            <option value="경기">경기도</option>
+            <option value="강원">강원도</option>
+            <option value="충북">충청북도</option>
+            <option value="충남">충청남도</option>
+            <option value="전북">전라북도</option>
+            <option value="전남">전라남도</option>
+            <option value="경북">경상북도</option>
+            <option value="경남">경상남도</option>
+            <option value="제주">제주특별자치도</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">취업 상태</label>
+        <div class="select-wrap">
+          <select class="form-select" id="f-occupation">
+            <option value="">선택 안 함</option>
+            <option value="EMPLOYED">재직 중</option>
+            <option value="UNEMPLOYED">미취업</option>
+            <option value="STUDENT">학생</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <label class="form-label">소득 구간</label>
+        <div class="select-wrap">
+          <select class="form-select" id="f-income">
+            <option value="">선택 안 함</option>
+            <option value="LOW">저소득 (중위소득 60% 이하)</option>
+            <option value="MIDDLE">중간소득 (중위소득 60~120%)</option>
+            <option value="HIGH">고소득 (중위소득 120% 초과)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeModal()">취소</button>
-      <button class="btn-confirm" onclick="saveNickname()">저장</button>
+      <button class="btn-confirm" id="btn-save-profile" onclick="saveProfile()">저장</button>
     </div>
   </div>
 </div>
@@ -295,16 +384,13 @@
   let bmPage = 0;
   let bmHasMore = false;
   let selectedCats = new Set();
+  let currentProfile = null;
 
-  function getToken() {
-    return localStorage.getItem('accessToken');
-  }
-
+  function getToken() { return localStorage.getItem('accessToken'); }
   function authHeaders() {
     return { 'Authorization': 'Bearer ' + getToken(), 'Content-Type': 'application/json' };
   }
 
-  // ── 날짜 포맷 ──
   function fmtDate(dt) {
     if (!dt) return '';
     const d = new Date(dt);
@@ -315,12 +401,32 @@
     return { ECONOMY:'경제', STOCK:'투자', INSURANCE:'보험', LOAN:'대출', POLICY:'정책', YOUTH:'청년금융' }[cat] || cat || '금융';
   }
 
+  const OCCUPATION_LABEL = { EMPLOYED:'재직 중', UNEMPLOYED:'미취업', STUDENT:'학생' };
+  const INCOME_LABEL = { LOW:'저소득', MIDDLE:'중간소득', HIGH:'고소득' };
+
   // ── 로그인 체크 ──
   function checkAuth() {
     if (!getToken()) {
       alert('로그인이 필요한 페이지입니다.');
       location.href = 'test.html';
     }
+  }
+
+  // ── 프로필 카드 업데이트 ──
+  function renderProfileCard(p) {
+    const initial = (p.nickname || p.name || '?').charAt(0).toUpperCase();
+    document.getElementById('profile-avatar').textContent = initial;
+    document.getElementById('profile-name').textContent = p.nickname || p.name;
+    document.getElementById('profile-email').textContent = p.email || '';
+
+    const badges = [];
+    if (p.occupation) badges.push(`<span class="badge badge-outline">${OCCUPATION_LABEL[p.occupation] || p.occupation}</span>`);
+    if (p.regionCode) badges.push(`<span class="badge badge-outline">${p.regionCode}</span>`);
+    if (p.incomeLevel) badges.push(`<span class="badge badge-outline">${INCOME_LABEL[p.incomeLevel] || p.incomeLevel}</span>`);
+    if (p.interests && p.interests.length) {
+      badges.push(`<span class="badge badge-yellow">${p.interests.slice(0,2).join(' · ')}${p.interests.length > 2 ? ' +' + (p.interests.length - 2) : ''}</span>`);
+    }
+    document.getElementById('profile-badges').innerHTML = badges.join('');
   }
 
   // ── 프로필 로드 ──
@@ -331,23 +437,13 @@
       const p = json.data;
       if (!p) return;
 
-      const initial = (p.nickname || p.name || '?').charAt(0).toUpperCase();
-      document.getElementById('profile-avatar').textContent = initial;
-      document.getElementById('profile-name').textContent = p.nickname || p.name;
-      document.getElementById('profile-email').textContent = p.email || '';
+      currentProfile = p;
+      renderProfileCard(p);
 
-      const badges = [];
-      if (p.occupation) badges.push(`<span class="badge badge-outline">${p.occupation}</span>`);
-      if (p.regionCode) badges.push(`<span class="badge badge-outline">${p.regionCode}</span>`);
       if (p.interests && p.interests.length) {
-        badges.push(`<span class="badge badge-yellow">${p.interests.slice(0,2).join(' · ')}${p.interests.length > 2 ? ' +' + (p.interests.length - 2) : ''}</span>`);
-        // 관심 카테고리 칩 초기 선택
         p.interests.forEach(cat => selectedCats.add(cat));
         updateCatUI();
       }
-      document.getElementById('profile-badges').innerHTML = badges.join('');
-
-      document.getElementById('nickname-input').value = p.nickname || '';
     } catch(e) {
       showToast('프로필을 불러오지 못했어요');
     }
@@ -360,7 +456,6 @@
       const json = await res.json();
       const s = json.data;
       if (!s) return;
-
       document.getElementById('stat-news').textContent  = s.readNewsCount ?? 0;
       document.getElementById('stat-terms').textContent = s.learnedTermCount ?? 0;
       document.getElementById('stat-days').textContent  = s.consecutiveLearningDays ?? 0;
@@ -392,7 +487,6 @@
       } else {
         renderBookmarks(items, true);
       }
-
       document.getElementById('load-more-btn').style.display = bmHasMore ? 'block' : 'none';
     } catch(e) {
       if (page === 0) renderBookmarks([], false);
@@ -401,19 +495,13 @@
 
   function renderBookmarks(items, append) {
     const list = document.getElementById('bookmark-list');
-
     if (!append) {
       if (!items.length) {
-        list.innerHTML = `
-          <div class="empty-bm">
-            <div class="icon">🤍</div>
-            <p>아직 북마크한 뉴스가 없어요</p>
-          </div>`;
+        list.innerHTML = `<div class="empty-bm"><div class="icon">🤍</div><p>아직 북마크한 뉴스가 없어요</p></div>`;
         return;
       }
       list.innerHTML = '';
     }
-
     items.forEach(item => {
       const el = document.createElement('div');
       el.className = 'bookmark-item';
@@ -430,9 +518,7 @@
     });
   }
 
-  function loadMoreBookmarks() {
-    loadBookmarks(bmPage + 1);
-  }
+  function loadMoreBookmarks() { loadBookmarks(bmPage + 1); }
 
   // ── 관심 카테고리 ──
   function updateCatUI() {
@@ -466,6 +552,10 @@
       });
       if (res.ok) {
         showToast('관심 카테고리가 저장됐어요');
+        if (currentProfile) {
+          currentProfile.interests = [...selectedCats];
+          renderProfileCard(currentProfile);
+        }
       } else {
         showToast('저장에 실패했어요. 다시 시도해주세요');
       }
@@ -477,10 +567,16 @@
     }
   }
 
-  // ── 닉네임 수정 모달 ──
+  // ── 프로필 수정 모달 ──
   function openEditModal() {
+    const p = currentProfile || {};
+    document.getElementById('f-nickname').value  = p.nickname || '';
+    document.getElementById('f-birthdate').value = p.birthDate || '';
+    document.getElementById('f-region').value    = p.regionCode || '';
+    document.getElementById('f-occupation').value = p.occupation || '';
+    document.getElementById('f-income').value    = p.incomeLevel || '';
     document.getElementById('modal-backdrop').classList.add('open');
-    document.getElementById('nickname-input').focus();
+    document.getElementById('f-nickname').focus();
   }
 
   function closeModal() {
@@ -491,37 +587,80 @@
     if (e.target === document.getElementById('modal-backdrop')) closeModal();
   }
 
-  async function saveNickname() {
-    const nickname = document.getElementById('nickname-input').value.trim();
-    if (!nickname) { showToast('닉네임을 입력해주세요'); return; }
+  async function saveProfile() {
+    const nickname   = document.getElementById('f-nickname').value.trim();
+    const birthDate  = document.getElementById('f-birthdate').value;
+    const regionCode = document.getElementById('f-region').value;
+    const occupation = document.getElementById('f-occupation').value;
+    const incomeLevel = document.getElementById('f-income').value;
+
+    if (!nickname || nickname.length < 2) {
+      showToast('닉네임은 2자 이상이어야 해요');
+      document.getElementById('f-nickname').focus();
+      return;
+    }
+
+    const btn = document.getElementById('btn-save-profile');
+    btn.disabled = true;
+    btn.textContent = '저장 중...';
 
     try {
-      const res = await fetch(BASE + '/api/users/me', {
+      // 닉네임 수정 (항상 호출)
+      const nicknameRes = await fetch(BASE + '/api/users/me', {
         method: 'PATCH',
         headers: authHeaders(),
         body: JSON.stringify({ nickname })
       });
-      const json = await res.json();
-      if (res.ok && json.data) {
-        document.getElementById('profile-name').textContent = json.data.nickname;
-        document.getElementById('profile-avatar').textContent = json.data.nickname.charAt(0).toUpperCase();
-        showToast('닉네임이 변경됐어요');
-        closeModal();
-      } else {
-        showToast('변경에 실패했어요');
+      const nicknameJson = await nicknameRes.json();
+      if (!nicknameRes.ok) {
+        const msg = nicknameJson?.message || '닉네임 변경에 실패했어요';
+        showToast(msg);
+        return;
       }
+
+      // 정책 프로필 수정 (값이 있을 때만)
+      const hasPolicyData = birthDate || regionCode || occupation || incomeLevel;
+      if (hasPolicyData) {
+        const body = {};
+        if (birthDate)   body.birthDate  = birthDate;
+        if (regionCode)  body.regionCode = regionCode;
+        if (occupation)  body.occupation = occupation;
+        if (incomeLevel) body.incomeLevel = incomeLevel;
+
+        await fetch(BASE + '/api/users/me/policy-profile', {
+          method: 'PUT',
+          headers: authHeaders(),
+          body: JSON.stringify(body)
+        });
+      }
+
+      // 로컬 상태 및 UI 업데이트
+      currentProfile = {
+        ...currentProfile,
+        nickname,
+        birthDate:   birthDate   || currentProfile?.birthDate,
+        regionCode:  regionCode  || currentProfile?.regionCode,
+        occupation:  occupation  || currentProfile?.occupation,
+        incomeLevel: incomeLevel || currentProfile?.incomeLevel,
+      };
+      renderProfileCard(currentProfile);
+
+      showToast('프로필이 저장됐어요');
+      closeModal();
     } catch(e) {
-      showToast('변경에 실패했어요');
+      showToast('저장 중 오류가 발생했어요');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '저장';
     }
   }
 
   // ── 로그아웃 ──
   async function logout() {
     try {
-      const at = getToken();
       await fetch(BASE + '/api/auth/logout', {
         method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + at }
+        headers: { 'Authorization': 'Bearer ' + getToken() }
       });
     } catch(e) {}
     localStorage.removeItem('accessToken');

@@ -5,7 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-import java.time.LocalDate;
+import java.sql.Date;
 import java.util.List;
 
 public interface ReadingHistoryRepository extends JpaRepository<ReadingHistory, Long> {
@@ -16,5 +16,5 @@ public interface ReadingHistoryRepository extends JpaRepository<ReadingHistory, 
 
     @Query(value = "SELECT DISTINCT read_at::DATE FROM reading_history WHERE user_id = :userId ORDER BY read_at::DATE DESC",
            nativeQuery = true)
-    List<LocalDate> findDistinctReadDatesByUserId(@Param("userId") Long userId);
+    List<Date> findDistinctReadDatesByUserId(@Param("userId") Long userId);
 }
