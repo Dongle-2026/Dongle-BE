@@ -195,25 +195,28 @@
 
 <script>
   // ── OAuth2 콜백 처리 ──
-  // 로그인 성공 후 ?accessToken=...&refreshToken=... 로 리다이렉트됨
   (function handleCallback() {
     const params = new URLSearchParams(window.location.search);
     const accessToken  = params.get('accessToken');
     const refreshToken = params.get('refreshToken');
+    const error        = params.get('error');
 
+    // 에러 처리
+    if (error) {
+      window.history.replaceState({}, '', '/login.html');
+      setTimeout(() => showToast('로그인에 실패했어요. 다시 시도해주세요.'), 100);
+      return;
+    }
+
+    // 로그인 성공 — 토큰 저장 후 홈으로
     if (accessToken) {
-      // 로딩 표시
       document.getElementById('loading-overlay').classList.add('show');
       document.getElementById('login-card').style.display = 'none';
 
-      // 토큰 저장
       localStorage.setItem('accessToken', accessToken);
       if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
 
-      // URL 파라미터 제거 (히스토리 정리)
       window.history.replaceState({}, '', '/login.html');
-
-      // 홈으로 이동
       setTimeout(() => { location.href = 'home.html'; }, 500);
       return;
     }
