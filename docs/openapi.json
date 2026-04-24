@@ -1,5 +1,5 @@
 {
-  "openapi": "3.1.0",
+  "openapi": "3.0.1",
   "info": {
     "title": "유스레터 API",
     "description": "청년 금융 AI 플랫폼 - Youth Letter Backend API",
@@ -1308,24 +1308,28 @@
         }
       },
       "CategoryUpdateRequest": {
+        "required": [
+          "categories"
+        ],
         "type": "object",
         "properties": {
           "categories": {
+            "maxItems": 6,
+            "minItems": 0,
             "type": "array",
             "items": {
               "type": "string"
-            },
-            "maxItems": 6,
-            "minItems": 0
+            }
           }
-        },
-        "required": [
-          "categories"
-        ]
+        }
       },
       "SpendingCreateRequest": {
+        "required": [
+          "amount",
+          "category",
+          "spentAt"
+        ],
         "type": "object",
-        "description": "소비 기록 생성/수정 요청",
         "properties": {
           "amount": {
             "type": "number",
@@ -1344,8 +1348,8 @@
           },
           "spentAt": {
             "type": "string",
-            "format": "date",
             "description": "소비 날짜",
+            "format": "date",
             "example": "2026-03-24"
           },
           "metadata": {
@@ -1353,11 +1357,7 @@
             "description": "부가 정보 (JSON)"
           }
         },
-        "required": [
-          "amount",
-          "category",
-          "spentAt"
-        ]
+        "description": "소비 기록 생성/수정 요청"
       },
       "GlobalResponseLong": {
         "type": "object",
@@ -1409,33 +1409,33 @@
         }
       },
       "SignupRequest": {
+        "required": [
+          "email",
+          "name",
+          "nickname",
+          "password"
+        ],
         "type": "object",
         "properties": {
           "email": {
             "type": "string"
           },
           "password": {
-            "type": "string",
             "maxLength": 100,
-            "minLength": 8
+            "minLength": 8,
+            "type": "string"
           },
           "name": {
-            "type": "string",
             "maxLength": 50,
-            "minLength": 0
+            "minLength": 0,
+            "type": "string"
           },
           "nickname": {
-            "type": "string",
             "maxLength": 30,
-            "minLength": 2
+            "minLength": 2,
+            "type": "string"
           }
-        },
-        "required": [
-          "email",
-          "name",
-          "nickname",
-          "password"
-        ]
+        }
       },
       "GlobalResponseTokenResponse": {
         "type": "object",
@@ -1464,17 +1464,21 @@
         }
       },
       "TokenReissueRequest": {
+        "required": [
+          "refreshToken"
+        ],
         "type": "object",
         "properties": {
           "refreshToken": {
             "type": "string"
           }
-        },
-        "required": [
-          "refreshToken"
-        ]
+        }
       },
       "LoginRequest": {
+        "required": [
+          "email",
+          "password"
+        ],
         "type": "object",
         "properties": {
           "email": {
@@ -1483,11 +1487,7 @@
           "password": {
             "type": "string"
           }
-        },
-        "required": [
-          "email",
-          "password"
-        ]
+        }
       },
       "GlobalResponseMapStringObject": {
         "type": "object",
@@ -1511,9 +1511,9 @@
         "type": "object",
         "properties": {
           "nickname": {
-            "type": "string",
             "maxLength": 30,
-            "minLength": 2
+            "minLength": 2,
+            "type": "string"
           }
         }
       },
@@ -1649,14 +1649,14 @@
         "type": "object",
         "properties": {
           "page": {
+            "minimum": 0,
             "type": "integer",
-            "format": "int32",
-            "minimum": 0
+            "format": "int32"
           },
           "size": {
+            "minimum": 1,
             "type": "integer",
-            "format": "int32",
-            "minimum": 1
+            "format": "int32"
           },
           "sort": {
             "type": "array",
@@ -1741,12 +1741,12 @@
           "sort": {
             "$ref": "#/components/schemas/SortObject"
           },
+          "pageable": {
+            "$ref": "#/components/schemas/PageableObject"
+          },
           "numberOfElements": {
             "type": "integer",
             "format": "int32"
-          },
-          "pageable": {
-            "$ref": "#/components/schemas/PageableObject"
           },
           "empty": {
             "type": "boolean"
@@ -1771,10 +1771,10 @@
             "type": "integer",
             "format": "int32"
           },
-          "paged": {
+          "unpaged": {
             "type": "boolean"
           },
-          "unpaged": {
+          "paged": {
             "type": "boolean"
           }
         }
@@ -1785,10 +1785,10 @@
           "empty": {
             "type": "boolean"
           },
-          "sorted": {
+          "unsorted": {
             "type": "boolean"
           },
-          "unsorted": {
+          "sorted": {
             "type": "boolean"
           }
         }
@@ -1842,12 +1842,12 @@
           "sort": {
             "$ref": "#/components/schemas/SortObject"
           },
+          "pageable": {
+            "$ref": "#/components/schemas/PageableObject"
+          },
           "numberOfElements": {
             "type": "integer",
             "format": "int32"
-          },
-          "pageable": {
-            "$ref": "#/components/schemas/PageableObject"
           },
           "empty": {
             "type": "boolean"
@@ -1959,7 +1959,6 @@
       },
       "SpendingDashboardResponse": {
         "type": "object",
-        "description": "소비 대시보드 응답",
         "properties": {
           "month": {
             "type": "string",
@@ -1968,7 +1967,8 @@
           "categoryTotals": {
             "type": "object",
             "additionalProperties": {
-              "type": "number"
+              "type": "number",
+              "description": "카테고리별 합계"
             },
             "description": "카테고리별 합계"
           },
@@ -1976,7 +1976,8 @@
             "type": "number",
             "description": "총 지출액"
           }
-        }
+        },
+        "description": "소비 대시보드 응답"
       },
       "GlobalResponsePolicyDetailResponse": {
         "type": "object",
@@ -1995,12 +1996,11 @@
       },
       "PolicyDetailResponse": {
         "type": "object",
-        "description": "정책 상세 응답",
         "properties": {
           "id": {
             "type": "integer",
-            "format": "int64",
-            "description": "정책 ID"
+            "description": "정책 ID",
+            "format": "int64"
           },
           "title": {
             "type": "string",
@@ -2024,13 +2024,13 @@
           },
           "ageMin": {
             "type": "integer",
-            "format": "int32",
-            "description": "대상 나이 (최소)"
+            "description": "대상 나이 (최소)",
+            "format": "int32"
           },
           "ageMax": {
             "type": "integer",
-            "format": "int32",
-            "description": "대상 나이 (최대)"
+            "description": "대상 나이 (최대)",
+            "format": "int32"
           },
           "incomeCriteria": {
             "type": "string",
@@ -2038,13 +2038,13 @@
           },
           "startDate": {
             "type": "string",
-            "format": "date",
-            "description": "시작일"
+            "description": "시작일",
+            "format": "date"
           },
           "endDate": {
             "type": "string",
-            "format": "date",
-            "description": "마감일"
+            "description": "마감일",
+            "format": "date"
           },
           "applicationUrl": {
             "type": "string",
@@ -2054,7 +2054,8 @@
             "type": "boolean",
             "description": "즐겨찾기 여부"
           }
-        }
+        },
+        "description": "정책 상세 응답"
       },
       "GlobalResponsePagePolicyListResponse": {
         "type": "object",
@@ -2105,12 +2106,12 @@
           "sort": {
             "$ref": "#/components/schemas/SortObject"
           },
+          "pageable": {
+            "$ref": "#/components/schemas/PageableObject"
+          },
           "numberOfElements": {
             "type": "integer",
             "format": "int32"
-          },
-          "pageable": {
-            "$ref": "#/components/schemas/PageableObject"
           },
           "empty": {
             "type": "boolean"
@@ -2119,12 +2120,11 @@
       },
       "PolicyListResponse": {
         "type": "object",
-        "description": "정책 목록 응답",
         "properties": {
           "id": {
             "type": "integer",
-            "format": "int64",
-            "description": "정책 ID"
+            "description": "정책 ID",
+            "format": "int64"
           },
           "title": {
             "type": "string",
@@ -2140,20 +2140,21 @@
           },
           "endDate": {
             "type": "string",
-            "format": "date",
-            "description": "마감일"
+            "description": "마감일",
+            "format": "date"
           },
           "ageMin": {
             "type": "integer",
-            "format": "int32",
-            "description": "대상 나이 (최소)"
+            "description": "대상 나이 (최소)",
+            "format": "int32"
           },
           "ageMax": {
             "type": "integer",
-            "format": "int32",
-            "description": "대상 나이 (최대)"
+            "description": "대상 나이 (최대)",
+            "format": "int32"
           }
-        }
+        },
+        "description": "정책 목록 응답"
       },
       "GlobalResponsePageNewsListResponse": {
         "type": "object",
@@ -2172,12 +2173,11 @@
       },
       "NewsListResponse": {
         "type": "object",
-        "description": "뉴스 목록 응답",
         "properties": {
           "id": {
             "type": "integer",
-            "format": "int64",
-            "description": "기사 ID"
+            "description": "기사 ID",
+            "format": "int64"
           },
           "title": {
             "type": "string",
@@ -2197,10 +2197,11 @@
           },
           "publishedAt": {
             "type": "string",
-            "format": "date-time",
-            "description": "발행일"
+            "description": "발행일",
+            "format": "date-time"
           }
-        }
+        },
+        "description": "뉴스 목록 응답"
       },
       "PageNewsListResponse": {
         "type": "object",
@@ -2236,12 +2237,12 @@
           "sort": {
             "$ref": "#/components/schemas/SortObject"
           },
+          "pageable": {
+            "$ref": "#/components/schemas/PageableObject"
+          },
           "numberOfElements": {
             "type": "integer",
             "format": "int32"
-          },
-          "pageable": {
-            "$ref": "#/components/schemas/PageableObject"
           },
           "empty": {
             "type": "boolean"
@@ -2265,12 +2266,11 @@
       },
       "NewsDetailResponse": {
         "type": "object",
-        "description": "뉴스 상세 응답",
         "properties": {
           "id": {
             "type": "integer",
-            "format": "int64",
-            "description": "기사 ID"
+            "description": "기사 ID",
+            "format": "int64"
           },
           "title": {
             "type": "string",
@@ -2294,8 +2294,8 @@
           },
           "publishedAt": {
             "type": "string",
-            "format": "date-time",
-            "description": "발행일"
+            "description": "발행일",
+            "format": "date-time"
           },
           "summary": {
             "type": "string",
@@ -2312,16 +2312,16 @@
               "$ref": "#/components/schemas/TermHighlightDto"
             }
           }
-        }
+        },
+        "description": "뉴스 상세 응답"
       },
       "TermHighlightDto": {
         "type": "object",
-        "description": "용어 하이라이트 정보",
         "properties": {
           "termId": {
             "type": "integer",
-            "format": "int64",
-            "description": "용어 ID"
+            "description": "용어 ID",
+            "format": "int64"
           },
           "termName": {
             "type": "string",
@@ -2333,15 +2333,16 @@
           },
           "positionStart": {
             "type": "integer",
-            "format": "int32",
-            "description": "본문 시작 위치"
+            "description": "본문 시작 위치",
+            "format": "int32"
           },
           "positionEnd": {
             "type": "integer",
-            "format": "int32",
-            "description": "본문 끝 위치"
+            "description": "본문 끝 위치",
+            "format": "int32"
           }
-        }
+        },
+        "description": "용어 하이라이트 정보"
       },
       "GlobalResponseListNewsListResponse": {
         "type": "object",
@@ -2443,12 +2444,12 @@
           "sort": {
             "$ref": "#/components/schemas/SortObject"
           },
+          "pageable": {
+            "$ref": "#/components/schemas/PageableObject"
+          },
           "numberOfElements": {
             "type": "integer",
             "format": "int32"
-          },
-          "pageable": {
-            "$ref": "#/components/schemas/PageableObject"
           },
           "empty": {
             "type": "boolean"

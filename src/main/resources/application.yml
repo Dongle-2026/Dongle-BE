@@ -33,6 +33,7 @@ springdoc:
     operations-sorter: alpha
   api-docs:
     path: /v3/api-docs
+    version: openapi_3_0
   default-consumes-media-type: application/json
   default-produces-media-type: application/json
 
