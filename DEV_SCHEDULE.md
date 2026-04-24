@@ -171,90 +171,87 @@
 
 ---
 
-## WEEK 3 — News 모듈 + 크롤러
+## WEEK 3 — News 모듈 + 크롤러 ✅ 완료
 
-### Day 11 (월)
+> **완료일: 2026-04-24**  
+> **설계 변경:** `News` 단일 엔티티 대신 `NewsArticle` + `NewsSummary` 분리 (Temporal Versioning — AI 모델 업그레이드 시 이전 요약 보존).  
+> `NewsRead` 대신 `activity.ReadingHistory` 사용 (Activity 도메인으로 분리).  
+> AI 호출을 summary/ner/insight 분리 대신 `AiProcessResponse` 통합 응답으로 단순화.
+
+### Day 11 (월) ✅
 **목표: News 엔티티 + Repository**
 
-- [ ] `News` 엔티티 작성 (CLAUDE.md 6번 Module 3 참고)
-  - `ner_terms`: `@JdbcTypeCode(SqlTypes.JSON)` + `List<NerTerm>` inner record
-- [ ] `NewsRead`, `NewsBookmark` 엔티티 작성
-- [ ] `NewsRepository` 작성
-  - `existsByOriginalUrl`
-  - `findTodayNews` native query
-  - `findSimilarNews` native query (AI 연동 후 사용, 지금은 메서드만)
-- [ ] `NewsReadRepository`, `NewsBookmarkRepository` 작성
+- [x] `NewsArticle` 엔티티 작성 (`news_articles` 테이블 — 크롤링 원본)
+- [x] `NewsSummary` 엔티티 작성 (`valid_from`/`valid_to` Temporal Versioning)
+- [x] `ArticleTermHighlight` 엔티티 작성 (본문 내 용어 위치 저장)
+- [x] `ReadingHistory` 엔티티 작성 (`activity` 도메인, `read_duration_seconds` 포함)
+- [x] `NewsBookmark` 엔티티 작성
+- [x] `NewsArticleRepository` 작성
+  - `existsBySourceUrl` (중복 체크)
+  - `findTodayArticles` — `crawledAt >= :startOfDay` JPQL
+  - `findByCategory`, `findAllByOrderByPublishedAtDesc` 페이지네이션
+- [x] `NewsSummaryRepository.findByArticleIdAndValidToIsNull` (현재 유효 버전 조회)
+- [x] `ReadingHistoryRepository`, `NewsBookmarkRepository` 작성
 
 ---
 
-### Day 12 (화)
+### Day 12 (화) ✅
 **목표: NewsService + NewsController**
 
-- [ ] `NewsService` 구현
-  - `getNewsList(category, date, keyword, pageable)` — 동적 조건 처리
-  - `getNewsDetail(newsId, userId)` — aiSummary, nerTerms 포함 (stub 값)
-  - `markAsRead(newsId, userId)` — upsert
-  - `toggleBookmark(newsId, userId)` — 있으면 삭제, 없으면 추가
-  - `getTodayNews(userId)` — 관심 카테고리 우선 정렬
-- [ ] `NewsController` 구현 (5개 엔드포인트)
-- [ ] 뉴스가 없으면 목록이 빈 배열로 잘 오는지 확인
+- [x] `NewsService` 구현
+  - `getNewsList(category, pageable)` — 카테고리 필터 + `NewsSummary` 조인
+  - `getNewsDetail(articleId)` — content + summary + `ArticleTermHighlight` 목록
+  - `markAsRead(userId, articleId, durationSeconds)` — `ActivityService.trackReading()` 위임
+  - `toggleBookmark(userId, articleId)` — 있으면 삭제, 없으면 추가
+  - `getTodayNews(userId)` — 관심 카테고리 우선 정렬 + AI 요약 포함
+  - `getMyBookmarks(userId, pageable)` — 북마크 목록
+- [x] `NewsController` 구현 (5개 엔드포인트)
+- [x] 뉴스 없는 경우 빈 배열 반환 확인
 
 ---
 
-### Day 13 (수)
+### Day 13 (수) ✅
 **목표: AiServiceClient stub 구현**
 
-- [ ] `WebClientConfig` 구현 (AI 서비스용 WebClient bean)
-- [ ] `AiSummaryResponse`, `AiNerResponse`, `AiInsightResponse` DTO 작성
-  - 각 DTO에 `.stub()` 정적 팩토리 메서드 포함
-    ```java
-    // AiSummaryResponse.stub() 예시
-    public static AiSummaryResponse stub() {
-        return new AiSummaryResponse(List.of(
-            "AI 요약 기능 준비 중입니다.",
-            "곧 실제 AI 요약이 제공됩니다.",
-            "현재는 stub 모드로 동작 중입니다."
-        ));
-    }
-    ```
-- [ ] `AiServiceClient` 구현
-  - `getSummary(Long newsId)` — stub 분기
-  - `getNer(Long newsId)` — stub 분기
-  - `getInsight(Object spendingData)` — stub 분기
-- [ ] `application.yml` `ai.service.stub-mode: true` 확인
+- [x] `WebClientConfig` 구현 (AI 서비스용 `WebClient` bean)
+- [x] `AiProcessRequest` / `AiProcessResponse` DTO 작성 (summary + nerTerms + embedding 통합)
+- [x] `AiServiceClient` 구현
+  - `process(AiProcessRequest)` — stub 분기 (`useStub` 플래그)
+  - stub 응답: 3줄 요약 문자열 + 빈 NER 목록 + 0벡터(1536차원)
+  - 실제 호출: `POST /api/ai/process` (Node.js AI 서버)
+  - `isStubMode()` / `setStubMode(boolean)` — 런타임 토글 지원
+- [x] `application.yml` `ai-service.use-stub: true` 확인
 
 ---
 
-### Day 14 (목)
+### Day 14 (목) ✅
 **목표: NewsProcessingService + 크롤러 기반 구조**
 
-- [ ] `CrawlerConfig` 작성 (`@EnableScheduling` 포함)
-- [ ] `NewsProcessingService` 구현
-  - `process(RawNews rawNews)` 
-    1. 중복 URL 체크
-    2. `News` 엔티티 저장
-    3. `AiServiceClient.getSummary()` 호출 → 결과 업데이트
-    4. `AiServiceClient.getNer()` 호출 → 결과 업데이트
-- [ ] `HankyungCrawlerService` 기본 구조 작성
-  - `@Scheduled` cron 설정
-  - Jsoup으로 한경 목록 페이지 접근 확인 (URL, CSS selector 확인)
+- [x] `CrawlerConfig` 작성 (`@EnableScheduling` 포함)
+- [x] `NewsProcessingService` 구현
+  - `processAll()` — 크롤링 → AI 처리 → `NewsArticle` + `NewsSummary` 저장
+  - `scheduledProcess()` — `@Scheduled(cron = "0 0 */6 * * *")` 6시간마다 자동 실행
+  - `CrawlStatus` record (lastRunAt, savedCount, failedCount, status)
+  - `AtomicReference<CrawlStatus>` 인메모리 상태 관리 (NEVER_RUN / RUNNING / SUCCESS / PARTIAL)
+- [x] `HankyungCrawlerService` 기본 구조 작성
+  - `BASE_URL = https://www.hankyung.com`, `FINANCE_URL = /economy`
+  - 목록 선택자: `ul.news-list a`, `div.article-list a` + fallback `a[href*='/article/']`
 
 ---
 
-### Day 15 (금)
+### Day 15 (금) ✅
 **목표: 크롤러 완성 + Admin 엔드포인트**
 
-- [ ] `HankyungCrawlerService.crawl()` 완성
-  - 목록 페이지 파싱 → 기사 URL 추출
-  - 각 기사 상세 페이지 파싱 → 제목, 본문, 썸네일, 날짜 추출
-  - `NewsProcessingService.process()` 호출
-- [ ] 크롤링 결과 상태 저장용 인메모리 변수 (마지막 실행 시각, 성공/실패 건수)
-- [ ] `AdminController` 구현
-  - `POST /api/admin/crawl` → 수동 크롤링 즉시 실행
-  - `GET /api/admin/crawl/status` → 상태 조회
-  - `POST /api/admin/ai-stub` → stub 모드 토글
-- [ ] 실제 크롤링 1회 실행 → DB에 뉴스 저장 확인
-- [ ] Git push (feature/news, feature/crawler → develop PR)
+- [x] `HankyungCrawlerService.crawl()` 완성
+  - 목록 페이지 파싱 → `/article/` 포함 URL 추출 (중복 제거)
+  - 기사 상세 페이지: `h1.headline`, `div#articletxt` 등 다중 selector fallback
+  - `CrawledArticleDto` 반환
+- [x] `NewsProcessingService` 내 `AtomicReference<CrawlStatus>` 상태 관리
+- [x] `AdminCrawlController` 구현
+  - `POST /api/admin/crawl/trigger` → 수동 크롤링 즉시 실행
+  - `GET /api/admin/crawl/status` → 마지막 실행 상태 조회
+  - `POST /api/admin/crawl/ai-stub` → stub 모드 런타임 토글
+- [x] Git push (현재 `feature/test-ci` 브랜치)
 
 ---
 
@@ -719,9 +716,9 @@
 
 | 주차 | 목표 | 상태 |
 |------|------|------|
-| Week 1 | 프로젝트 세팅 + JWT 인증 | ⬜ |
-| Week 2 | OAuth2 + User Profile | ⬜ |
-| Week 3 | News 모듈 + 크롤러 | ⬜ |
+| Week 1 | 프로젝트 세팅 + JWT 인증 | ✅ |
+| Week 2 | OAuth2 + User Profile | ✅ |
+| Week 3 | News 모듈 + 크롤러 | ✅ |
 | Week 4 | Term + Policy | ⬜ |
 | Week 5 | Spending | ⬜ |
 | Week 6 | Stock + 통합 | ⬜ |

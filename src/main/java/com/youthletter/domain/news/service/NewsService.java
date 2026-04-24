@@ -125,7 +125,13 @@ public class NewsService {
 
         return articles.stream()
                 .limit(12)
-                .map(a -> NewsListResponse.from(a, null))
+                .map(a -> {
+                    String summary = summaryRepository
+                            .findByArticleIdAndValidToIsNull(a.getId())
+                            .map(NewsSummary::getSummaryText)
+                            .orElse(null);
+                    return NewsListResponse.from(a, summary);
+                })
                 .toList();
     }
 

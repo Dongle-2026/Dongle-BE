@@ -21,6 +21,9 @@ public class AiServiceClient {
     @Value("${ai-service.use-stub:true}")
     private boolean useStub;
 
+    public boolean isStubMode() { return useStub; }
+    public void setStubMode(boolean stubMode) { this.useStub = stubMode; }
+
     /**
      * AI Service에 기사를 전송하여 요약 + NER + 임베딩을 받아옴.
      * stub 모드가 true면 AI Service 없이도 크롤링 → DB 저장 흐름 테스트 가능.

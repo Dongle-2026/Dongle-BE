@@ -1,0 +1,36 @@
+# ============================================
+# 유스레터 - 로컬 테스트용 Docker Compose
+# CI의 GitHub Actions 서비스와 동일한 환경
+# 사용법: docker-compose -f docker-compose.test.yml up -d
+# 테스트 후: docker-compose -f docker-compose.test.yml down
+# ============================================
+
+services:
+  postgres-test:
+    image: pgvector/pgvector:pg16
+    container_name: youthletter-postgres-test
+    environment:
+      POSTGRES_DB: youthletter_test
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test1234
+      TZ: Asia/Seoul
+    ports:
+      - "5433:5432"  # 개발용 5432와 충돌 방지
+    volumes:
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d youthletter_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis-test:
+    image: redis:7-alpine
+    container_name: youthletter-redis-test
+    ports:
+      - "6380:6379"  # 개발용 6379와 충돌 방지
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
