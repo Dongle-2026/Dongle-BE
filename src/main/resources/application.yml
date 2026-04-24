@@ -13,6 +13,12 @@ spring:
         format_sql: true
         default_batch_fetch_size: 100  # N+1 방지 기본 배치 사이즈
 
+  # ── 스케줄링 ──
+  task:
+    scheduling:
+      pool:
+        size: 3
+
   # ── Jackson 직렬화 ──
   jackson:
     serialization:
@@ -27,6 +33,7 @@ springdoc:
     operations-sorter: alpha
   api-docs:
     path: /v3/api-docs
+    version: openapi_3_0
   default-consumes-media-type: application/json
   default-produces-media-type: application/json
 
@@ -98,9 +105,14 @@ jwt:
   access-token-expiration: 900000      # 15분 (ms)
   refresh-token-expiration: 604800000  # 7일 (ms)
 
+# ── OAuth2 프론트엔드 리다이렉트 ──
+oauth2:
+  redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:8080/login.html}
+
 # ── AI Service (Node.js) 내부 호출 ──
 ai-service:
   base-url: http://localhost:3000
+  use-stub: true   # 혜린이 API 완성 후 false로 변경
 
 # ── 로깅 ──
 logging:
@@ -119,17 +131,18 @@ spring:
       on-profile: prod
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
-    hikari:
-      maximum-pool-size: 20
-      minimum-idle: 10
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:youthletter}
+    username: ${DB_USERNAME:youthletter}
+    password: ${DB_PASSWORD:youthletter1234}
+    driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
-      ddl-auto: validate
-    show-sql: false
+      ddl-auto: update
+    properties:
+      hibernate:
+        format_sql: true
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
 
   data:
     redis:
@@ -140,6 +153,9 @@ jwt:
   secret: ${JWT_SECRET}
   access-token-expiration: 900000
   refresh-token-expiration: 604800000
+
+oauth2:
+  redirect-uri: ${OAUTH2_REDIRECT_URI:https://youthletter.com/auth/callback}
 
 ai-service:
   base-url: http://ai-service:3000  # Docker 네트워크 내 서비스명

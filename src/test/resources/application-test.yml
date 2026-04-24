@@ -7,7 +7,7 @@ spring:
       on-profile: test
 
   datasource:
-    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:youthletter_test}
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:youthletter_test}
     username: ${DB_USERNAME:test}
     password: ${DB_PASSWORD:test1234}
     driver-class-name: org.postgresql.Driver
@@ -15,12 +15,13 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
     show-sql: true
 
   data:
     redis:
       host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
+      port: ${REDIS_PORT:6380}
 
   security:
     oauth2:

@@ -9,7 +9,7 @@ version = '0.0.1-SNAPSHOT'
 
 java {
     toolchain {
-        languageVersion = JavaLanguageVersion.of(21)
+        languageVersion = JavaLanguageVersion.of(17)
     }
 }
 
@@ -27,6 +27,7 @@ dependencies {
     // ── Spring Boot Core ──
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation "io.hypersistence:hypersistence-utils-hibernate-63:3.7.6"
 
     // ── Security (JWT + OAuth2) ──
     implementation 'org.springframework.boot:spring-boot-starter-security'

@@ -2,11 +2,13 @@ package com.youthletter.domain.spending.entity;
 
 import com.youthletter.domain.user.entity.User;
 import com.youthletter.global.util.BaseEntity;
+import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Type;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -52,6 +54,7 @@ public class SpendingEvent extends BaseEntity {
     @Column(name = "spent_at", nullable = false)
     private LocalDate spentAt;
 
+    @Type(JsonType.class)
     @Column(columnDefinition = "jsonb")
     private String metadata;
 

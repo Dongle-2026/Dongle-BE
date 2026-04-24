@@ -1,11 +1,13 @@
 package com.youthletter.domain.policy.entity;
 
 import com.youthletter.global.util.BaseTimeEntity;
+import io.hypersistence.utils.hibernate.type.json.JsonType;
 import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.Type;
 
 import java.time.LocalDate;
 
@@ -43,6 +45,7 @@ public class Policy extends BaseTimeEntity {
     @Column(name = "income_criteria", length = 50)
     private String incomeCriteria;
 
+    @Type(JsonType.class)
     @Column(name = "occupation_criteria", columnDefinition = "jsonb")
     private String occupationCriteria;  // JSON 배열
 
