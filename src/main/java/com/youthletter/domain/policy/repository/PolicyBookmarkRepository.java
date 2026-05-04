@@ -14,4 +14,6 @@ public interface PolicyBookmarkRepository extends JpaRepository<PolicyBookmark, 
     Optional<PolicyBookmark> findByUserIdAndPolicyId(Long userId, Long policyId);
 
     boolean existsByUserIdAndPolicyId(Long userId, Long policyId);
+
+    java.util.List<PolicyBookmark> findByPolicyId(Long policyId);
 }
