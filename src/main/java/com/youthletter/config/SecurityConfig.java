@@ -50,6 +50,8 @@ public class SecurityConfig {
                     "/api/terms/category",
                     "/api/terms/level",
                     "/api/terms/{id}",
+                    "/api/policies",
+                    "/api/policies/{policyId}",
                     "/api/guides/**",
                     "/oauth2/**",
                     "/login/oauth2/**",
