@@ -66,7 +66,7 @@ spring:
   # ── JPA (local) ──
   jpa:
     hibernate:
-      ddl-auto: validate  # init.sql로 스키마 관리, Hibernate는 검증만
+      ddl-auto: update
     show-sql: true
 
   # ── Redis ──

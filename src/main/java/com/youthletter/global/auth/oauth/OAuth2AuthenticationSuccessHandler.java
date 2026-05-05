@@ -21,7 +21,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
     private final JwtTokenProvider jwtTokenProvider;
 
-    @Value("${oauth2.redirect-uri:http://localhost:3001/auth/callback}")
+    @Value("${oauth2.redirect-uri:http://localhost:3000/auth/callback}")
     private String frontendRedirectUri;
 
     @Override

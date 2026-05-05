@@ -105,7 +105,6 @@ public class SecurityConfig {
     @Bean
     public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
         var config = new org.springframework.web.cors.CorsConfiguration();
-        config.addAllowedOrigin("http://localhost:3001");
         config.addAllowedOrigin("http://localhost:3000");
         config.addAllowedOrigin("http://localhost:8080");  // 테스트 HTML 페이지용
         config.addAllowedMethod("*");
