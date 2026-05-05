@@ -38,6 +38,16 @@ public enum ErrorCode {
     POLICY_NOT_FOUND(HttpStatus.NOT_FOUND, 4400, "정책을 찾을 수 없습니다"),
     ALREADY_BOOKMARKED(HttpStatus.CONFLICT, 4401, "이미 즐겨찾기에 추가된 정책입니다"),
 
+    // ── 소비 (46xx) ──
+    SPENDING_NOT_FOUND(HttpStatus.NOT_FOUND, 4600, "소비 내역을 찾을 수 없습니다"),
+    SPENDING_NOT_OWNED(HttpStatus.FORBIDDEN, 4601, "본인의 소비 내역만 수정/삭제할 수 있습니다"),
+    BUDGET_NOT_FOUND(HttpStatus.NOT_FOUND, 4602, "예산이 설정되지 않았습니다"),
+
+    // ── 주식 (47xx) ──
+    TICKER_NOT_FOUND(HttpStatus.NOT_FOUND, 4700, "존재하지 않는 종목 코드입니다"),
+    WATCHLIST_ALREADY_EXISTS(HttpStatus.CONFLICT, 4701, "이미 관심종목에 추가된 종목입니다"),
+    WATCHLIST_NOT_FOUND(HttpStatus.NOT_FOUND, 4702, "관심종목에 없는 종목입니다"),
+
     // ── AI Agent (45xx) ──
     SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, 4500, "채팅 세션을 찾을 수 없습니다"),
 

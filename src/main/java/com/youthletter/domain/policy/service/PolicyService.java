@@ -68,6 +68,14 @@ public class PolicyService {
     }
 
     /**
+     * 내 정책 북마크 목록
+     */
+    public Page<PolicyListResponse> getMyPolicyBookmarks(Long userId, Pageable pageable) {
+        return bookmarkRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable)
+                .map(bookmark -> PolicyListResponse.from(bookmark.getPolicy()));
+    }
+
+    /**
      * 정책 즐겨찾기 토글
      */
     @Transactional
