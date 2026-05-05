@@ -5,6 +5,7 @@ import com.youthletter.domain.spending.service.SpendingService;
 import com.youthletter.global.auth.jwt.CustomUserPrincipal;
 import com.youthletter.global.response.GlobalResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -49,11 +50,13 @@ public class SpendingController {
         return GlobalResponse.ok();
     }
 
-    @Operation(summary = "월별 소비 목록", description = "해당 월의 유효한 소비 내역 목록 (최신 이벤트 기준)")
+    @Operation(summary = "월별 소비 목록", description = "해당 월의 유효한 소비 내역 목록 (최신 이벤트 기준, DELETED 제외)")
     @GetMapping
     public GlobalResponse<List<SpendingListResponse>> getMonthlyList(
             @AuthenticationPrincipal CustomUserPrincipal principal,
+            @Parameter(description = "조회 연도 (기본: 현재 연도)", example = "2026")
             @RequestParam(defaultValue = "#{T(java.time.LocalDate).now().getYear()}") int year,
+            @Parameter(description = "조회 월 1~12 (기본: 현재 월)", example = "5")
             @RequestParam(defaultValue = "#{T(java.time.LocalDate).now().getMonthValue()}") int month) {
         return GlobalResponse.ok(spendingService.getMonthlyList(principal.getUserId(), year, month));
     }
@@ -62,6 +65,7 @@ public class SpendingController {
     @GetMapping("/dashboard")
     public GlobalResponse<SpendingDashboardResponse> getDashboard(
             @AuthenticationPrincipal CustomUserPrincipal principal,
+            @Parameter(description = "조회 월 (yyyy-MM 형식, 기본: 현재 월)", example = "2026-05")
             @RequestParam(required = false) String month) {
         if (month == null) month = java.time.YearMonth.now().toString();
         return GlobalResponse.ok(spendingService.getDashboard(principal.getUserId(), month));

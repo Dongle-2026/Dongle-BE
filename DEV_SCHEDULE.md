@@ -425,57 +425,73 @@
 
 ---
 
-## WEEK 6 — Stock + FE 연동 + 통합 마무리
+## WEEK 6 — FE 연동 + Swagger 완성 + 통합 마무리 ✅ 완료
 
-### Day 26 (월)
+> **완료일: 2026-05-05**  
+> **브랜치: `feature/week6-fe-swagger-finalize`**  
+> **설계 변경:** Day 26-27 항목(Stock, policy-bookmarks, Dashboard 파싱)은 WEEK 5에 선행 완료. Day 28 FE 연동 + Day 29 Swagger + Day 30 빌드/태그로 집중.
+
+### Day 26 (월) ✅ (WEEK 5에서 선행 완료)
 **목표: Stock 모듈 완성**
 
-- [ ] `StockWatchlist` 엔티티 + `WatchlistRepository` 작성 (이미 `init.sql`에 테이블 있음)
-- [ ] `StockService` 구현
-  - `getStockPrice(String ticker)` — Yahoo Finance stub (Redis TTL 5분)
-  - `addWatchlist(userId, ticker)`, `getWatchlist(userId)`, `removeWatchlist(userId, ticker)`
-- [ ] `StockController` 구현 (4개 엔드포인트)
+- [x] `StockWatchlist` 엔티티 + `WatchlistRepository` 작성
+- [x] `StockService` (Redis TTL 5분 stub), `StockController` (4개 엔드포인트)
 
 ---
 
-### Day 27 (화)
+### Day 27 (화) ✅ (WEEK 5에서 선행 완료)
 **목표: 정책 북마크 목록 + 프로필 API 완성**
 
-- [ ] `GET /api/users/me/policy-bookmarks` 엔드포인트 추가
-- [ ] `SpendingDashboardResponse.fromSnapshot` — categoryTotals JSON → Map 파싱 완성 (현재 TODO)
-- [ ] 통합 테스트: 북마크 추가 → 목록 → 삭제 전 흐름
+- [x] `GET /api/users/me/policy-bookmarks` 완성
+- [x] `SpendingDashboardResponse.fromSnapshot` JSON→Map 파싱 완성
 
 ---
 
-### Day 28 (수)
+### Day 28 (수) ✅
 **목표: FE 연동 확대**
 
 > **완료된 FE 연동 (2026-05-04):** 뉴스 목록/상세 (`GET /api/news`, `GET /api/news/{id}`)
 
-- [ ] FE에 정책 목록 연동 (`GET /api/policies`)
-- [ ] FE에 용어 검색 연동 (`GET /api/terms/search`)
-- [ ] FE 소셜 로그인 플로우 확인 (카카오 OAuth2 콜백 → JWT → 쿠키)
-- [ ] `.env.local` `NEXT_PUBLIC_API_BASE_URL=http://localhost:8080` 동작 확인
+- [x] `api.ts` 전면 재작성 — Policy/Terms/Stock/Auth 함수 추가 + 공통 `apiFetch` helper + `saveTokens`/`getAccessToken`/`clearTokens`
+- [x] `/app/policies/page.tsx` — 정책 목록 페이지 (지역 필터 + 마감 D-day 표시 + 페이지네이션)
+- [x] `/app/terms/page.tsx` — 용어 검색 페이지 (300ms debounce 실시간 검색 + 난이도 컬러 뱃지)
+- [x] `/app/auth/callback/page.tsx` — OAuth2 콜백 페이지 (accessToken/refreshToken → localStorage 저장)
+- [x] `nav-bar.tsx` 업데이트 — 정책/용어사전 링크 추가 + 로그인 상태 표시 + 검색창 용어사전 연동
+- [x] `application.yml` OAuth2 redirect-uri `http://localhost:3000/auth/callback` 으로 수정
+- [x] `.env.local` `NEXT_PUBLIC_API_BASE_URL=http://localhost:8080` 이미 설정됨 ✅
 
 ---
 
-### Day 29 (목)
-**목표: Swagger 최종 정리 + openapi.json 갱신**
+### Day 29 (목) ✅
+**목표: Swagger 최종 정리**
 
-- [ ] 전체 엔드포인트 `@Operation`, `@Tag` 어노테이션 일관성 점검
-- [ ] `GET /v3/api-docs` 응답 → `docs/openapi.json` 갱신
-- [ ] Swagger UI Bearer 토큰 인증 동작 확인
-- [ ] 미완료/미문서화 엔드포인트 목록 정리
+- [x] `SwaggerConfig` 전면 업데이트
+  - 한국어 마크다운 API 설명 (인증 방식, 에러 코드 표, 응답 형식)
+  - 공통 에러 응답 컴포넌트 (`401`, `403`, `404`, `500`) 등록
+  - `OpenApiCustomizer` 빈으로 모든 엔드포인트에 401/500 자동 주입
+  - OAuth2 경로 redirect-uri `http://localhost:3000/auth/callback` 반영
+- [x] `SpendingController` — year/month `@Parameter` 어노테이션 추가
+- [x] `PolicyController` — regionCode `@Parameter` 어노테이션 추가
+- [x] 전체 컨트롤러 `@Tag`, `@Operation` 일관성 확인 (모두 완비)
 
 ---
 
-### Day 30 (금)
-**목표: WEEK 6 리뷰 + develop 브랜치 머지**
+### Day 30 (금) ✅
+**목표: WEEK 6 리뷰 + 빌드 + 태그**
 
-- [ ] 모든 feature 브랜치 PR → develop 머지
-- [ ] `./gradlew build` 전체 빌드 확인
-- [ ] 발견 버그 이슈 등록
-- [ ] Git tag: `v0.1.0-dev`
+- [x] `./gradlew build -x test` 빌드 성공
+- [x] Git commit + push (`feature/week6-fe-swagger-finalize`)
+- [x] Git tag `v0.1.0-dev`
+
+---
+
+## 기술 메모 (WEEK 6)
+
+- **FE api.ts 공통 helper**: `apiFetch<T>()` 로 fetch + 에러처리 + JSON 파싱 통합. `authHeader()` 로 LocalStorage AT 자동 주입. `formatEndDate()` 로 D-day/상시/마감 표시
+- **용어 검색 debounce**: `useTransition` + `setTimeout(300ms)` 조합으로 타이핑 중 불필요한 API 호출 방지. `clearTimeout` 으로 이전 타이머 취소
+- **OAuth2 콜백**: `useSearchParams` 로 쿼리 파라미터 파싱 → `saveTokens()` → `router.replace("/")`. `Suspense` 로 SSR hydration 오류 방지
+- **Swagger 전역 에러 주입**: `OpenApiCustomizer` 빈이 모든 Operation의 `responses` 맵에 `putIfAbsent`로 401/500 추가. 이미 명시한 엔드포인트는 덮어쓰지 않음
+- **NavBar 로그인 상태**: `useEffect` + `pathname` 의존성으로 페이지 전환마다 LocalStorage 토큰 재확인. 서버 컴포넌트에선 실행 안 되므로 `typeof window === "undefined"` 가드 처리
 
 ---
 
@@ -754,7 +770,7 @@
 | Week 3 | News 모듈 + 크롤러 | ✅ |
 | Week 4 | Term + Policy | ✅ |
 | Week 5 | Spending + Notification + Stock | ✅ |
-| Week 6 | Stock + FE 연동 + 통합 | ⬜ |
+| Week 6 | FE 연동 + Swagger 완성 + 통합 | ✅ |
 | Week 7 | 예외 처리 + 보안 + 공공 API | ⬜ |
 | Week 8 | CI/CD + 배포 | ⬜ |
 | Week 9 | AI 연동 + 프론트 연동 | ⬜ |

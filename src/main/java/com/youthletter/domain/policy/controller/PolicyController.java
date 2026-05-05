@@ -6,6 +6,7 @@ import com.youthletter.domain.policy.service.PolicyService;
 import com.youthletter.global.auth.jwt.CustomUserPrincipal;
 import com.youthletter.global.response.GlobalResponse;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -22,9 +23,10 @@ public class PolicyController {
 
     private final PolicyService policyService;
 
-    @Operation(summary = "정책 목록 조회", description = "활성 정책 목록. regionCode 파라미터로 지역 필터 (미입력 시 전체)")
+    @Operation(summary = "정책 목록 조회", description = "활성 정책 목록. regionCode 파라미터로 지역 필터 (미입력 시 전국 포함 전체)")
     @GetMapping
     public GlobalResponse<Page<PolicyListResponse>> getPolicyList(
+            @Parameter(description = "지역 코드 (11=서울, 26=부산, null=전체)", example = "26")
             @RequestParam(required = false) String regionCode,
             @PageableDefault(size = 10) Pageable pageable) {
         return GlobalResponse.ok(policyService.getPolicyList(regionCode, pageable));
