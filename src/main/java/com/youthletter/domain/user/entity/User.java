@@ -109,4 +109,11 @@ public class User extends BaseTimeEntity {
         if (occupation != null) this.occupation = occupation;
         if (incomeLevel != null) this.incomeLevel = incomeLevel;
     }
+
+    /**
+     * 역할 변경 (USER ↔ ADMIN) — 관리자 전용 API에서만 호출
+     */
+    public void updateRole(String role) {
+        this.role = role;
+    }
 }
