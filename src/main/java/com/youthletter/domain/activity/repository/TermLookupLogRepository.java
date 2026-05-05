@@ -16,4 +16,6 @@ public interface TermLookupLogRepository extends JpaRepository<TermLookupLog, Lo
 
     @Query("SELECT t FROM TermLookupLog t JOIN FETCH t.term WHERE t.user.id = :userId ORDER BY t.lookedUpAt DESC")
     List<com.youthletter.domain.activity.entity.TermLookupLog> findByUserIdWithTermOrderByDesc(@Param("userId") Long userId);
+
+    boolean existsByUserIdAndTermId(Long userId, Long termId);
 }

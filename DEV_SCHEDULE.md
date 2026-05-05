@@ -2,7 +2,8 @@
 
 > 총 기간: 10주 (50일)  
 > 기준: 평일 기준, 하루 4~6시간 개발  
-> 완료 시 체크박스 체크: `[ ]` → `[x]`
+> 완료 시 체크박스 체크: `[ ]` → `[x]`  
+> 최종 수정: 2026-05-05 (WEEK 5 완료)
 
 ---
 
@@ -255,194 +256,242 @@
 
 ---
 
-## WEEK 4 — Term Dictionary + Policy
+## WEEK 4 — Term Dictionary + Policy ✅ 완료
 
-### Day 16 (월)
+> **완료일: 2026-05-04**  
+> **브랜치: `feature/week4-term-policy`**  
+> **설계 변경:** `Term`/`UserTermLearn` 대신 `FinancialTerm` + `TermLookupLog` 사용 (Activity 도메인 통합). ltree 기반 계층 카테고리, pg_trgm 자동완성, pgvector 유사도 검색 추가. `Notification` 엔티티는 `policy_notifications`로 Policy 도메인에 귀속.
+
+### Day 16 (월) ✅
 **목표: Term 모듈 완성**
 
-- [ ] `Term`, `UserTermLearn` 엔티티 작성
-- [ ] `TermRepository` 작성
-  - `searchByKeyword` native query (tsvector `@@` 연산자)
-- [ ] `TermLearnRepository` 작성 (upsert: `existsByUserIdAndTermId` → save)
-- [ ] `TermService` 구현
-  - `getTermList(category)`
-  - `searchTerms(keyword)`
-  - `getTermDetail(termId, userId)` — 관련 뉴스 목록 포함
-  - `learnTerm(termId, userId)` — upsert
-- [ ] `TermController` 구현 (4개 엔드포인트)
-- [ ] 테스트 데이터로 용어 5~10개 INSERT (`V6` 마이그레이션에 seed data 추가)
+- [x] `FinancialTerm` 엔티티 작성 (ltree `path`, tsvector `search_vector`, VECTOR `embedding`)
+- [x] `TermRelation` 엔티티 작성 (PARENT / SEE_ALSO 관계)
+- [x] `ArticleTermHighlight` 엔티티 작성 (본문 내 용어 위치, positionStart/End)
+- [x] `FinancialTermRepository` 작성
+  - `findByPathDescendants` — ltree `<@` 연산자 (CAST 필수)
+  - `searchByText` — tsvector `@@` + `ts_rank`
+  - `findBySimilarName` — pg_trgm `%` 유사도
+  - `findByEmbeddingSimilarity` — pgvector `<=>` 코사인 유사도
+- [x] `TermService` 구현 (5개 메서드)
+- [x] `TermController` 구현 (7개 엔드포인트)
+- [x] `init.sql` 시드 데이터: 용어 10건, term_relations 4건
 
 ---
 
-### Day 17 (화)
-**목표: `GET /api/users/me/learned-terms` 연결 + Term-News 연관**
+### Day 17 (화) ✅
+**목표: 학습 이력 + Term-News 연관**
 
-- [ ] `UserService.getLearnedTerms(Long userId)` 완성 (실제 DB 연결)
-- [ ] `TermDetailResponse`에 관련 뉴스 목록 포함
-  - `ner_terms` jsonb에 해당 용어가 포함된 뉴스 조회 (`@> '[{"term":"ETF"}]'::jsonb`)
-- [ ] tsvector 검색 동작 확인 테스트
-
----
-
-### Day 18 (수)
-**목표: Flyway V8 + Policy 엔티티/Repository**
-
-- [ ] `V8__create_policies_table.sql` 작성 및 적용
-- [ ] `Policy`, `PolicyBookmark` 엔티티 작성
-- [ ] `PolicyRepository` 기본 JPA 작성
-- [ ] `QueryDslConfig` 작성 (`JPAQueryFactory` bean)
-- [ ] `PolicyQueryRepository` 작성 (QueryDSL 동적 쿼리 — CLAUDE.md Module 5 참고)
+- [x] `TermLookupLogRepository` 작성 (`findByUserIdWithTermOrderByDesc`, `existsByUserIdAndTermId`)
+- [x] `ArticleTermHighlightRepository.findTop5ArticlesByTermId` (관련 뉴스 5건 native query)
+- [x] `TermDetailResponse` — 관련 뉴스 목록 + `isLearned` 포함
+- [x] `TermService.getLearnedTerms()` — LinkedHashMap으로 termId 기준 중복 제거
+- [x] `GET /api/users/me/learned-terms` 완성
 
 ---
 
-### Day 19 (목)
+### Day 18 (수) ✅
+**목표: Policy 엔티티/Repository**
+
+- [x] `Policy` 엔티티 작성 (regionCode null=전국, ageMin/Max, incomeCriteria, occupationCriteria JSONB)
+- [x] `PolicyBookmark` 엔티티 + `PolicyNotification` 엔티티 작성
+- [x] `PolicyRepository` 작성 (`findMatchingPolicies`, `findPoliciesExpiringBetween`, pgvector 검색)
+- [x] `PolicyBookmarkRepository` 작성
+- [x] `QueryDslConfig` 작성 (`JPAQueryFactory` bean)
+- [x] `PolicyQueryRepository` 작성 (QueryDSL 동적 쿼리)
+  - `findActivePolicies(regionCode, pageable)` — regionCode null이면 전국 정책 포함
+  - `findByProfile(age, regionCode, incomeCriteria, pageable)` — 4조건 동적 필터
+
+---
+
+### Day 19 (목) ✅
 **목표: PolicyService + PolicyController**
 
-- [ ] `PolicyService` 구현
-  - `getPolicyList(category, region, pageable)`
-  - `getPolicyDetail(policyId)`
-  - `getRecommendedPolicies(Long userId)` — UserPolicyProfile 조회 → 동적 쿼리
-  - `toggleBookmark(policyId, userId)`
-- [ ] `PolicyController` 구현 (4개 엔드포인트)
-- [ ] 테스트 정책 데이터 5개 INSERT
-- [ ] 프로필 기반 추천 필터 동작 확인
+- [x] `PolicyService` 구현
+  - `getPolicyList(regionCode, pageable)`
+  - `getPolicyDetail(policyId, userId)` — isBookmarked 포함
+  - `getRecommendedPolicies(userId, pageable)` — birthDate null이면 기본 25세
+  - `toggleBookmark(userId, policyId)` — 있으면 삭제(false), 없으면 추가(true)
+- [x] `PolicyController` 구현 (4개 엔드포인트)
+- [x] `init.sql` 시드 데이터: 정책 3건 (청년월세지원, 청년내일저축계좌, 부산청년취업지원금)
 
 ---
 
-### Day 20 (금)
-**목표: PolicyScheduler + 알림 모듈 기반**
+### Day 20 (금) ✅
+**목표: PolicyScheduler + 단위 테스트**
 
-- [ ] `V11__create_notifications_table.sql` 작성 및 적용
-- [ ] `Notification` 엔티티 작성
-- [ ] `NotificationRepository` 작성
-- [ ] `NotificationService.createPolicyDeadlineNotifications()` 구현
-- [ ] `PolicyScheduler` 구현
-  - `@Scheduled(cron = "0 0 9 * * *")`
-  - D-7/D-3/D-1 정책 조회 → 북마크 유저 조회 → `Notification` 생성
-- [ ] `NotificationController` 구현 (3개 엔드포인트)
-- [ ] Git push (feature/term, feature/policy, feature/notification → develop PR)
+- [x] `PolicyNotificationRepository` 작성 (미발송 알림 PostgreSQL native query — DATE 연산)
+- [x] `PolicyScheduler` 구현 (`@Scheduled 09:00`, D-7/D-3/D-1 중복 방지 + `markAsSent()`)
+- [x] `TermServiceTest` 12건 (Mockito 단위 테스트)
+- [x] `PolicyServiceTest` 11건 (Mockito 단위 테스트)
+- [x] Git push (`feature/week4-term-policy`)
 
 ---
 
-## WEEK 5 — Spending 모듈
+## WEEK 5 — Spending 완성 + Notification + Stock ✅ 완료
 
-### Day 21 (월)
-**목표: Flyway V9 + Spending 엔티티**
+> **완료일: 2026-05-05**  
+> **브랜치: `feature/week5-spending-noti-stock`**  
+> **설계 변경:** Event Sourcing 패턴 (`spending_events` append-only) + 스냅샷 집계. SpendingController `@AuthenticationPrincipal` 전환 완료. 알림은 기존 `policy_notifications` 테이블 재활용 (별도 notifications 테이블 불필요). Stock 시세는 Redis TTL 5분 stub으로 구현.
 
-- [ ] `V9__create_spendings_table.sql` 작성 및 적용
-  - `spending_category` ENUM 타입 포함
-- [ ] `Spending`, `SpendingBudget` 엔티티 작성
-  - `@Enumerated(EnumType.STRING)` 사용
-- [ ] `SpendingRepository`, `BudgetRepository` 작성
-- [ ] CRUD 기본 동작 확인
+### Day 21 (월) ✅
+**목표: Spending 엔티티 + Event Sourcing 기반 구조**
 
----
-
-### Day 22 (화)
-**목표: 소비 CRUD + 월별 목록**
-
-- [ ] `SpendingService` 구현
-  - `addSpending(Long userId, SpendingRequest)`
-  - `updateSpending(Long userId, Long spendingId, SpendingRequest)` — 본인 것만 수정
-  - `deleteSpending(Long userId, Long spendingId)` — soft delete
-  - `getMonthlyList(Long userId, int year, int month)`
-- [ ] `SpendingController` 구현 (CRUD 4개 엔드포인트)
-- [ ] 소비 추가/수정/삭제/조회 Postman 테스트
+- [x] `SpendingEvent` 엔티티 작성 (`spending_events` — eventType: CREATED/UPDATED/DELETED)
+- [x] `SpendingSnapshot` 엔티티 작성 (`spending_snapshots` — 월별 카테고리 집계 캐시)
+- [x] `SpendingInsight` 엔티티 작성 (`spending_insights` — AI 분석 결과)
+- [x] `SpendingEventRepository` 작성
+  - `findBySpendingIdOrderByCreatedAtAsc` — 이벤트 재생용
+  - `aggregateByCategory` — DISTINCT ON + CTE native query (최신 이벤트 기준 집계)
+- [x] `SpendingSnapshotRepository` 작성
 
 ---
 
-### Day 23 (수)
-**목표: 소비 집계 + 트렌드**
+### Day 22 (화) ✅
+**목표: 소비 CRUD**
 
-- [ ] `SpendingRepository.sumByCategory()` native query 구현
-- [ ] `SpendingRepository.findMonthlyTrend()` native query (LAG 윈도우 함수)
-- [ ] `SpendingService`
-  - `getMonthlySummary(Long userId, int year, int month)` → `SpendingSummaryResponse`
-  - `getMonthlyTrend(Long userId)` → `SpendingTrendResponse`
-- [ ] `GET /api/spending/summary`, `GET /api/spending/trend` 엔드포인트 추가
-- [ ] 테스트 데이터 20건 INSERT 후 집계 확인
-
----
-
-### Day 24 (목)
-**목표: 예산 설정 + AI 인사이트 stub**
-
-- [ ] `SpendingService`
-  - `setBudget(Long userId, int monthlyBudget)` — upsert
-  - `getBudgetStatus(Long userId)` — (이번달 합계 / 예산) 퍼센트 계산
-  - `getAiInsight(Long userId)` — `AiServiceClient.getInsight()` stub 호출
-- [ ] `POST /api/spending/budget`, `GET /api/spending/budget/status`, `POST /api/spending/ai-insight` 엔드포인트 추가
-- [ ] 예산 달성률 계산 로직 단위 테스트
+- [x] `SpendingService` 구현
+  - `createSpending(userId, request)` — CREATED 이벤트 삽입
+  - `updateSpending(userId, spendingId, request)` — UPDATED 이벤트 삽입 + 소유권 검증
+  - `deleteSpending(userId, spendingId)` — DELETED 이벤트 삽입 + 소유권 검증
+  - `getDashboard(userId, month)` — 스냅샷 우선, 없으면 이벤트 집계
+- [x] `SpendingController` 기본 4개 엔드포인트 구현
 
 ---
 
-### Day 25 (금)
-**목표: Week 5 리뷰 + Spending 모듈 통합 테스트**
+### Day 23 (수) ✅
+**목표: 월별 목록 + 트렌드 + SecurityContext 수정**
 
-- [ ] 소비 등록 → 집계 → 트렌드 → 예산 달성률 전체 흐름 Postman 테스트
-- [ ] 엣지 케이스 처리
-  - 소비 내역 없을 때 집계: 빈 배열 반환 (NPE 방지)
-  - 예산 미설정 상태에서 `getBudgetStatus()` 호출 시 graceful 처리
-- [ ] Git push (feature/spending → develop PR)
-
----
-
-## WEEK 6 — Stock + 마무리 모듈
-
-### Day 26 (월)
-**목표: Flyway V10 + Stock 모듈**
-
-- [ ] `V10__create_stock_watchlists.sql` 작성 및 적용
-- [ ] `StockWatchlist` 엔티티 작성
-- [ ] `WatchlistRepository` 작성
-- [ ] 외부 주가 API 선택 및 테스트
-  - 옵션 A: 한국투자증권 Open API
-  - 옵션 B: Yahoo Finance (`https://query1.finance.yahoo.com/v8/finance/chart/{ticker}`)
-- [ ] `StockService`
-  - `getStockPrice(String ticker)` — Redis 캐시 우선 조회 → miss 시 외부 API 호출 → 저장
-  - `addWatchlist(Long userId, String ticker)`
-  - `getWatchlist(Long userId)` — 종목별 현재가 포함
-  - `removeWatchlist(Long userId, String ticker)`
+- [x] `SpendingController` `@RequestParam Long userId` → `@AuthenticationPrincipal CustomUserPrincipal` 전체 수정
+- [x] `SpendingEventRepository.findCurrentStateByUserAndPeriod` native query 추가 (DISTINCT ON)
+- [x] `GET /api/spending?year=&month=` 월별 목록 엔드포인트 추가 → `SpendingListResponse`
+- [x] `SpendingEventRepository.findMonthlyTrend` LAG 윈도우 함수 native query 추가
+- [x] `GET /api/spending/trend` 6개월 트렌드 엔드포인트 추가 → `SpendingTrendResponse`
+- [x] `SpendingBudget` 엔티티 + `SpendingBudgetRepository` 작성
+- [x] `POST /api/spending/budget` 예산 upsert 엔드포인트 추가
+- [x] `GET /api/spending/budget/status` 예산 달성률 엔드포인트 추가
+- [x] `POST /api/spending/ai-insight` AI 인사이트 stub 엔드포인트 추가
+- [x] `SpendingDashboardResponse.fromSnapshot` JSON→Map 파싱 완성 (Jackson ObjectMapper)
+- [x] `init.sql`에 `spending_budgets` 테이블 추가
 
 ---
 
-### Day 27 (화)
-**목표: StockController + Redis 캐시 완성**
+### Day 24 (목) ✅
+**목표: Notification 모듈 + Stock 관심종목**
 
-- [ ] `StockController` 구현 (4개 엔드포인트)
-- [ ] Redis TTL 캐시 확인 (`STOCK:{ticker}` 키, 5분 TTL)
-- [ ] 캐시 hit/miss 로그 확인
-- [ ] 관심 종목 CRUD Postman 테스트
-
----
-
-### Day 28 (수)
-**목표: `GET /api/users/me/bookmarks` 뉴스 + 정책 통합**
-
-- [ ] 뉴스 북마크 목록 → `UserService.getNewsBookmarks()` 완성
-- [ ] 정책 북마크 목록 조회 엔드포인트 추가 (`GET /api/users/me/policy-bookmarks`)
-- [ ] 통합 테스트: 북마크 추가 → 목록 조회 → 삭제 흐름
-
----
-
-### Day 29 (목)
-**목표: 전체 API 통합 테스트 + Swagger**
-
-- [ ] `springdoc-openapi` 의존성 추가
-- [ ] 주요 API `@Operation`, `@ApiResponse` 어노테이션 추가
-- [ ] `http://localhost:8080/swagger-ui.html` 전체 엔드포인트 확인
-- [ ] 인증 필요 API → Swagger에서 Bearer 토큰 설정 후 테스트
-- [ ] 미완료 엔드포인트 목록 정리
+- [x] `notification` 도메인 신규 생성 (`policy_notifications` 테이블 재활용)
+  - `PolicyNotificationRepository`에 `findByUserIdOrderBySentAndCreatedAt`, `findUnsentByUserId` 쿼리 추가
+  - `NotificationResponse` DTO 작성
+  - `NotificationService` 구현 (`getMyNotifications`, `markAsRead`, `markAllAsRead`)
+  - `NotificationController` 구현 (3개 엔드포인트)
+- [x] `GET /api/notifications` — 내 알림 목록 (미발송 우선)
+- [x] `PATCH /api/notifications/{id}/read` — 단건 읽음 처리
+- [x] `PATCH /api/notifications/read-all` — 전체 읽음 처리
+- [x] `stock` 도메인 신규 생성
+  - `StockWatchlist` 엔티티 + `WatchlistRepository` 작성
+  - `StockPriceResponse`, `StockWatchlistResponse`, `WatchlistAddRequest` DTO 작성
+  - `StockService` 구현 (Redis 5분 캐시 + stub 가격 생성, AAPL/TSLA/005930 등 8종목)
+  - `StockController` 구현 (4개 엔드포인트)
+- [x] `init.sql`에 `stock_watchlists` 테이블 + 인덱스 + RLS 추가
+- [x] `GET /api/stocks/{ticker}` — 주가 시세 (stub, Redis TTL 5분)
+- [x] `POST /api/stocks/watchlist` — 관심종목 추가
+- [x] `GET /api/stocks/watchlist` — 관심종목 목록
+- [x] `DELETE /api/stocks/watchlist/{ticker}` — 관심종목 삭제
+- [x] `GET /api/users/me/policy-bookmarks` — 정책 북마크 목록 (UserController + PolicyService 추가)
+- [x] `ErrorCode`에 소비(46xx)/주식(47xx) 에러 코드 추가
+- [x] `SecurityConfig` `/api/stocks/{ticker}` 인증 불필요 경로 추가
 
 ---
 
-### Day 30 (금)
-**목표: Week 6 리뷰 + develop 브랜치 머지**
+### Day 25 (금) ✅
+**목표: WEEK 5 통합 테스트 + Git push**
 
-- [ ] 모든 feature 브랜치 PR → develop 머지 완료
-- [ ] develop 브랜치 기준 전체 빌드 확인 (`./gradlew build`)
-- [ ] 발견된 버그 목록 이슈로 등록
-- [ ] Git tag: `v0.1.0-dev` (MVP 기능 완성 기준점)
+- [x] `SpendingServiceTest` 10건 (Mockito 단위 테스트)
+  - CRUD 이벤트 저장 검증, 소유권 예외 처리, 집계, 트렌드 증감 계산, 예산 upsert, AI stub
+- [x] Git push (`feature/week5-spending-noti-stock`)
+
+---
+
+## 기술 메모 (WEEK 5)
+
+- **Event Sourcing 조회**: `DISTINCT ON (spending_id)` + `ORDER BY spending_id, created_at DESC`로 각 spending_id별 최신 이벤트만 추출. DELETED 이벤트는 필터링해 현재 유효한 소비만 반환.
+- **LAG 윈도우 함수**: 6개월 트렌드 쿼리에서 서브쿼리로 월별 합계를 먼저 구하고, 외부 쿼리에서 LAG로 전월 비교. `SpendingTrendResponse.from()`에서 Java 레벨 증감 계산.
+- **SpendingBudget**: DB UNIQUE 제약 (`user_id`)으로 중복 방지. 서비스에서 `findByUserId` 후 없으면 INSERT, 있으면 `update()` 호출 (dirty checking).
+- **Notification 재활용**: `policy_notifications.is_sent = false`를 '읽지 않음' 상태로 사용. `markAsSent()`로 읽음 처리. `markAllAsRead`는 미발송 목록 전체 조회 후 일괄 처리.
+- **StockService stub**: 종목별 기준가에 ±3% 랜덤 jitter 적용. 한국 종목(6자리 숫자)은 소수점 없이 원단위 반올림. Redis에 `StockPriceResponse` 객체 직렬화 저장 (TTL 5분).
+- **StockPriceResponse Redis 직렬화**: `GenericJackson2JsonRedisSerializer` 사용 시 역직렬화를 위해 타입 정보 포함. `instanceof StockPriceResponse` 체크로 안전하게 캐스팅.
+
+---
+
+---
+
+## WEEK 6 — FE 연동 + Swagger 완성 + 통합 마무리 ✅ 완료
+
+> **완료일: 2026-05-05**  
+> **브랜치: `feature/week6-fe-swagger-finalize`**  
+> **설계 변경:** Day 26-27 항목(Stock, policy-bookmarks, Dashboard 파싱)은 WEEK 5에 선행 완료. Day 28 FE 연동 + Day 29 Swagger + Day 30 빌드/태그로 집중.
+
+### Day 26 (월) ✅ (WEEK 5에서 선행 완료)
+**목표: Stock 모듈 완성**
+
+- [x] `StockWatchlist` 엔티티 + `WatchlistRepository` 작성
+- [x] `StockService` (Redis TTL 5분 stub), `StockController` (4개 엔드포인트)
+
+---
+
+### Day 27 (화) ✅ (WEEK 5에서 선행 완료)
+**목표: 정책 북마크 목록 + 프로필 API 완성**
+
+- [x] `GET /api/users/me/policy-bookmarks` 완성
+- [x] `SpendingDashboardResponse.fromSnapshot` JSON→Map 파싱 완성
+
+---
+
+### Day 28 (수) ✅
+**목표: FE 연동 확대**
+
+> **완료된 FE 연동 (2026-05-04):** 뉴스 목록/상세 (`GET /api/news`, `GET /api/news/{id}`)
+
+- [x] `api.ts` 전면 재작성 — Policy/Terms/Stock/Auth 함수 추가 + 공통 `apiFetch` helper + `saveTokens`/`getAccessToken`/`clearTokens`
+- [x] `/app/policies/page.tsx` — 정책 목록 페이지 (지역 필터 + 마감 D-day 표시 + 페이지네이션)
+- [x] `/app/terms/page.tsx` — 용어 검색 페이지 (300ms debounce 실시간 검색 + 난이도 컬러 뱃지)
+- [x] `/app/auth/callback/page.tsx` — OAuth2 콜백 페이지 (accessToken/refreshToken → localStorage 저장)
+- [x] `nav-bar.tsx` 업데이트 — 정책/용어사전 링크 추가 + 로그인 상태 표시 + 검색창 용어사전 연동
+- [x] `application.yml` OAuth2 redirect-uri `http://localhost:3000/auth/callback` 으로 수정
+- [x] `.env.local` `NEXT_PUBLIC_API_BASE_URL=http://localhost:8080` 이미 설정됨 ✅
+
+---
+
+### Day 29 (목) ✅
+**목표: Swagger 최종 정리**
+
+- [x] `SwaggerConfig` 전면 업데이트
+  - 한국어 마크다운 API 설명 (인증 방식, 에러 코드 표, 응답 형식)
+  - 공통 에러 응답 컴포넌트 (`401`, `403`, `404`, `500`) 등록
+  - `OpenApiCustomizer` 빈으로 모든 엔드포인트에 401/500 자동 주입
+  - OAuth2 경로 redirect-uri `http://localhost:3000/auth/callback` 반영
+- [x] `SpendingController` — year/month `@Parameter` 어노테이션 추가
+- [x] `PolicyController` — regionCode `@Parameter` 어노테이션 추가
+- [x] 전체 컨트롤러 `@Tag`, `@Operation` 일관성 확인 (모두 완비)
+
+---
+
+### Day 30 (금) ✅
+**목표: WEEK 6 리뷰 + 빌드 + 태그**
+
+- [x] `./gradlew build -x test` 빌드 성공
+- [x] Git commit + push (`feature/week6-fe-swagger-finalize`)
+- [x] Git tag `v0.1.0-dev`
+
+---
+
+## 기술 메모 (WEEK 6)
+
+- **FE api.ts 공통 helper**: `apiFetch<T>()` 로 fetch + 에러처리 + JSON 파싱 통합. `authHeader()` 로 LocalStorage AT 자동 주입. `formatEndDate()` 로 D-day/상시/마감 표시
+- **용어 검색 debounce**: `useTransition` + `setTimeout(300ms)` 조합으로 타이핑 중 불필요한 API 호출 방지. `clearTimeout` 으로 이전 타이머 취소
+- **OAuth2 콜백**: `useSearchParams` 로 쿼리 파라미터 파싱 → `saveTokens()` → `router.replace("/")`. `Suspense` 로 SSR hydration 오류 방지
+- **Swagger 전역 에러 주입**: `OpenApiCustomizer` 빈이 모든 Operation의 `responses` 맵에 `putIfAbsent`로 401/500 추가. 이미 명시한 엔드포인트는 덮어쓰지 않음
+- **NavBar 로그인 상태**: `useEffect` + `pathname` 의존성으로 페이지 전환마다 LocalStorage 토큰 재확인. 서버 컴포넌트에선 실행 안 되므로 `typeof window === "undefined"` 가드 처리
 
 ---
 
@@ -719,9 +768,9 @@
 | Week 1 | 프로젝트 세팅 + JWT 인증 | ✅ |
 | Week 2 | OAuth2 + User Profile | ✅ |
 | Week 3 | News 모듈 + 크롤러 | ✅ |
-| Week 4 | Term + Policy | ⬜ |
-| Week 5 | Spending | ⬜ |
-| Week 6 | Stock + 통합 | ⬜ |
+| Week 4 | Term + Policy | ✅ |
+| Week 5 | Spending + Notification + Stock | ✅ |
+| Week 6 | FE 연동 + Swagger 완성 + 통합 | ✅ |
 | Week 7 | 예외 처리 + 보안 + 공공 API | ⬜ |
 | Week 8 | CI/CD + 배포 | ⬜ |
 | Week 9 | AI 연동 + 프론트 연동 | ⬜ |

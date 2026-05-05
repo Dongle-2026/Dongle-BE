@@ -27,6 +27,7 @@ public enum ErrorCode {
     DUPLICATE_NICKNAME(HttpStatus.CONFLICT, 4102, "이미 사용 중인 닉네임입니다"),
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, 4103, "이메일 또는 비밀번호가 올바르지 않습니다"),
     OAUTH_ONLY_ACCOUNT(HttpStatus.BAD_REQUEST, 4104, "소셜 로그인 전용 계정입니다. 비밀번호 로그인을 사용할 수 없습니다"),
+    INVALID_INPUT(HttpStatus.BAD_REQUEST, 4105, "유효하지 않은 입력값입니다"),
 
     // ── 뉴스 (42xx) ──
     ARTICLE_NOT_FOUND(HttpStatus.NOT_FOUND, 4200, "뉴스 기사를 찾을 수 없습니다"),
@@ -37,6 +38,16 @@ public enum ErrorCode {
     // ── 정책 (44xx) ──
     POLICY_NOT_FOUND(HttpStatus.NOT_FOUND, 4400, "정책을 찾을 수 없습니다"),
     ALREADY_BOOKMARKED(HttpStatus.CONFLICT, 4401, "이미 즐겨찾기에 추가된 정책입니다"),
+
+    // ── 소비 (46xx) ──
+    SPENDING_NOT_FOUND(HttpStatus.NOT_FOUND, 4600, "소비 내역을 찾을 수 없습니다"),
+    SPENDING_NOT_OWNED(HttpStatus.FORBIDDEN, 4601, "본인의 소비 내역만 수정/삭제할 수 있습니다"),
+    BUDGET_NOT_FOUND(HttpStatus.NOT_FOUND, 4602, "예산이 설정되지 않았습니다"),
+
+    // ── 주식 (47xx) ──
+    TICKER_NOT_FOUND(HttpStatus.NOT_FOUND, 4700, "존재하지 않는 종목 코드입니다"),
+    WATCHLIST_ALREADY_EXISTS(HttpStatus.CONFLICT, 4701, "이미 관심종목에 추가된 종목입니다"),
+    WATCHLIST_NOT_FOUND(HttpStatus.NOT_FOUND, 4702, "관심종목에 없는 종목입니다"),
 
     // ── AI Agent (45xx) ──
     SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, 4500, "채팅 세션을 찾을 수 없습니다"),

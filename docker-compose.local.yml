@@ -1,0 +1,93 @@
+# ============================================
+# 유스레터 - 프론트엔드 연동용 Docker Compose
+#
+# 포함: PostgreSQL + Redis + Spring Boot API
+# 프론트(Next.js)는 로컬에서 실행 (npm run dev)
+#
+# 사용법:
+#   docker-compose -f docker-compose.local.yml up -d --build
+#   (최초 또는 코드 변경 시 --build 필요)
+#
+# 종료:
+#   docker-compose -f docker-compose.local.yml down
+# ============================================
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: youthletter-postgres
+    environment:
+      POSTGRES_USER: youthletter
+      POSTGRES_PASSWORD: youthletter1234
+      POSTGRES_DB: youthletter
+      TZ: Asia/Seoul
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U youthletter -d youthletter"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Redis ───────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: youthletter-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Spring Boot API ─────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: youthletter-api
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      # DB (컨테이너 내부에서는 서비스명으로 접근)
+      DB_USERNAME: youthletter
+      DB_PASSWORD: youthletter1234
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/youthletter
+      # Redis
+      SPRING_DATA_REDIS_HOST: redis
+      # JWT (로컬 개발용 고정값)
+      JWT_SECRET: youth-letter-local-dev-secret-key-at-least-256-bits-long-for-hs256
+      # OAuth2 (카카오/구글 키는 .env 파일에서 주입)
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-your-kakao-client-id}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:-your-kakao-client-secret}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-your-google-client-id}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-your-google-client-secret}
+      # OAuth2 성공 후 프론트로 리다이렉트
+      OAUTH2_REDIRECT_URI: http://localhost:3001/auth/callback
+      # AI 서비스 (연동 전 stub 모드)
+      AI_SERVICE_USE_STUB: "true"
+      TZ: Asia/Seoul
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    name: youthletter_postgres_data
+  redis_data:
+    name: youthletter_redis_data

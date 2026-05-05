@@ -1,12 +1,11 @@
 package com.youthletter.domain.term.controller;
 
+import com.youthletter.domain.term.dto.TermDetailResponse;
 import com.youthletter.domain.term.dto.TermListResponse;
 import com.youthletter.domain.term.entity.FinancialTerm;
 import com.youthletter.domain.term.repository.FinancialTermRepository;
 import com.youthletter.domain.term.service.TermService;
 import com.youthletter.global.auth.jwt.CustomUserPrincipal;
-import com.youthletter.global.exception.BusinessException;
-import com.youthletter.global.exception.ErrorCode;
 import com.youthletter.global.response.GlobalResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,25 +26,25 @@ import java.util.List;
 @RequiredArgsConstructor
 public class TermController {
 
-    private final FinancialTermRepository termRepository;
+    private final FinancialTermRepository termRepository;  // autocomplete, category, level 조회용
     private final TermService termService;
 
-    @Operation(summary = "용어 전체 목록", description = "난이도순 정렬, 페이지네이션")
+    @Operation(summary = "용어 전체 목록", description = "난이도순 정렬, 페이지네이션. path 파라미터로 ltree 카테고리 필터 가능")
     @GetMapping
     public ResponseEntity<GlobalResponse<Page<TermListResponse>>> getTermList(
+            @RequestParam(required = false) String path,
             @PageableDefault(size = 20, sort = "difficultyLevel", direction = Sort.Direction.ASC)
             Pageable pageable) {
-        Page<TermListResponse> result = termRepository.findAll(pageable)
-                .map(TermListResponse::from);
-        return ResponseEntity.ok(GlobalResponse.ok(result));
+        return ResponseEntity.ok(GlobalResponse.ok(termService.getTermList(path, pageable)));
     }
 
-    @Operation(summary = "용어 상세 조회")
+    @Operation(summary = "용어 상세 조회", description = "관련 뉴스 목록 최대 5건 포함, 로그인 시 학습 여부 표시")
     @GetMapping("/{termId}")
-    public ResponseEntity<GlobalResponse<FinancialTerm>> getTerm(@PathVariable Long termId) {
-        FinancialTerm term = termRepository.findById(termId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.TERM_NOT_FOUND));
-        return ResponseEntity.ok(GlobalResponse.ok(term));
+    public ResponseEntity<GlobalResponse<TermDetailResponse>> getTerm(
+            @PathVariable Long termId,
+            @AuthenticationPrincipal CustomUserPrincipal principal) {
+        Long userId = principal != null ? principal.getUserId() : null;
+        return ResponseEntity.ok(GlobalResponse.ok(termService.getTermDetail(termId, userId)));
     }
 
     @Operation(summary = "용어 학습 완료 처리", description = "학습 이력을 저장합니다")
@@ -59,10 +58,10 @@ public class TermController {
 
     @Operation(summary = "용어 검색 (전문 검색)", description = "tsvector 기반")
     @GetMapping("/search")
-    public ResponseEntity<GlobalResponse<List<FinancialTerm>>> searchTerms(
+    public ResponseEntity<GlobalResponse<List<TermListResponse>>> searchTerms(
             @RequestParam String query,
             @RequestParam(defaultValue = "10") int limit) {
-        return ResponseEntity.ok(GlobalResponse.ok(termRepository.searchByText(query, limit)));
+        return ResponseEntity.ok(GlobalResponse.ok(termService.searchTerms(query, limit)));
     }
 
     @Operation(summary = "용어 자동완성", description = "pg_trgm 기반 유사 문자열")

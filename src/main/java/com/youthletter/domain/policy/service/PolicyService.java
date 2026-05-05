@@ -5,9 +5,9 @@ import com.youthletter.domain.policy.dto.PolicyListResponse;
 import com.youthletter.domain.policy.entity.Policy;
 import com.youthletter.domain.policy.entity.PolicyBookmark;
 import com.youthletter.domain.policy.repository.PolicyBookmarkRepository;
+import com.youthletter.domain.policy.repository.PolicyQueryRepository;
 import com.youthletter.domain.policy.repository.PolicyRepository;
 import com.youthletter.domain.user.entity.User;
-import com.youthletter.domain.user.entity.UserProfile;
 import com.youthletter.domain.user.repository.UserRepository;
 import com.youthletter.global.exception.BusinessException;
 import com.youthletter.global.exception.ErrorCode;
@@ -26,11 +26,20 @@ import java.time.Period;
 public class PolicyService {
 
     private final PolicyRepository policyRepository;
+    private final PolicyQueryRepository policyQueryRepository;
     private final PolicyBookmarkRepository bookmarkRepository;
     private final UserRepository userRepository;
 
     /**
-     * 프로필 기반 정책 추천
+     * 정책 목록 조회 (지역 필터 + 활성 정책)
+     */
+    public Page<PolicyListResponse> getPolicyList(String regionCode, Pageable pageable) {
+        return policyQueryRepository.findActivePolicies(regionCode, pageable)
+                .map(PolicyListResponse::from);
+    }
+
+    /**
+     * 프로필 기반 정책 추천 (QueryDSL 동적 쿼리)
      */
     public Page<PolicyListResponse> getRecommendedPolicies(Long userId, Pageable pageable) {
         User user = userRepository.findById(userId)
@@ -38,14 +47,11 @@ public class PolicyService {
 
         int age = user.getBirthDate() != null
                 ? Period.between(user.getBirthDate(), LocalDate.now()).getYears()
-                : 25;  // 기본값
+                : 25;
 
-        String regionCode = user.getRegionCode() != null ? user.getRegionCode() : "";
-
-        Page<Policy> policies = policyRepository.findMatchingPolicies(
-                age, regionCode, LocalDate.now(), pageable);
-
-        return policies.map(PolicyListResponse::from);
+        return policyQueryRepository.findByProfile(
+                age, user.getRegionCode(), user.getIncomeLevel(), pageable)
+                .map(PolicyListResponse::from);
     }
 
     /**
@@ -59,6 +65,14 @@ public class PolicyService {
                 && bookmarkRepository.existsByUserIdAndPolicyId(userId, policyId);
 
         return PolicyDetailResponse.from(policy, isBookmarked);
+    }
+
+    /**
+     * 내 정책 북마크 목록
+     */
+    public Page<PolicyListResponse> getMyPolicyBookmarks(Long userId, Pageable pageable) {
+        return bookmarkRepository.findByUserIdOrderByCreatedAtDesc(userId, pageable)
+                .map(bookmark -> PolicyListResponse.from(bookmark.getPolicy()));
     }
 
     /**
