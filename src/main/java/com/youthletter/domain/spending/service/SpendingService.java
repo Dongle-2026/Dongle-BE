@@ -1,11 +1,8 @@
 package com.youthletter.domain.spending.service;
 
-import com.youthletter.domain.spending.dto.SpendingCreateRequest;
-import com.youthletter.domain.spending.dto.SpendingDashboardResponse;
-import com.youthletter.domain.spending.entity.SpendingEvent;
-import com.youthletter.domain.spending.entity.SpendingSnapshot;
-import com.youthletter.domain.spending.repository.SpendingEventRepository;
-import com.youthletter.domain.spending.repository.SpendingSnapshotRepository;
+import com.youthletter.domain.spending.dto.*;
+import com.youthletter.domain.spending.entity.*;
+import com.youthletter.domain.spending.repository.*;
 import com.youthletter.domain.user.entity.User;
 import com.youthletter.domain.user.repository.UserRepository;
 import com.youthletter.global.exception.BusinessException;
@@ -27,22 +24,20 @@ public class SpendingService {
 
     private final SpendingEventRepository eventRepository;
     private final SpendingSnapshotRepository snapshotRepository;
+    private final SpendingBudgetRepository budgetRepository;
+    private final SpendingInsightRepository insightRepository;
     private final UserRepository userRepository;
 
-    // spending_id 생성용 (실무에서는 시퀀스 또는 Snowflake ID 사용)
     private final AtomicLong spendingIdGenerator = new AtomicLong(System.currentTimeMillis());
 
-    /**
-     * 소비 기록 추가 (Event Sourcing: CREATED 이벤트 삽입)
-     */
+    // ── CRUD ──────────────────────────────────────────────────────────────────
+
     @Transactional
     public Long createSpending(Long userId, SpendingCreateRequest request) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-
+        User user = findUser(userId);
         long spendingId = spendingIdGenerator.incrementAndGet();
 
-        SpendingEvent event = SpendingEvent.builder()
+        eventRepository.save(SpendingEvent.builder()
                 .user(user)
                 .eventType("CREATED")
                 .spendingId(spendingId)
@@ -51,21 +46,20 @@ public class SpendingService {
                 .description(request.description())
                 .spentAt(request.spentAt())
                 .metadata(request.metadata())
-                .build();
+                .build());
 
-        eventRepository.save(event);
         return spendingId;
     }
 
-    /**
-     * 소비 기록 수정 (Event Sourcing: UPDATED 이벤트 삽입, 기존 이벤트는 그대로)
-     */
     @Transactional
     public void updateSpending(Long userId, Long spendingId, SpendingCreateRequest request) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        User user = findUser(userId);
 
-        SpendingEvent event = SpendingEvent.builder()
+        List<SpendingEvent> events = eventRepository.findBySpendingIdOrderByCreatedAtAsc(spendingId);
+        if (events.isEmpty()) throw new BusinessException(ErrorCode.SPENDING_NOT_FOUND);
+        if (!events.get(0).getUser().getId().equals(userId)) throw new BusinessException(ErrorCode.SPENDING_NOT_OWNED);
+
+        eventRepository.save(SpendingEvent.builder()
                 .user(user)
                 .eventType("UPDATED")
                 .spendingId(spendingId)
@@ -74,28 +68,19 @@ public class SpendingService {
                 .description(request.description())
                 .spentAt(request.spentAt())
                 .metadata(request.metadata())
-                .build();
-
-        eventRepository.save(event);
+                .build());
     }
 
-    /**
-     * 소비 기록 삭제 (Event Sourcing: DELETED 이벤트 삽입)
-     */
     @Transactional
     public void deleteSpending(Long userId, Long spendingId) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        User user = findUser(userId);
 
-        // 최신 이벤트를 기준으로 삭제 이벤트 생성
-        List<SpendingEvent> events = eventRepository
-                .findBySpendingIdOrderByCreatedAtAsc(spendingId);
-
-        if (events.isEmpty()) return;
+        List<SpendingEvent> events = eventRepository.findBySpendingIdOrderByCreatedAtAsc(spendingId);
+        if (events.isEmpty()) throw new BusinessException(ErrorCode.SPENDING_NOT_FOUND);
+        if (!events.get(0).getUser().getId().equals(userId)) throw new BusinessException(ErrorCode.SPENDING_NOT_OWNED);
 
         SpendingEvent latest = events.get(events.size() - 1);
-
-        SpendingEvent deleteEvent = SpendingEvent.builder()
+        eventRepository.save(SpendingEvent.builder()
                 .user(user)
                 .eventType("DELETED")
                 .spendingId(spendingId)
@@ -103,16 +88,23 @@ public class SpendingService {
                 .category(latest.getCategory())
                 .description(latest.getDescription())
                 .spentAt(latest.getSpentAt())
-                .build();
-
-        eventRepository.save(deleteEvent);
+                .build());
     }
 
-    /**
-     * 월별 소비 대시보드 조회 (스냅샷 기반 — O(1))
-     */
+    // ── 조회 ──────────────────────────────────────────────────────────────────
+
+    public List<SpendingListResponse> getMonthlyList(Long userId, int year, int month) {
+        YearMonth ym = YearMonth.of(year, month);
+        LocalDate start = ym.atDay(1);
+        LocalDate end = ym.atEndOfMonth();
+
+        return eventRepository.findCurrentStateByUserAndPeriod(userId, start, end).stream()
+                .filter(e -> !"DELETED".equals(e.getEventType()))
+                .map(SpendingListResponse::from)
+                .toList();
+    }
+
     public SpendingDashboardResponse getDashboard(Long userId, String month) {
-        // month: "2026-03" 형식
         SpendingSnapshot snapshot = snapshotRepository
                 .findByUserIdAndSnapshotMonth(userId, month)
                 .orElse(null);
@@ -121,14 +113,59 @@ public class SpendingService {
             return SpendingDashboardResponse.fromSnapshot(snapshot);
         }
 
-        // 스냅샷이 없으면 이벤트에서 직접 집계 (최초 조회 시)
         YearMonth ym = YearMonth.parse(month);
-        LocalDate start = ym.atDay(1);
-        LocalDate end = ym.atEndOfMonth();
-
         List<Object[]> aggregated = eventRepository
-                .aggregateByCategory(userId, start, end);
+                .aggregateByCategory(userId, ym.atDay(1), ym.atEndOfMonth());
 
         return SpendingDashboardResponse.fromAggregation(month, aggregated);
+    }
+
+    public SpendingTrendResponse getTrend(Long userId) {
+        List<Object[]> rows = eventRepository.findMonthlyTrend(userId);
+        return SpendingTrendResponse.from(rows);
+    }
+
+    // ── 예산 ──────────────────────────────────────────────────────────────────
+
+    @Transactional
+    public void upsertBudget(Long userId, SpendingBudgetRequest request) {
+        User user = findUser(userId);
+        SpendingBudget budget = budgetRepository.findByUserId(userId)
+                .orElse(null);
+
+        if (budget == null) {
+            budgetRepository.save(SpendingBudget.builder()
+                    .user(user)
+                    .monthlyBudget(request.monthlyBudget())
+                    .build());
+        } else {
+            budget.update(request.monthlyBudget());
+        }
+    }
+
+    public SpendingBudgetStatusResponse getBudgetStatus(Long userId) {
+        SpendingBudget budget = budgetRepository.findByUserId(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_NOT_FOUND));
+
+        String currentMonth = YearMonth.now().toString();
+        SpendingDashboardResponse dashboard = getDashboard(userId, currentMonth);
+        BigDecimal spent = dashboard.totalAmount() != null ? dashboard.totalAmount() : BigDecimal.ZERO;
+
+        return SpendingBudgetStatusResponse.of(budget.getMonthlyBudget(), spent);
+    }
+
+    // ── AI 인사이트 (stub) ────────────────────────────────────────────────────
+
+    public SpendingAiInsightResponse getAiInsight(Long userId) {
+        LocalDate end = LocalDate.now();
+        LocalDate start = end.minusDays(29);
+        return SpendingAiInsightResponse.stub(start, end);
+    }
+
+    // ── 내부 ──────────────────────────────────────────────────────────────────
+
+    private User findUser(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
     }
 }

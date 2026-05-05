@@ -121,7 +121,70 @@
 
 | 단계 | 내용 |
 |------|------|
-| 3단계 | SPEND-01~09 (소비 CRUD + 집계 + 트렌드 + 예산 + AI 인사이트) |
-| 4단계 | STOCK-01~04 (주식 시세 + 관심종목) |
-| 4단계 | NOTI-01~04 (알림 목록/읽음처리) |
-| 5단계 | stub → AiServiceClient 실제 연동 (혜린 API 완성 후) |
+## 2026-05-05 — WEEK5: Spending 완성 + Notification + Stock
+
+> 브랜치: `feature/week5-spending-noti-stock`
+
+### Spending 완성 (SPEND-01~09)
+
+| ID | 기능 | 엔드포인트 | 상태 |
+|----|------|-----------|------|
+| SPEND-01 | 소비 기록 추가 (CREATED 이벤트) | POST /api/spending | ✅ |
+| SPEND-02 | 소비 기록 수정 (UPDATED 이벤트) | PUT /api/spending/{id} | ✅ |
+| SPEND-03 | 소비 기록 삭제 (DELETED 이벤트) | DELETE /api/spending/{id} | ✅ |
+| SPEND-04 | 월별 소비 목록 | GET /api/spending?year=&month= | ✅ |
+| SPEND-05 | 월별 소비 대시보드 (카테고리 집계) | GET /api/spending/dashboard | ✅ |
+| SPEND-06 | 6개월 트렌드 (LAG 윈도우) | GET /api/spending/trend | ✅ |
+| SPEND-07 | 예산 설정 (upsert) | POST /api/spending/budget | ✅ |
+| SPEND-08 | 예산 달성률 | GET /api/spending/budget/status | ✅ |
+| SPEND-09 | AI 소비 인사이트 (stub) | POST /api/spending/ai-insight | ✅ |
+
+### Notification (NOTI-01~03)
+
+| ID | 기능 | 엔드포인트 | 상태 |
+|----|------|-----------|------|
+| NOTI-01 | 내 알림 목록 (미발송 우선) | GET /api/notifications | ✅ |
+| NOTI-02 | 단건 읽음 처리 | PATCH /api/notifications/{id}/read | ✅ |
+| NOTI-03 | 전체 읽음 처리 | PATCH /api/notifications/read-all | ✅ |
+
+### Stock (STOCK-01~04)
+
+| ID | 기능 | 엔드포인트 | 상태 |
+|----|------|-----------|------|
+| STOCK-01 | 주가 시세 조회 (Redis 5분 캐시, stub) | GET /api/stocks/{ticker} | ✅ |
+| STOCK-02 | 관심종목 추가 | POST /api/stocks/watchlist | ✅ |
+| STOCK-03 | 관심종목 목록 조회 | GET /api/stocks/watchlist | ✅ |
+| STOCK-04 | 관심종목 삭제 | DELETE /api/stocks/watchlist/{ticker} | ✅ |
+
+### User 보완
+
+| ID | 기능 | 엔드포인트 | 상태 |
+|----|------|-----------|------|
+| USER-06 | 정책 북마크 목록 | GET /api/users/me/policy-bookmarks | ✅ |
+
+### 테스트
+
+| 파일 | 케이스 수 | 설명 |
+|------|-----------|------|
+| `SpendingServiceTest` | 10건 | CRUD 이벤트/소유권/집계/트렌드/예산/AI stub |
+
+### 기술 메모
+
+- **`@AuthenticationPrincipal` 전환**: SpendingController 전체 `@RequestParam Long userId` 제거 → `@AuthenticationPrincipal CustomUserPrincipal` 적용
+- **Event Sourcing 월별 조회**: `DISTINCT ON (spending_id) ORDER BY spending_id, created_at DESC` 패턴으로 각 spending_id의 최신 이벤트 추출 → DELETED 필터링
+- **LAG 윈도우**: PostgreSQL `LAG()` 함수로 전월 대비 증감. `SpendingTrendResponse.from()`에서 Java 레벨 BigDecimal 증감 계산
+- **예산**: `spending_budgets(user_id UNIQUE)` 테이블 신규 추가. `findByUserId` 후 없으면 INSERT, 있으면 dirty checking으로 UPDATE
+- **Notification 재활용**: `policy_notifications.is_sent`를 읽음/안읽음으로 사용. 별도 notifications 테이블 불필요
+- **Stock stub**: 종목별 기준가 ±3% 랜덤 jitter. Redis `STOCK:{ticker}` 키로 TTL 5분 캐시
+- **`init.sql` 변경**: `spending_budgets` + `stock_watchlists` 테이블/인덱스/RLS 추가
+
+---
+
+## 2026-05-04 이후 — 4~5단계
+
+| 단계 | 내용 | 상태 |
+|------|------|------|
+| 3단계 | SPEND-01~09 (소비 CRUD + 집계 + 트렌드 + 예산 + AI 인사이트) | ✅ |
+| 4단계 | STOCK-01~04 (주식 시세 + 관심종목) | ✅ |
+| 4단계 | NOTI-01~03 (알림 목록/읽음처리) | ✅ |
+| 5단계 | stub → AiServiceClient 실제 연동 (혜린 API 완성 후) | ⬜ |

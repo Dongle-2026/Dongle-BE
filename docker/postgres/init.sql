@@ -212,6 +212,21 @@ CREATE TABLE spending_insights (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE spending_budgets (
+    id              BIGSERIAL PRIMARY KEY,
+    user_id         BIGINT NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
+    monthly_budget  BIGINT NOT NULL,
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE stock_watchlists (
+    id          BIGSERIAL PRIMARY KEY,
+    user_id     BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    ticker      VARCHAR(20) NOT NULL,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (user_id, ticker)
+);
+
 -- ============================================
 -- 6. Guides 도메인
 -- ============================================
@@ -305,6 +320,8 @@ CREATE INDEX idx_spending_events_user_date ON spending_events(user_id, spent_at 
 CREATE INDEX idx_spending_events_spending_id ON spending_events(spending_id, created_at);
 CREATE INDEX idx_snapshots_user_month ON spending_snapshots(user_id, snapshot_month DESC);
 
+CREATE INDEX idx_stock_watchlists_user ON stock_watchlists(user_id, created_at DESC);
+
 CREATE INDEX idx_sessions_user ON chat_sessions(user_id, updated_at DESC);
 CREATE INDEX idx_messages_session ON chat_messages(session_id, created_at);
 
@@ -365,6 +382,8 @@ CREATE TRIGGER trg_chat_sessions_updated_at
 ALTER TABLE spending_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE spending_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE spending_insights ENABLE ROW LEVEL SECURITY;
+ALTER TABLE spending_budgets ENABLE ROW LEVEL SECURITY;
+ALTER TABLE stock_watchlists ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chat_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE reading_history ENABLE ROW LEVEL SECURITY;
@@ -415,6 +434,12 @@ CREATE POLICY user_isolation_news_bookmarks ON news_bookmarks
     TO youthletter_app
     USING (user_id = current_setting('app.current_user_id', true)::bigint);
 CREATE POLICY user_isolation_policy_notifications ON policy_notifications
+    TO youthletter_app
+    USING (user_id = current_setting('app.current_user_id', true)::bigint);
+CREATE POLICY user_isolation_spending_budgets ON spending_budgets
+    TO youthletter_app
+    USING (user_id = current_setting('app.current_user_id', true)::bigint);
+CREATE POLICY user_isolation_stock_watchlists ON stock_watchlists
     TO youthletter_app
     USING (user_id = current_setting('app.current_user_id', true)::bigint);
 

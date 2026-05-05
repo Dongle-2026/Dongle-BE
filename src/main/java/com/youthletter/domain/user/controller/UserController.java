@@ -2,6 +2,8 @@ package com.youthletter.domain.user.controller;
 
 import com.youthletter.domain.news.dto.NewsBookmarkResponse;
 import com.youthletter.domain.news.service.NewsService;
+import com.youthletter.domain.policy.dto.PolicyListResponse;
+import com.youthletter.domain.policy.service.PolicyService;
 import com.youthletter.domain.term.dto.LearnedTermResponse;
 import com.youthletter.domain.term.service.TermService;
 import com.youthletter.domain.user.dto.*;
@@ -31,6 +33,7 @@ public class UserController {
     private final UserService userService;
     private final NewsService newsService;
     private final TermService termService;
+    private final PolicyService policyService;
 
     @Operation(summary = "내 프로필 조회")
     @GetMapping("/me")
@@ -86,5 +89,14 @@ public class UserController {
     public ResponseEntity<GlobalResponse<List<LearnedTermResponse>>> getLearnedTerms(
             @AuthenticationPrincipal CustomUserPrincipal principal) {
         return ResponseEntity.ok(GlobalResponse.ok(termService.getLearnedTerms(principal.getUserId())));
+    }
+
+    @Operation(summary = "내 정책 북마크 목록", description = "최신 북마크 순 정렬")
+    @GetMapping("/me/policy-bookmarks")
+    public ResponseEntity<GlobalResponse<Page<PolicyListResponse>>> getMyPolicyBookmarks(
+            @AuthenticationPrincipal CustomUserPrincipal principal,
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC)
+            Pageable pageable) {
+        return ResponseEntity.ok(GlobalResponse.ok(policyService.getMyPolicyBookmarks(principal.getUserId(), pageable)));
     }
 }

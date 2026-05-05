@@ -52,6 +52,7 @@ public class SecurityConfig {
                     "/api/terms/{id}",
                     "/api/policies",
                     "/api/policies/{policyId}",
+                    "/api/stocks/{ticker}",
                     "/api/guides/**",
                     "/oauth2/**",
                     "/login/oauth2/**",

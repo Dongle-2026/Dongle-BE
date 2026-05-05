@@ -3,7 +3,7 @@
 > 총 기간: 10주 (50일)  
 > 기준: 평일 기준, 하루 4~6시간 개발  
 > 완료 시 체크박스 체크: `[ ]` → `[x]`  
-> 최종 수정: 2026-05-05
+> 최종 수정: 2026-05-05 (WEEK 5 완료)
 
 ---
 
@@ -328,14 +328,13 @@
 
 ---
 
-## WEEK 5 — Spending 완성 + Notification + Stock 🔧 진행 중
+## WEEK 5 — Spending 완성 + Notification + Stock ✅ 완료
 
-> **기준일: 2026-05-05**  
-> **브랜치: `feature/week5-spending-noti-stock` (예정)**  
-> **설계 변경:** 원래 단순 CRUD 대신 **Event Sourcing** 패턴 적용 (`spending_events` append-only 테이블). 삭제가 물리 삭제 아닌 DELETED 이벤트 추가. 집계는 스냅샷(`spending_snapshots`) 기반으로 O(1) 조회.  
-> SpendingController 현재 `@RequestParam Long userId` → `@AuthenticationPrincipal`로 수정 필요 (TODO 남아있음).
+> **완료일: 2026-05-05**  
+> **브랜치: `feature/week5-spending-noti-stock`**  
+> **설계 변경:** Event Sourcing 패턴 (`spending_events` append-only) + 스냅샷 집계. SpendingController `@AuthenticationPrincipal` 전환 완료. 알림은 기존 `policy_notifications` 테이블 재활용 (별도 notifications 테이블 불필요). Stock 시세는 Redis TTL 5분 stub으로 구현.
 
-### Day 21 (월) ✅ (부분 완료)
+### Day 21 (월) ✅
 **목표: Spending 엔티티 + Event Sourcing 기반 구조**
 
 - [x] `SpendingEvent` 엔티티 작성 (`spending_events` — eventType: CREATED/UPDATED/DELETED)
@@ -348,54 +347,81 @@
 
 ---
 
-### Day 22 (화) ✅ (부분 완료)
+### Day 22 (화) ✅
 **목표: 소비 CRUD**
 
 - [x] `SpendingService` 구현
   - `createSpending(userId, request)` — CREATED 이벤트 삽입
-  - `updateSpending(userId, spendingId, request)` — UPDATED 이벤트 삽입
-  - `deleteSpending(userId, spendingId)` — DELETED 이벤트 삽입 (latest 이벤트 기준)
+  - `updateSpending(userId, spendingId, request)` — UPDATED 이벤트 삽입 + 소유권 검증
+  - `deleteSpending(userId, spendingId)` — DELETED 이벤트 삽입 + 소유권 검증
   - `getDashboard(userId, month)` — 스냅샷 우선, 없으면 이벤트 집계
-- [x] `SpendingController` 구현 (4개 엔드포인트)
-- [ ] **미완료:** `@RequestParam Long userId` → `@AuthenticationPrincipal`로 수정
-- [ ] **미완료:** `GET /api/spending?year=&month=` 월별 목록 조회 (이벤트 재생)
+- [x] `SpendingController` 기본 4개 엔드포인트 구현
 
 ---
 
-### Day 23 (수) 🔧 진행 예정
+### Day 23 (수) ✅
 **목표: 월별 목록 + 트렌드 + SecurityContext 수정**
 
-- [ ] `SpendingController` `@RequestParam Long userId` → `@AuthenticationPrincipal CustomUserPrincipal` 수정 (전체)
-- [ ] `SpendingEventRepository.findByUserIdAndSpentAtBetweenOrderBySpentAtDesc` 활용 → 월별 목록 API
-- [ ] `GET /api/spending?year=&month=` 엔드포인트 추가
-- [ ] `SpendingEventRepository` 6개월 트렌드 native query (LAG 윈도우 함수)
-- [ ] `GET /api/spending/trend` 엔드포인트 추가
-- [ ] `SpendingServiceTest` 단위 테스트 추가
+- [x] `SpendingController` `@RequestParam Long userId` → `@AuthenticationPrincipal CustomUserPrincipal` 전체 수정
+- [x] `SpendingEventRepository.findCurrentStateByUserAndPeriod` native query 추가 (DISTINCT ON)
+- [x] `GET /api/spending?year=&month=` 월별 목록 엔드포인트 추가 → `SpendingListResponse`
+- [x] `SpendingEventRepository.findMonthlyTrend` LAG 윈도우 함수 native query 추가
+- [x] `GET /api/spending/trend` 6개월 트렌드 엔드포인트 추가 → `SpendingTrendResponse`
+- [x] `SpendingBudget` 엔티티 + `SpendingBudgetRepository` 작성
+- [x] `POST /api/spending/budget` 예산 upsert 엔드포인트 추가
+- [x] `GET /api/spending/budget/status` 예산 달성률 엔드포인트 추가
+- [x] `POST /api/spending/ai-insight` AI 인사이트 stub 엔드포인트 추가
+- [x] `SpendingDashboardResponse.fromSnapshot` JSON→Map 파싱 완성 (Jackson ObjectMapper)
+- [x] `init.sql`에 `spending_budgets` 테이블 추가
 
 ---
 
-### Day 24 (목) 🔧 진행 예정
+### Day 24 (목) ✅
 **목표: Notification 모듈 + Stock 관심종목**
 
-- [ ] `Notification` 관련 엔티티/레포지토리 없음 → `notification` 도메인 신규 생성
-  - 단, `policy_notifications` 테이블은 이미 있으므로 별도 알림 목록 테이블 불필요
-  - `policy_notifications` 기반 알림 목록 API 구현
-- [ ] `GET /api/notifications` — 내 알림 목록 (미발송 우선)
-- [ ] `PATCH /api/notifications/{id}/read` — 단건 읽음 처리
-- [ ] `StockWatchlist` 엔티티 + `WatchlistRepository` 작성
-- [ ] `GET /api/stocks/watchlist`, `POST /api/stocks/watchlist`, `DELETE /api/stocks/watchlist/{ticker}`
-- [ ] 주가 시세는 Yahoo Finance stub으로 대체 (실제 API 키 없이 동작)
+- [x] `notification` 도메인 신규 생성 (`policy_notifications` 테이블 재활용)
+  - `PolicyNotificationRepository`에 `findByUserIdOrderBySentAndCreatedAt`, `findUnsentByUserId` 쿼리 추가
+  - `NotificationResponse` DTO 작성
+  - `NotificationService` 구현 (`getMyNotifications`, `markAsRead`, `markAllAsRead`)
+  - `NotificationController` 구현 (3개 엔드포인트)
+- [x] `GET /api/notifications` — 내 알림 목록 (미발송 우선)
+- [x] `PATCH /api/notifications/{id}/read` — 단건 읽음 처리
+- [x] `PATCH /api/notifications/read-all` — 전체 읽음 처리
+- [x] `stock` 도메인 신규 생성
+  - `StockWatchlist` 엔티티 + `WatchlistRepository` 작성
+  - `StockPriceResponse`, `StockWatchlistResponse`, `WatchlistAddRequest` DTO 작성
+  - `StockService` 구현 (Redis 5분 캐시 + stub 가격 생성, AAPL/TSLA/005930 등 8종목)
+  - `StockController` 구현 (4개 엔드포인트)
+- [x] `init.sql`에 `stock_watchlists` 테이블 + 인덱스 + RLS 추가
+- [x] `GET /api/stocks/{ticker}` — 주가 시세 (stub, Redis TTL 5분)
+- [x] `POST /api/stocks/watchlist` — 관심종목 추가
+- [x] `GET /api/stocks/watchlist` — 관심종목 목록
+- [x] `DELETE /api/stocks/watchlist/{ticker}` — 관심종목 삭제
+- [x] `GET /api/users/me/policy-bookmarks` — 정책 북마크 목록 (UserController + PolicyService 추가)
+- [x] `ErrorCode`에 소비(46xx)/주식(47xx) 에러 코드 추가
+- [x] `SecurityConfig` `/api/stocks/{ticker}` 인증 불필요 경로 추가
 
 ---
 
-### Day 25 (금) 🔧 진행 예정
+### Day 25 (금) ✅
 **목표: WEEK 5 통합 테스트 + Git push**
 
-- [ ] Spending 전체 흐름 Postman 테스트 (등록 → 집계 → 트렌드)
-- [ ] Notification 알림 목록 조회 확인
-- [ ] Stock 관심종목 CRUD 확인
-- [ ] `SpendingServiceTest` 단위 테스트 작성
-- [ ] Git push (`feature/week5-spending-noti-stock`)
+- [x] `SpendingServiceTest` 10건 (Mockito 단위 테스트)
+  - CRUD 이벤트 저장 검증, 소유권 예외 처리, 집계, 트렌드 증감 계산, 예산 upsert, AI stub
+- [x] Git push (`feature/week5-spending-noti-stock`)
+
+---
+
+## 기술 메모 (WEEK 5)
+
+- **Event Sourcing 조회**: `DISTINCT ON (spending_id)` + `ORDER BY spending_id, created_at DESC`로 각 spending_id별 최신 이벤트만 추출. DELETED 이벤트는 필터링해 현재 유효한 소비만 반환.
+- **LAG 윈도우 함수**: 6개월 트렌드 쿼리에서 서브쿼리로 월별 합계를 먼저 구하고, 외부 쿼리에서 LAG로 전월 비교. `SpendingTrendResponse.from()`에서 Java 레벨 증감 계산.
+- **SpendingBudget**: DB UNIQUE 제약 (`user_id`)으로 중복 방지. 서비스에서 `findByUserId` 후 없으면 INSERT, 있으면 `update()` 호출 (dirty checking).
+- **Notification 재활용**: `policy_notifications.is_sent = false`를 '읽지 않음' 상태로 사용. `markAsSent()`로 읽음 처리. `markAllAsRead`는 미발송 목록 전체 조회 후 일괄 처리.
+- **StockService stub**: 종목별 기준가에 ±3% 랜덤 jitter 적용. 한국 종목(6자리 숫자)은 소수점 없이 원단위 반올림. Redis에 `StockPriceResponse` 객체 직렬화 저장 (TTL 5분).
+- **StockPriceResponse Redis 직렬화**: `GenericJackson2JsonRedisSerializer` 사용 시 역직렬화를 위해 타입 정보 포함. `instanceof StockPriceResponse` 체크로 안전하게 캐스팅.
+
+---
 
 ---
 
@@ -727,7 +753,7 @@
 | Week 2 | OAuth2 + User Profile | ✅ |
 | Week 3 | News 모듈 + 크롤러 | ✅ |
 | Week 4 | Term + Policy | ✅ |
-| Week 5 | Spending + Notification + Stock | 🔧 |
+| Week 5 | Spending + Notification + Stock | ✅ |
 | Week 6 | Stock + FE 연동 + 통합 | ⬜ |
 | Week 7 | 예외 처리 + 보안 + 공공 API | ⬜ |
 | Week 8 | CI/CD + 배포 | ⬜ |
