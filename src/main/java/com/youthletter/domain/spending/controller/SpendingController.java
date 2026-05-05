@@ -10,6 +10,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.YearMonth;
+
 @Tag(name = "Spending", description = "소비 분석 API (Event Sourcing)")
 @RestController
 @RequestMapping("/api/spending")
@@ -50,8 +52,8 @@ public class SpendingController {
     @GetMapping("/dashboard")
     public GlobalResponse<SpendingDashboardResponse> getDashboard(
             @RequestParam Long userId,
-            @RequestParam(defaultValue = "#{T(java.time.YearMonth).now().toString()}")
-            String month) {
+            @RequestParam(required = false) String month) {
+        if (month == null) month = YearMonth.now().toString();
         return GlobalResponse.ok(spendingService.getDashboard(userId, month));
     }
 }

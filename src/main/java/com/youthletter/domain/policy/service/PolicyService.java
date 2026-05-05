@@ -17,7 +17,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import jakarta.persistence.EntityManager;
 import java.time.LocalDate;
 import java.time.Period;
 
@@ -29,7 +28,6 @@ public class PolicyService {
     private final PolicyRepository policyRepository;
     private final PolicyBookmarkRepository bookmarkRepository;
     private final UserRepository userRepository;
-    private final EntityManager entityManager;
 
     /**
      * 프로필 기반 정책 추천

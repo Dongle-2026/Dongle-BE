@@ -27,7 +27,7 @@ dependencies {
     // ── Spring Boot Core ──
     implementation 'org.springframework.boot:spring-boot-starter-web'
     implementation 'org.springframework.boot:spring-boot-starter-validation'
-    implementation "io.hypersistence:hypersistence-utils-hibernate-63:3.7.6"
+    implementation "io.hypersistence:hypersistence-utils-hibernate-63:3.9.11"
 
     // ── Security (JWT + OAuth2) ──
     implementation 'org.springframework.boot:spring-boot-starter-security'
