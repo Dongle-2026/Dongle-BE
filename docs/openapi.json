@@ -2,10 +2,10 @@
   "openapi": "3.0.1",
   "info": {
     "title": "유스레터 API",
-    "description": "청년 금융 AI 플랫폼 - Youth Letter Backend API",
+    "description": "## 청년 금융 AI 플랫폼 — Youth Letter Backend API\n\n### 공통 응답 형식\n모든 API는 아래 형태로 응답합니다.\n```json\n{ \"status\": 200, \"message\": \"ok\", \"data\": { ... } }\n{ \"status\": 4101, \"message\": \"이미 가입된 이메일입니다\" }\n```\n\n### 인증 방식\n로그인/회원가입 이후 발급된 `accessToken`을 아래 헤더에 담아 요청합니다.\n```\nAuthorization: Bearer <accessToken>\n```\naccessToken 유효 시간은 **15분**, refreshToken은 **7일**입니다.\n\n### 카카오 OAuth2 로그인 흐름\n```\n프론트 → GET /oauth2/authorization/kakao\n       → 카카오 로그인\n       → GET /login/oauth2/code/kakao (백엔드 자동 처리)\n       → GET http://localhost:3000/auth/callback?accessToken=...&refreshToken=...\n```\n콜백 URL의 쿼리파라미터에서 토큰을 꺼내 localStorage에 저장하면 됩니다.",
     "contact": {
       "name": "정다은",
-      "email": "daeun@example.com"
+      "email": "ekdms8652@pusan.ac.kr"
     },
     "version": "v1.0.0"
   },
@@ -26,548 +26,191 @@
   ],
   "tags": [
     {
-      "name": "Admin - Crawl",
-      "description": "크롤링 관리 API"
-    },
-    {
-      "name": "Guide",
-      "description": "주식/보험 가이드 API"
-    },
-    {
-      "name": "Health",
-      "description": "서버 상태 확인"
-    },
-    {
-      "name": "News",
-      "description": "뉴스 API"
-    },
-    {
-      "name": "Policy",
-      "description": "청년 정책 추천 API"
-    },
-    {
-      "name": "Spending",
-      "description": "소비 분석 API (Event Sourcing)"
-    },
-    {
       "name": "Auth",
-      "description": "인증 API"
-    },
-    {
-      "name": "Terms",
-      "description": "금융 용어 사전 API"
+      "description": "회원가입·로그인·토큰 관리. 이메일/비밀번호 방식과 카카오·구글 OAuth2를 지원합니다."
     },
     {
       "name": "User",
-      "description": "사용자 프로필 API"
+      "description": "내 프로필 조회·수정, 관심 카테고리, 정책 추천 프로필, 학습 현황, 북마크 목록."
+    },
+    {
+      "name": "News",
+      "description": "한경 금융 뉴스 목록·상세·읽음 처리·북마크. AI 요약(stub)과 용어 하이라이트 포함."
+    },
+    {
+      "name": "Terms",
+      "description": "금융 용어 사전. 전문 검색(tsvector), 자동완성(pg_trgm), ltree 카테고리 트리 탐색."
+    },
+    {
+      "name": "Policy",
+      "description": "청년 정책 추천. 나이·지역·소득 기반 동적 필터링, 즐겨찾기 토글."
+    },
+    {
+      "name": "Spending",
+      "description": "소비 분석. 이벤트 소싱 방식(append-only)으로 소비를 기록하고, 스냅샷 기반 대시보드 제공."
+    },
+    {
+      "name": "Guide",
+      "description": "주식·보험 입문 가이드. 난이도순 정렬, STOCK / INSURANCE 타입별 조회."
+    },
+    {
+      "name": "Admin - Crawl",
+      "description": "관리자 전용(ROLE_ADMIN). 뉴스 크롤링 수동 트리거, 상태 조회, AI stub 모드 토글."
+    },
+    {
+      "name": "Health",
+      "description": "서버·DB·Redis 연결 상태 확인."
     }
   ],
   "paths": {
-    "/api/users/me/policy-profile": {
-      "put": {
-        "tags": [
-          "User"
-        ],
-        "summary": "정책 추천용 프로필 설정",
-        "description": "나이, 거주 지역, 취업 여부, 소득 구간",
-        "operationId": "updatePolicyProfile",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/PolicyProfileRequest"
-              }
-            }
-          },
-          "required": true
+    "/oauth2/authorization/kakao": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "카카오 OAuth2 로그인 시작",
+        "description": "이 URL로 브라우저를 이동시키면 Spring Security가 카카오 인증 서버로 리다이렉트합니다.\n\n**프론트 사용법:**\n```tsx\nwindow.location.href = 'http://localhost:8080/oauth2/authorization/kakao'\n// 또는 <a href=\"...\"> 링크\n```\n\n로그인 성공 후 `http://localhost:3000/auth/callback?accessToken=...&refreshToken=...` 로 리다이렉트됩니다.\n\n**⚠️ 주의:** 카카오 개발자 콘솔에 `http://localhost:8080/login/oauth2/code/kakao` 가 Redirect URI로 등록되어 있어야 합니다.",
+        "operationId": "kakaoLogin",
+        "responses": {
+          "302": {
+            "description": "카카오 로그인 페이지로 리다이렉트"
+          }
         },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseVoid"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/users/me/categories": {
-      "put": {
-        "tags": [
-          "User"
-        ],
-        "summary": "관심 카테고리 설정",
-        "description": "경제/투자/보험/대출/정책/청년금융 중 다중 선택",
-        "operationId": "updateCategories",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CategoryUpdateRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseVoid"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/spending/{spendingId}": {
-      "put": {
-        "tags": [
-          "Spending"
-        ],
-        "summary": "소비 기록 수정",
-        "description": "UPDATED 이벤트를 추가합니다 (원본 이벤트는 보존)",
-        "operationId": "updateSpending",
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "spendingId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SpendingCreateRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseVoid"
-                }
-              }
-            }
-          }
-        }
-      },
-      "delete": {
-        "tags": [
-          "Spending"
-        ],
-        "summary": "소비 기록 삭제",
-        "description": "DELETED 이벤트를 추가합니다 (실제 데이터는 삭제되지 않음)",
-        "operationId": "deleteSpending",
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "spendingId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseVoid"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/terms/{termId}/learn": {
-      "post": {
-        "tags": [
-          "Terms"
-        ],
-        "summary": "용어 학습 완료 처리",
-        "description": "학습 이력을 저장합니다",
-        "operationId": "learnTerm",
-        "parameters": [
-          {
-            "name": "termId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseVoid"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/spending": {
-      "post": {
-        "tags": [
-          "Spending"
-        ],
-        "summary": "소비 기록 추가",
-        "description": "CREATED 이벤트를 생성합니다 (append-only)",
-        "operationId": "createSpending",
-        "parameters": [
-          {
-            "name": "userId",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SpendingCreateRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseLong"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/policies/{policyId}/bookmark": {
-      "post": {
-        "tags": [
-          "Policy"
-        ],
-        "summary": "정책 즐겨찾기 토글",
-        "description": "이미 추가되어 있으면 해제, 없으면 추가",
-        "operationId": "toggleBookmark",
-        "parameters": [
-          {
-            "name": "policyId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "userId",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseBoolean"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/news/{articleId}/read": {
-      "post": {
-        "tags": [
-          "News"
-        ],
-        "summary": "뉴스 읽음 처리",
-        "description": "읽기 이력 저장. durationSeconds는 선택.",
-        "operationId": "markAsRead",
-        "parameters": [
-          {
-            "name": "articleId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "durationSeconds",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseVoid"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/news/{articleId}/bookmark": {
-      "post": {
-        "tags": [
-          "News"
-        ],
-        "summary": "뉴스 북마크 토글",
-        "description": "북마크 추가 시 true, 해제 시 false 반환",
-        "operationId": "toggleBookmark_1",
-        "parameters": [
-          {
-            "name": "articleId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseMapStringBoolean"
-                }
-              }
-            }
-          }
-        }
+        "security": []
       }
     },
     "/api/auth/signup": {
       "post": {
-        "tags": [
-          "Auth"
-        ],
+        "tags": ["Auth"],
         "summary": "이메일 회원가입",
-        "description": "이메일+비밀번호로 회원가입, JWT 발급",
+        "description": "이메일·비밀번호로 회원가입합니다. 성공 시 accessToken + refreshToken을 즉시 발급합니다.\n\n**응답 HTTP 상태: 201 Created** (200이 아님에 주의)\n\n카카오·구글 소셜 로그인 유저는 이 API를 사용하지 않습니다. 소셜 로그인은 `/oauth2/authorization/kakao` 로 시작합니다.\n\n**유효성 검사:**\n- `email`: 이메일 형식\n- `password`: 8~100자\n- `name`: 50자 이하\n- `nickname`: 2~30자, 중복 불가",
         "operationId": "signup",
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SignupRequest"
+              "schema": { "$ref": "#/components/schemas/SignupRequest" },
+              "example": {
+                "email": "test@example.com",
+                "password": "password123",
+                "name": "홍길동",
+                "nickname": "길동이"
               }
             }
           },
           "required": true
         },
         "responses": {
-          "200": {
-            "description": "OK",
+          "201": {
+            "description": "회원가입 성공 — accessToken + refreshToken 발급",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseTokenResponse"
+                "schema": { "$ref": "#/components/schemas/GlobalResponseTokenResponse" },
+                "example": {
+                  "status": 201,
+                  "message": "created",
+                  "data": { "accessToken": "eyJ...", "refreshToken": "eyJ..." }
                 }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/reissue": {
-      "post": {
-        "tags": [
-          "Auth"
-        ],
-        "summary": "토큰 재발급",
-        "description": "Refresh Token → 새 Access/Refresh Token 발급",
-        "operationId": "reissue",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/TokenReissueRequest"
               }
             }
           },
-          "required": true
+          "409": {
+            "description": "이미 가입된 이메일 또는 닉네임"
+          }
         },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseTokenResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/auth/logout": {
-      "post": {
-        "tags": [
-          "Auth"
-        ],
-        "summary": "로그아웃",
-        "description": "Access Token 블랙리스트 등록 + Refresh Token 삭제",
-        "operationId": "logout",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseVoid"
-                }
-              }
-            }
-          }
-        }
+        "security": []
       }
     },
     "/api/auth/login": {
       "post": {
-        "tags": [
-          "Auth"
-        ],
+        "tags": ["Auth"],
         "summary": "이메일 로그인",
-        "description": "이메일+비밀번호 검증, JWT 발급",
+        "description": "이메일·비밀번호로 로그인합니다. 성공 시 accessToken + refreshToken을 발급합니다.\n\n**카카오 로그인과 혼동 주의:** 이 API는 이메일/비밀번호 전용입니다.\n카카오 로그인은 `GET /oauth2/authorization/kakao` 로 시작합니다.\n\n**토큰 저장 예시:**\n```ts\nconst res = await fetch('/api/auth/login', { method: 'POST', body: JSON.stringify({email, password}) })\nconst json = await res.json()\nlocalStorage.setItem('accessToken', json.data.accessToken)\nlocalStorage.setItem('refreshToken', json.data.refreshToken)\n```",
         "operationId": "login",
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LoginRequest"
-              }
+              "schema": { "$ref": "#/components/schemas/LoginRequest" },
+              "example": { "email": "test@example.com", "password": "password123" }
             }
           },
           "required": true
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "로그인 성공",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseTokenResponse"
+                "schema": { "$ref": "#/components/schemas/GlobalResponseTokenResponse" },
+                "example": {
+                  "status": 200,
+                  "message": "ok",
+                  "data": { "accessToken": "eyJ...", "refreshToken": "eyJ..." }
                 }
+              }
+            }
+          },
+          "401": { "description": "이메일 또는 비밀번호 불일치" }
+        },
+        "security": []
+      }
+    },
+    "/api/auth/reissue": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "토큰 재발급",
+        "description": "accessToken이 만료(15분)되면 refreshToken으로 새 토큰을 발급받습니다.\n\n**언제 호출?** API 요청에서 401이 돌아올 때 이 API를 먼저 호출하고, 성공하면 새 토큰으로 원래 요청을 재시도합니다.\n\nrefreshToken도 7일이 지나 만료되었으면 재로그인이 필요합니다.",
+        "operationId": "reissue",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TokenReissueRequest" },
+              "example": { "refreshToken": "eyJ..." }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "새 accessToken + refreshToken 발급",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GlobalResponseTokenResponse" }
+              }
+            }
+          },
+          "401": { "description": "refreshToken 만료 또는 유효하지 않음 → 재로그인 필요" }
+        },
+        "security": []
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "로그아웃",
+        "description": "현재 accessToken을 Redis 블랙리스트에 등록하고 refreshToken을 삭제합니다.\n\n로그아웃 후에는 해당 accessToken으로 인증이 불가능합니다. 프론트에서도 localStorage의 토큰을 함께 삭제해야 합니다.\n\n**Authorization 헤더 필수**",
+        "operationId": "logout",
+        "responses": {
+          "200": {
+            "description": "로그아웃 성공",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GlobalResponseVoid" }
               }
             }
           }
         }
       }
     },
-    "/api/admin/crawl/trigger": {
-      "post": {
-        "tags": [
-          "Admin - Crawl"
-        ],
-        "summary": "수동 크롤링 트리거",
-        "description": "한경 금융 뉴스 즉시 크롤링 → AI 처리 → DB 저장",
-        "operationId": "trigger",
+    "/api/auth/withdraw": {
+      "delete": {
+        "tags": ["Auth"],
+        "summary": "회원 탈퇴",
+        "description": "회원을 soft delete(deleted_at 기록) 처리합니다. 실제 DB 행은 남아 있습니다.\n\n토큰도 전부 무효화되므로 이후에는 로그인 불가입니다. 프론트에서도 localStorage 토큰을 삭제해야 합니다.\n\n**Authorization 헤더 필수**",
+        "operationId": "withdraw",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "탈퇴 처리 완료",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseMapStringObject"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/admin/crawl/ai-stub": {
-      "post": {
-        "tags": [
-          "Admin - Crawl"
-        ],
-        "summary": "AI Stub 모드 토글",
-        "description": "true면 stub 응답, false면 실제 AI 서비스 호출. 개발 환경 전용.",
-        "operationId": "toggleAiStub",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseMapStringObject"
-                }
+                "schema": { "$ref": "#/components/schemas/GlobalResponseVoid" }
               }
             }
           }
@@ -576,35 +219,89 @@
     },
     "/api/users/me": {
       "get": {
-        "tags": [
-          "User"
-        ],
+        "tags": ["User"],
         "summary": "내 프로필 조회",
+        "description": "로그인한 유저의 프로필 정보를 반환합니다.\n\n반환 필드: id, email, name, nickname, birthDate, gender, regionCode, occupation, incomeLevel, interests(관심사 배열)\n\n**Authorization 헤더 필수**",
         "operationId": "getMyProfile",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "프로필 정보",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseUserProfileResponse"
-                }
+                "schema": { "$ref": "#/components/schemas/GlobalResponseUserProfileResponse" }
               }
             }
           }
         }
       },
       "patch": {
-        "tags": [
-          "User"
-        ],
+        "tags": ["User"],
         "summary": "프로필 수정 (닉네임)",
+        "description": "닉네임을 수정합니다. 다른 유저와 중복될 수 없습니다.\n\n**Authorization 헤더 필수**",
         "operationId": "updateProfile",
         "requestBody": {
           "content": {
             "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ProfileUpdateRequest"
+              "schema": { "$ref": "#/components/schemas/ProfileUpdateRequest" },
+              "example": { "nickname": "새닉네임" }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "수정된 프로필 반환",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GlobalResponseUserProfileResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/me/categories": {
+      "put": {
+        "tags": ["User"],
+        "summary": "관심 카테고리 설정",
+        "description": "유저의 관심 카테고리를 교체합니다 (기존 값 전체 덮어쓰기).\n\n선택 가능 값: `경제`, `투자`, `보험`, `대출`, `정책`, `청년금융`\n\n이 카테고리는 뉴스 홈 브리핑(`GET /api/news/today`) 정렬에 사용됩니다.\n\n**Authorization 헤더 필수**",
+        "operationId": "updateCategories",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CategoryUpdateRequest" },
+              "example": { "categories": ["경제", "투자"] }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "카테고리 저장 완료",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GlobalResponseVoid" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/me/policy-profile": {
+      "put": {
+        "tags": ["User"],
+        "summary": "정책 추천용 프로필 설정",
+        "description": "나이·지역·직업·소득 정보를 저장합니다. 이 정보가 `GET /api/policies/recommend` 맞춤 추천 필터로 사용됩니다.\n\n**처음 정책 추천을 받으려면 반드시 이 API를 먼저 호출해야 합니다.**\n\n**Authorization 헤더 필수**",
+        "operationId": "updatePolicyProfile",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/PolicyProfileRequest" },
+              "example": {
+                "birthDate": "2000-01-15",
+                "regionCode": "11",
+                "occupation": "STUDENT",
+                "incomeLevel": "LOW"
               }
             }
           },
@@ -612,12 +309,10 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "프로필 저장 완료",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseUserProfileResponse"
-                }
+                "schema": { "$ref": "#/components/schemas/GlobalResponseVoid" }
               }
             }
           }
@@ -626,41 +321,20 @@
     },
     "/api/users/me/learning-stats": {
       "get": {
-        "tags": [
-          "User"
-        ],
+        "tags": ["User"],
         "summary": "학습 진행 현황 조회",
-        "description": "읽은 뉴스 수, 학습한 용어 수, 연속 학습일",
+        "description": "유저의 학습 통계를 반환합니다.\n\n- `readNewsCount`: 지금까지 읽은 뉴스 총 건수\n- `learnedTermCount`: 학습한 고유 금융 용어 수 (중복 제거)\n- `consecutiveLearningDays`: 오늘 기준 연속 학습일 수\n\n**Authorization 헤더 필수**",
         "operationId": "getLearningStats",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "학습 현황",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseLearningStatsResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/users/me/learned-terms": {
-      "get": {
-        "tags": [
-          "User"
-        ],
-        "summary": "내가 학습한 용어 목록",
-        "description": "학습 날짜 최신순, 용어별 중복 제거",
-        "operationId": "getLearnedTerms",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseListLearnedTermResponse"
+                "schema": { "$ref": "#/components/schemas/GlobalResponseLearningStatsResponse" },
+                "example": {
+                  "status": 200,
+                  "message": "ok",
+                  "data": { "readNewsCount": 42, "learnedTermCount": 15, "consecutiveLearningDays": 3 }
                 }
               }
             }
@@ -670,29 +344,185 @@
     },
     "/api/users/me/bookmarks": {
       "get": {
-        "tags": [
-          "User"
-        ],
+        "tags": ["User"],
         "summary": "내 뉴스 북마크 목록",
-        "description": "최신 북마크 순 정렬",
+        "description": "유저가 북마크한 뉴스 목록을 최신 북마크 순으로 반환합니다.\n\n페이지네이션: `?page=0&size=10`\n\n**Authorization 헤더 필수**",
         "operationId": "getMyBookmarks",
         "parameters": [
           {
             "name": "pageable",
             "in": "query",
             "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Pageable"
-            }
+            "schema": { "$ref": "#/components/schemas/Pageable" }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "북마크 목록 (페이지)",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponsePageNewsBookmarkResponse"
+                "schema": { "$ref": "#/components/schemas/GlobalResponsePageNewsBookmarkResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/me/learned-terms": {
+      "get": {
+        "tags": ["User"],
+        "summary": "내가 학습한 용어 목록",
+        "description": "유저가 학습 완료 처리한 금융 용어 목록을 반환합니다.\n\n같은 용어를 여러 번 학습해도 가장 최근 학습 날짜 기준으로 1개만 반환됩니다 (중복 제거).\n\n**Authorization 헤더 필수**",
+        "operationId": "getLearnedTerms",
+        "responses": {
+          "200": {
+            "description": "학습한 용어 목록",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GlobalResponseListLearnedTermResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/news": {
+      "get": {
+        "tags": ["News"],
+        "summary": "뉴스 목록 조회",
+        "description": "수집된 뉴스 목록을 반환합니다. 카테고리 필터와 페이지네이션을 지원합니다.\n\n**category 값:** `ECONOMY`, `STOCK`, `INSURANCE`, `LOAN`, `POLICY`, `YOUTH` (생략 시 전체)\n\n**인증 불필요** (비로그인도 조회 가능)\n\nAI 요약(`summary`)은 stub 모드에서는 mock 텍스트로 채워집니다.",
+        "operationId": "getNewsList",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "query",
+            "description": "카테고리 필터 (생략 시 전체)",
+            "required": false,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "pageable",
+            "in": "query",
+            "required": false,
+            "schema": { "$ref": "#/components/schemas/Pageable" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "뉴스 목록 (페이지)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GlobalResponsePageNewsListResponse" }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/news/today": {
+      "get": {
+        "tags": ["News"],
+        "summary": "오늘의 뉴스 홈 브리핑",
+        "description": "오늘 수집된 뉴스를 최대 12건 반환합니다.\n\n**로그인한 유저:** 관심 카테고리(`PUT /api/users/me/categories`)에 설정한 카테고리가 우선 정렬됩니다.\n\n**비로그인 유저:** 수집 시간 최신순으로 반환됩니다.\n\n**인증 불필요** (Authorization 헤더 있으면 관심 카테고리 반영)",
+        "operationId": "getTodayNews",
+        "responses": {
+          "200": {
+            "description": "오늘 뉴스 최대 12건",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GlobalResponseListNewsListResponse" }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/news/{articleId}": {
+      "get": {
+        "tags": ["News"],
+        "summary": "뉴스 상세 조회",
+        "description": "뉴스 원문 전체와 AI 요약, 본문 내 금융 용어 하이라이트 목록을 반환합니다.\n\n**termHighlights:** 본문 내 금융 용어의 위치(`positionStart`~`positionEnd`)와 쉬운 설명(`simpleDefinition`)을 포함합니다. 프론트에서 해당 위치 텍스트에 팝업을 붙이는 용도로 사용합니다.\n\n**인증 불필요**",
+        "operationId": "getNewsDetail",
+        "parameters": [
+          {
+            "name": "articleId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "뉴스 상세",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GlobalResponseNewsDetailResponse" }
+              }
+            }
+          },
+          "404": { "description": "존재하지 않는 기사 ID" }
+        },
+        "security": []
+      }
+    },
+    "/api/news/{articleId}/read": {
+      "post": {
+        "tags": ["News"],
+        "summary": "뉴스 읽음 처리",
+        "description": "뉴스를 읽은 기록을 저장합니다. 이 기록이 학습 현황(`GET /api/users/me/learning-stats`)의 `readNewsCount`와 연속 학습일 계산에 반영됩니다.\n\n`durationSeconds`: 유저가 기사를 읽은 시간(초). 생략 가능.\n\n**Authorization 헤더 필수**",
+        "operationId": "markAsRead",
+        "parameters": [
+          {
+            "name": "articleId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          },
+          {
+            "name": "durationSeconds",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "format": "int32" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "읽음 처리 완료",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GlobalResponseVoid" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/news/{articleId}/bookmark": {
+      "post": {
+        "tags": ["News"],
+        "summary": "뉴스 북마크 토글",
+        "description": "뉴스를 북마크하거나 해제합니다.\n\n- 이미 북마크 상태 → 해제 후 `{ \"bookmarked\": false }` 반환\n- 북마크 안 된 상태 → 추가 후 `{ \"bookmarked\": true }` 반환\n\n**Authorization 헤더 필수**",
+        "operationId": "toggleNewsBookmark",
+        "parameters": [
+          {
+            "name": "articleId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "토글 결과",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GlobalResponseMapStringBoolean" },
+                "example": {
+                  "status": 200,
+                  "message": "ok",
+                  "data": { "bookmarked": true }
                 }
               }
             }
@@ -702,294 +532,202 @@
     },
     "/api/terms": {
       "get": {
-        "tags": [
-          "Terms"
-        ],
-        "summary": "용어 전체 목록",
-        "description": "난이도순 정렬, 페이지네이션",
+        "tags": ["Terms"],
+        "summary": "금융 용어 전체 목록",
+        "description": "금융 용어를 난이도 오름차순으로 반환합니다.\n\n**인증 불필요**",
         "operationId": "getTermList",
         "parameters": [
           {
             "name": "pageable",
             "in": "query",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Pageable"
-            }
+            "required": false,
+            "schema": { "$ref": "#/components/schemas/Pageable" }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "용어 목록",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponsePageTermListResponse"
-                }
+                "schema": { "$ref": "#/components/schemas/GlobalResponsePageTermListResponse" }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/terms/{termId}": {
       "get": {
-        "tags": [
-          "Terms"
-        ],
-        "summary": "용어 상세 조회",
+        "tags": ["Terms"],
+        "summary": "금융 용어 상세 조회",
+        "description": "용어 ID로 상세 정보를 반환합니다.\n\n반환 필드: id, name, path(ltree 경로), definition(전체 설명), simpleDefinition(쉬운 설명), difficultyLevel(1~5)\n\n**인증 불필요**",
         "operationId": "getTerm",
         "parameters": [
           {
             "name": "termId",
             "in": "path",
             "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
+            "schema": { "type": "integer", "format": "int64" }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "용어 상세",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseFinancialTerm"
-                }
+                "schema": { "$ref": "#/components/schemas/GlobalResponseFinancialTerm" }
               }
             }
-          }
-        }
+          },
+          "404": { "description": "존재하지 않는 용어 ID" }
+        },
+        "security": []
       }
     },
     "/api/terms/search": {
       "get": {
-        "tags": [
-          "Terms"
-        ],
-        "summary": "용어 검색 (전문 검색)",
-        "description": "tsvector 기반",
+        "tags": ["Terms"],
+        "summary": "금융 용어 전문 검색",
+        "description": "PostgreSQL tsvector 기반 전문 검색입니다. 용어명·설명에서 검색합니다.\n\n부분 일치, 형태소 분석은 지원하지 않습니다. 정확한 단어 검색에 사용하세요. 자동완성에는 `/api/terms/autocomplete` 를 사용하세요.\n\n**인증 불필요**",
         "operationId": "searchTerms",
         "parameters": [
           {
             "name": "query",
             "in": "query",
             "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" },
+            "example": "ETF"
           },
           {
             "name": "limit",
             "in": "query",
             "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 10
-            }
+            "schema": { "type": "integer", "format": "int32", "default": 10 }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "검색 결과",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseListFinancialTerm"
-                }
+                "schema": { "$ref": "#/components/schemas/GlobalResponseListFinancialTerm" }
               }
             }
           }
-        }
-      }
-    },
-    "/api/terms/level": {
-      "get": {
-        "tags": [
-          "Terms"
-        ],
-        "summary": "난이도별 용어 조회",
-        "operationId": "getByLevel",
-        "parameters": [
-          {
-            "name": "maxLevel",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 3
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseListFinancialTerm"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/terms/category": {
-      "get": {
-        "tags": [
-          "Terms"
-        ],
-        "summary": "카테고리별 용어 조회",
-        "description": "ltree 경로 기반 하위 용어",
-        "operationId": "getByCategory",
-        "parameters": [
-          {
-            "name": "path",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseListFinancialTerm"
-                }
-              }
-            }
-          }
-        }
+        },
+        "security": []
       }
     },
     "/api/terms/autocomplete": {
       "get": {
-        "tags": [
-          "Terms"
-        ],
-        "summary": "용어 자동완성",
-        "description": "pg_trgm 기반 유사 문자열",
+        "tags": ["Terms"],
+        "summary": "금융 용어 자동완성",
+        "description": "pg_trgm 기반 유사 문자열 검색입니다. 검색창에서 글자를 입력할 때마다 호출하는 용도입니다.\n\n오타·부분 입력에도 유사한 결과를 반환합니다.\n\n**인증 불필요**",
         "operationId": "autocomplete",
         "parameters": [
           {
             "name": "query",
             "in": "query",
             "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" },
+            "example": "이티"
           },
           {
             "name": "limit",
             "in": "query",
             "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 5
-            }
+            "schema": { "type": "integer", "format": "int32", "default": 5 }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "자동완성 후보 목록",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseListFinancialTerm"
-                }
+                "schema": { "$ref": "#/components/schemas/GlobalResponseListFinancialTerm" }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
-    "/api/spending/dashboard": {
+    "/api/terms/category": {
       "get": {
-        "tags": [
-          "Spending"
-        ],
-        "summary": "월별 소비 대시보드",
-        "description": "카테고리별 지출 합계를 반환합니다 (스냅샷 기반)",
-        "operationId": "getDashboard",
+        "tags": ["Terms"],
+        "summary": "카테고리별 용어 조회 (ltree)",
+        "description": "ltree 경로 기반으로 해당 카테고리의 모든 하위 용어를 반환합니다.\n\n예시:\n- `path=finance` → 금융 전체\n- `path=finance.stock` → 주식 하위 용어 전체\n- `path=finance.stock.etf` → ETF만\n\n**인증 불필요**",
+        "operationId": "getByCategory",
         "parameters": [
           {
-            "name": "userId",
+            "name": "path",
             "in": "query",
             "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "month",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "default": "2026-04"
-            }
+            "schema": { "type": "string" },
+            "example": "finance.stock"
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "해당 카테고리 용어 목록",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseSpendingDashboardResponse"
-                }
+                "schema": { "$ref": "#/components/schemas/GlobalResponseListFinancialTerm" }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
-    "/api/policies/{policyId}": {
+    "/api/terms/level": {
       "get": {
-        "tags": [
-          "Policy"
-        ],
-        "summary": "정책 상세 조회",
-        "operationId": "getPolicyDetail",
+        "tags": ["Terms"],
+        "summary": "난이도별 용어 조회",
+        "description": "difficultyLevel이 maxLevel 이하인 용어를 이름 오름차순으로 반환합니다.\n\n난이도 기준: 1(입문) ~ 5(전문)\n\n**인증 불필요**",
+        "operationId": "getByLevel",
         "parameters": [
           {
-            "name": "policyId",
+            "name": "maxLevel",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "integer", "format": "int32", "default": 3 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "난이도 필터 용어 목록",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GlobalResponseListFinancialTerm" }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/terms/{termId}/learn": {
+      "post": {
+        "tags": ["Terms"],
+        "summary": "용어 학습 완료 처리",
+        "description": "용어를 학습했음을 기록합니다. 이 기록이 학습 현황의 `learnedTermCount`에 반영됩니다.\n\n같은 용어를 여러 번 호출해도 중복 처리됩니다 (내부적으로는 모두 기록).\n\n**Authorization 헤더 필수**",
+        "operationId": "learnTerm",
+        "parameters": [
+          {
+            "name": "termId",
             "in": "path",
             "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "userId",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
+            "schema": { "type": "integer", "format": "int64" }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "학습 완료 처리 성공",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponsePolicyDetailResponse"
-                }
+                "schema": { "$ref": "#/components/schemas/GlobalResponseVoid" }
               }
             }
           }
@@ -998,134 +736,219 @@
     },
     "/api/policies/recommend": {
       "get": {
-        "tags": [
-          "Policy"
-        ],
+        "tags": ["Policy"],
         "summary": "맞춤 정책 추천",
-        "description": "사용자 프로필(나이, 지역, 소득) 기반으로 매칭된 정책 목록 반환",
+        "description": "유저의 나이·지역·소득 수준에 맞는 정책을 추천합니다.\n\n**사전 조건:** `PUT /api/users/me/policy-profile` 을 먼저 호출해 프로필을 등록해야 합니다. 미등록 시 빈 목록이 반환될 수 있습니다.\n\n마감이 지나지 않은 정책만 반환하며, 마감일 오름차순으로 정렬됩니다.\n\n**Authorization 헤더 필수**",
         "operationId": "getRecommendedPolicies",
         "parameters": [
           {
-            "name": "userId",
+            "name": "page",
             "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "pageable",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Pageable"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponsePagePolicyListResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/news": {
-      "get": {
-        "tags": [
-          "News"
-        ],
-        "summary": "뉴스 목록 조회",
-        "description": "카테고리/페이지네이션",
-        "operationId": "getNewsList",
-        "parameters": [
-          {
-            "name": "category",
-            "in": "query",
-            "description": "카테고리 (ECONOMY, STOCK, INSURANCE, LOAN, POLICY, YOUTH)",
             "required": false,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "integer", "default": 0 }
           },
           {
-            "name": "pageable",
+            "name": "size",
             "in": "query",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Pageable"
-            }
+            "required": false,
+            "schema": { "type": "integer", "default": 10 }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "추천 정책 목록",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponsePageNewsListResponse"
-                }
+                "schema": { "$ref": "#/components/schemas/GlobalResponsePagePolicyListResponse" }
               }
             }
           }
         }
       }
     },
-    "/api/news/{articleId}": {
+    "/api/policies/{policyId}": {
       "get": {
-        "tags": [
-          "News"
-        ],
-        "summary": "뉴스 상세 조회",
-        "description": "원문 + AI 요약(stub) + 용어 하이라이트",
-        "operationId": "getNewsDetail",
+        "tags": ["Policy"],
+        "summary": "정책 상세 조회",
+        "description": "정책의 상세 정보를 반환합니다.\n\n`userId` 쿼리파라미터를 함께 전달하면 해당 유저의 즐겨찾기 여부(`isBookmarked`)도 함께 반환합니다.\n\n**인증 불필요** (userId는 선택)",
+        "operationId": "getPolicyDetail",
         "parameters": [
           {
-            "name": "articleId",
+            "name": "policyId",
             "in": "path",
             "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
+            "schema": { "type": "integer", "format": "int64" }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "description": "즐겨찾기 여부 확인용 (선택)",
+            "required": false,
+            "schema": { "type": "integer", "format": "int64" }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "정책 상세",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseNewsDetailResponse"
-                }
+                "schema": { "$ref": "#/components/schemas/GlobalResponsePolicyDetailResponse" }
+              }
+            }
+          },
+          "404": { "description": "존재하지 않는 정책 ID" }
+        },
+        "security": []
+      }
+    },
+    "/api/policies/{policyId}/bookmark": {
+      "post": {
+        "tags": ["Policy"],
+        "summary": "정책 즐겨찾기 토글",
+        "description": "정책을 즐겨찾기하거나 해제합니다.\n\n- 이미 즐겨찾기 → 해제 후 `false` 반환\n- 즐겨찾기 안 됨 → 추가 후 `true` 반환\n\n**Authorization 헤더 필수**",
+        "operationId": "togglePolicyBookmark",
+        "parameters": [
+          {
+            "name": "policyId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "토글 결과 (true=추가, false=해제)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GlobalResponseBoolean" },
+                "example": { "status": 200, "message": "즐겨찾기에 추가했습니다", "data": true }
               }
             }
           }
         }
       }
     },
-    "/api/news/today": {
-      "get": {
-        "tags": [
-          "News"
-        ],
-        "summary": "오늘의 뉴스 홈 브리핑",
-        "description": "오늘 수집된 최신 12건. 로그인 시 관심 카테고리 우선 정렬.",
-        "operationId": "getTodayNews",
+    "/api/spending": {
+      "post": {
+        "tags": ["Spending"],
+        "summary": "소비 기록 추가",
+        "description": "소비를 기록합니다. **이벤트 소싱** 방식으로 `CREATED` 이벤트를 추가합니다.\n\n반환값은 `spendingId`입니다. 이후 수정·삭제 시 이 ID를 사용합니다.\n\n**카테고리 값:** `FOOD`, `TRANSPORT`, `HOUSING`, `ENTERTAINMENT`, `SHOPPING`, `HEALTH`, `EDUCATION`, `ETC`\n\n**Authorization 헤더 필수**",
+        "operationId": "createSpending",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SpendingCreateRequest" },
+              "example": {
+                "amount": 15000,
+                "category": "FOOD",
+                "description": "점심 식사",
+                "spentAt": "2026-05-06"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "생성된 spendingId 반환",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseListNewsListResponse"
+                "schema": { "$ref": "#/components/schemas/GlobalResponseLong" },
+                "example": { "status": 200, "message": "ok", "data": 1716912345678 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/spending/{spendingId}": {
+      "put": {
+        "tags": ["Spending"],
+        "summary": "소비 기록 수정",
+        "description": "`UPDATED` 이벤트를 추가합니다. 원본 이벤트는 그대로 보존됩니다.\n\n수정 내용 전체를 다시 전송해야 합니다 (partial update 미지원).\n\n**Authorization 헤더 필수**",
+        "operationId": "updateSpending",
+        "parameters": [
+          {
+            "name": "spendingId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/SpendingCreateRequest" }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "수정 이벤트 추가 완료",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GlobalResponseVoid" }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Spending"],
+        "summary": "소비 기록 삭제",
+        "description": "`DELETED` 이벤트를 추가합니다. 실제 DB 데이터는 삭제되지 않습니다.\n\n대시보드 집계 시 `DELETED` 이벤트가 있는 소비는 제외됩니다.\n\n**Authorization 헤더 필수**",
+        "operationId": "deleteSpending",
+        "parameters": [
+          {
+            "name": "spendingId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "integer", "format": "int64" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "삭제 이벤트 추가 완료",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GlobalResponseVoid" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/spending/dashboard": {
+      "get": {
+        "tags": ["Spending"],
+        "summary": "월별 소비 대시보드",
+        "description": "특정 월의 카테고리별 지출 합계를 반환합니다.\n\n내부적으로 스냅샷이 있으면 스냅샷을 사용(빠름), 없으면 이벤트를 직접 집계합니다.\n\n`month` 파라미터 생략 시 이번 달로 자동 적용됩니다.\n\n**Authorization 헤더 필수**",
+        "operationId": "getDashboard",
+        "parameters": [
+          {
+            "name": "month",
+            "in": "query",
+            "description": "조회 월 (yyyy-MM 형식, 생략 시 현재 월)",
+            "required": false,
+            "schema": { "type": "string" },
+            "example": "2026-05"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "월별 소비 대시보드",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GlobalResponseSpendingDashboardResponse" },
+                "example": {
+                  "status": 200,
+                  "message": "ok",
+                  "data": {
+                    "month": "2026-05",
+                    "categoryTotals": { "FOOD": 150000, "TRANSPORT": 80000 },
+                    "totalAmount": 230000
+                  }
                 }
               }
             }
@@ -1135,69 +958,81 @@
     },
     "/api/guides": {
       "get": {
-        "tags": [
-          "Guide"
-        ],
+        "tags": ["Guide"],
         "summary": "가이드 목록 조회",
-        "description": "타입별 가이드 목록 (STOCK, INSURANCE)",
+        "description": "주식 또는 보험 입문 가이드 목록을 난이도 오름차순으로 반환합니다.\n\n**type 값:** `STOCK` (주식), `INSURANCE` (보험)\n\n**인증 불필요**",
         "operationId": "getGuides",
         "parameters": [
           {
             "name": "type",
             "in": "query",
             "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" },
+            "example": "STOCK"
           },
           {
             "name": "pageable",
             "in": "query",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/Pageable"
-            }
+            "required": false,
+            "schema": { "$ref": "#/components/schemas/Pageable" }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "가이드 목록",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponsePageGuide"
-                }
+                "schema": { "$ref": "#/components/schemas/GlobalResponsePageGuide" }
               }
             }
           }
-        }
+        },
+        "security": []
       }
     },
     "/api/guides/{guideId}": {
       "get": {
-        "tags": [
-          "Guide"
-        ],
+        "tags": ["Guide"],
         "summary": "가이드 상세 조회",
+        "description": "가이드 ID로 상세 내용을 반환합니다.\n\n**인증 불필요**",
         "operationId": "getGuide",
         "parameters": [
           {
             "name": "guideId",
             "in": "path",
             "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
+            "schema": { "type": "integer", "format": "int64" }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "가이드 상세",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseGuide"
+                "schema": { "$ref": "#/components/schemas/GlobalResponseGuide" }
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/admin/crawl/trigger": {
+      "post": {
+        "tags": ["Admin - Crawl"],
+        "summary": "수동 크롤링 트리거",
+        "description": "한경 금융 뉴스를 즉시 크롤링하고 AI 처리(요약·NER) 후 DB에 저장합니다.\n\n스케줄러는 6시간마다 자동 실행됩니다. 이 API는 수동으로 즉시 실행할 때 사용합니다.\n\n**ROLE_ADMIN 필요**",
+        "operationId": "trigger",
+        "responses": {
+          "200": {
+            "description": "크롤링 결과 (저장 건수)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GlobalResponseMapStringObject" },
+                "example": {
+                  "status": 200,
+                  "message": "ok",
+                  "data": { "savedCount": 8, "message": "8건의 뉴스가 처리되었습니다" }
                 }
               }
             }
@@ -1207,19 +1042,38 @@
     },
     "/api/admin/crawl/status": {
       "get": {
-        "tags": [
-          "Admin - Crawl"
-        ],
+        "tags": ["Admin - Crawl"],
         "summary": "크롤링 처리 상태 조회",
-        "description": "마지막 실행 시각, 저장 건수, 실패 건수, 상태",
+        "description": "마지막 크롤링 실행 시각, 저장 건수, 실패 건수, 현재 상태를 반환합니다.\n\n상태값: `NEVER_RUN`, `RUNNING`, `SUCCESS`, `PARTIAL`(일부 실패), `FAILED`\n\n**ROLE_ADMIN 필요**",
         "operationId": "getStatus",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "크롤링 상태",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseCrawlStatus"
+                "schema": { "$ref": "#/components/schemas/GlobalResponseCrawlStatus" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/crawl/ai-stub": {
+      "post": {
+        "tags": ["Admin - Crawl"],
+        "summary": "AI Stub 모드 토글",
+        "description": "AI 서비스(Node.js) 연동 여부를 토글합니다.\n\n- `stubMode: true` → AI 없이 mock 데이터로 처리 (개발 환경 기본값)\n- `stubMode: false` → 실제 AI 서비스(localhost:3000) 호출\n\n**ROLE_ADMIN 필요**",
+        "operationId": "toggleAiStub",
+        "responses": {
+          "200": {
+            "description": "변경된 stub 모드 상태",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GlobalResponseMapStringObject" },
+                "example": {
+                  "status": 200,
+                  "message": "ok",
+                  "data": { "stubMode": false, "message": "실제 AI 서비스 모드 활성화" }
                 }
               }
             }
@@ -1229,46 +1083,26 @@
     },
     "/actuator/health": {
       "get": {
-        "tags": [
-          "Health"
-        ],
+        "tags": ["Health"],
         "summary": "전체 헬스 체크",
-        "description": "서버, DB, Redis 연결 상태를 확인합니다",
+        "description": "서버·PostgreSQL·Redis의 연결 상태를 반환합니다.\n\n**인증 불필요**",
         "operationId": "healthCheck",
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "각 컴포넌트 상태",
             "content": {
               "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseMapStringObject"
+                "schema": { "$ref": "#/components/schemas/GlobalResponseMapStringObject" },
+                "example": {
+                  "status": 200,
+                  "message": "ok",
+                  "data": { "status": "UP", "database": "connected", "redis": "connected" }
                 }
               }
             }
           }
-        }
-      }
-    },
-    "/api/auth/withdraw": {
-      "delete": {
-        "tags": [
-          "Auth"
-        ],
-        "summary": "회원 탈퇴",
-        "description": "soft delete + 토큰 전체 무효화",
-        "operationId": "withdraw",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/GlobalResponseVoid"
-                }
-              }
-            }
-          }
-        }
+        },
+        "security": []
       }
     }
   },
@@ -1277,1240 +1111,535 @@
       "PolicyProfileRequest": {
         "type": "object",
         "properties": {
-          "birthDate": {
-            "type": "string",
-            "format": "date"
-          },
-          "regionCode": {
-            "type": "string"
-          },
-          "occupation": {
-            "type": "string"
-          },
-          "incomeLevel": {
-            "type": "string"
-          }
+          "birthDate": { "type": "string", "format": "date", "example": "2000-01-15" },
+          "regionCode": { "type": "string", "example": "11", "description": "지역 코드 (11=서울, 26=부산 등)" },
+          "occupation": { "type": "string", "example": "STUDENT", "description": "STUDENT / EMPLOYED / UNEMPLOYED" },
+          "incomeLevel": { "type": "string", "example": "LOW", "description": "LOW / BELOW_MEDIAN / BELOW_200PCT" }
         }
       },
       "GlobalResponseVoid": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "type": "object"
-          }
+          "status": { "type": "integer", "format": "int32" },
+          "message": { "type": "string" },
+          "data": { "type": "object" }
         }
       },
       "CategoryUpdateRequest": {
-        "required": [
-          "categories"
-        ],
+        "required": ["categories"],
         "type": "object",
         "properties": {
           "categories": {
             "maxItems": 6,
             "minItems": 0,
             "type": "array",
-            "items": {
-              "type": "string"
-            }
+            "items": { "type": "string" },
+            "example": ["경제", "투자"],
+            "description": "경제 / 투자 / 보험 / 대출 / 정책 / 청년금융"
           }
         }
       },
       "SpendingCreateRequest": {
-        "required": [
-          "amount",
-          "category",
-          "spentAt"
-        ],
+        "required": ["amount", "category", "spentAt"],
         "type": "object",
         "properties": {
-          "amount": {
-            "type": "number",
-            "description": "금액",
-            "example": 15000
-          },
-          "category": {
-            "type": "string",
-            "description": "카테고리",
-            "example": "FOOD"
-          },
-          "description": {
-            "type": "string",
-            "description": "설명",
-            "example": "점심 식사"
-          },
-          "spentAt": {
-            "type": "string",
-            "description": "소비 날짜",
-            "format": "date",
-            "example": "2026-03-24"
-          },
-          "metadata": {
-            "type": "string",
-            "description": "부가 정보 (JSON)"
-          }
-        },
-        "description": "소비 기록 생성/수정 요청"
+          "amount": { "type": "number", "description": "금액 (원)", "example": 15000 },
+          "category": { "type": "string", "description": "FOOD / TRANSPORT / HOUSING / ENTERTAINMENT / SHOPPING / HEALTH / EDUCATION / ETC", "example": "FOOD" },
+          "description": { "type": "string", "description": "메모 (선택)", "example": "점심 식사" },
+          "spentAt": { "type": "string", "format": "date", "description": "소비 날짜", "example": "2026-05-06" },
+          "metadata": { "type": "string", "description": "부가 정보 JSON 문자열 (선택)" }
+        }
       },
       "GlobalResponseLong": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "type": "integer",
-            "format": "int64"
-          }
+          "status": { "type": "integer", "format": "int32" },
+          "message": { "type": "string" },
+          "data": { "type": "integer", "format": "int64" }
         }
       },
       "GlobalResponseBoolean": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "type": "boolean"
-          }
+          "status": { "type": "integer", "format": "int32" },
+          "message": { "type": "string" },
+          "data": { "type": "boolean" }
         }
       },
       "GlobalResponseMapStringBoolean": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "boolean"
-            }
-          }
+          "status": { "type": "integer", "format": "int32" },
+          "message": { "type": "string" },
+          "data": { "type": "object", "additionalProperties": { "type": "boolean" } }
         }
       },
       "SignupRequest": {
-        "required": [
-          "email",
-          "name",
-          "nickname",
-          "password"
-        ],
+        "required": ["email", "name", "nickname", "password"],
         "type": "object",
         "properties": {
-          "email": {
-            "type": "string"
-          },
-          "password": {
-            "maxLength": 100,
-            "minLength": 8,
-            "type": "string"
-          },
-          "name": {
-            "maxLength": 50,
-            "minLength": 0,
-            "type": "string"
-          },
-          "nickname": {
-            "maxLength": 30,
-            "minLength": 2,
-            "type": "string"
-          }
+          "email": { "type": "string", "example": "test@example.com" },
+          "password": { "maxLength": 100, "minLength": 8, "type": "string", "example": "password123" },
+          "name": { "maxLength": 50, "minLength": 1, "type": "string", "example": "홍길동" },
+          "nickname": { "maxLength": 30, "minLength": 2, "type": "string", "example": "길동이" }
         }
       },
       "GlobalResponseTokenResponse": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/TokenResponse"
-          }
+          "status": { "type": "integer", "format": "int32" },
+          "message": { "type": "string" },
+          "data": { "$ref": "#/components/schemas/TokenResponse" }
         }
       },
       "TokenResponse": {
         "type": "object",
         "properties": {
-          "accessToken": {
-            "type": "string"
-          },
-          "refreshToken": {
-            "type": "string"
-          }
+          "accessToken": { "type": "string", "description": "유효 시간 15분" },
+          "refreshToken": { "type": "string", "description": "유효 시간 7일" }
         }
       },
       "TokenReissueRequest": {
-        "required": [
-          "refreshToken"
-        ],
+        "required": ["refreshToken"],
         "type": "object",
         "properties": {
-          "refreshToken": {
-            "type": "string"
-          }
+          "refreshToken": { "type": "string" }
         }
       },
       "LoginRequest": {
-        "required": [
-          "email",
-          "password"
-        ],
+        "required": ["email", "password"],
         "type": "object",
         "properties": {
-          "email": {
-            "type": "string"
-          },
-          "password": {
-            "type": "string"
-          }
+          "email": { "type": "string", "example": "test@example.com" },
+          "password": { "type": "string", "example": "password123" }
         }
       },
       "GlobalResponseMapStringObject": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "object"
-            }
-          }
+          "status": { "type": "integer", "format": "int32" },
+          "message": { "type": "string" },
+          "data": { "type": "object", "additionalProperties": { "type": "object" } }
         }
       },
       "ProfileUpdateRequest": {
         "type": "object",
         "properties": {
-          "nickname": {
-            "maxLength": 30,
-            "minLength": 2,
-            "type": "string"
-          }
+          "nickname": { "maxLength": 30, "minLength": 2, "type": "string", "example": "새닉네임" }
         }
       },
       "GlobalResponseUserProfileResponse": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/UserProfileResponse"
-          }
+          "status": { "type": "integer", "format": "int32" },
+          "message": { "type": "string" },
+          "data": { "$ref": "#/components/schemas/UserProfileResponse" }
         }
       },
       "UserProfileResponse": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "email": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "nickname": {
-            "type": "string"
-          },
-          "birthDate": {
-            "type": "string",
-            "format": "date"
-          },
-          "gender": {
-            "type": "string"
-          },
-          "regionCode": {
-            "type": "string"
-          },
-          "occupation": {
-            "type": "string"
-          },
-          "incomeLevel": {
-            "type": "string"
-          },
-          "interests": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
+          "id": { "type": "integer", "format": "int64" },
+          "email": { "type": "string" },
+          "name": { "type": "string" },
+          "nickname": { "type": "string" },
+          "birthDate": { "type": "string", "format": "date" },
+          "gender": { "type": "string" },
+          "regionCode": { "type": "string" },
+          "occupation": { "type": "string" },
+          "incomeLevel": { "type": "string" },
+          "interests": { "type": "array", "items": { "type": "string" }, "description": "관심 카테고리 목록" }
         }
       },
       "GlobalResponseLearningStatsResponse": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/LearningStatsResponse"
-          }
+          "status": { "type": "integer", "format": "int32" },
+          "message": { "type": "string" },
+          "data": { "$ref": "#/components/schemas/LearningStatsResponse" }
         }
       },
       "LearningStatsResponse": {
         "type": "object",
         "properties": {
-          "readNewsCount": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "learnedTermCount": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "consecutiveLearningDays": {
-            "type": "integer",
-            "format": "int32"
-          }
+          "readNewsCount": { "type": "integer", "format": "int64", "description": "읽은 뉴스 총 건수" },
+          "learnedTermCount": { "type": "integer", "format": "int64", "description": "학습한 고유 용어 수" },
+          "consecutiveLearningDays": { "type": "integer", "format": "int32", "description": "오늘 기준 연속 학습일" }
         }
       },
       "GlobalResponseListLearnedTermResponse": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/LearnedTermResponse"
-            }
-          }
+          "status": { "type": "integer", "format": "int32" },
+          "message": { "type": "string" },
+          "data": { "type": "array", "items": { "$ref": "#/components/schemas/LearnedTermResponse" } }
         }
       },
       "LearnedTermResponse": {
         "type": "object",
         "properties": {
-          "termId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "name": {
-            "type": "string"
-          },
-          "simpleDefinition": {
-            "type": "string"
-          },
-          "difficultyLevel": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "learnedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
+          "termId": { "type": "integer", "format": "int64" },
+          "name": { "type": "string" },
+          "simpleDefinition": { "type": "string" },
+          "difficultyLevel": { "type": "integer", "format": "int32" },
+          "learnedAt": { "type": "string", "format": "date-time" }
         }
       },
       "Pageable": {
         "type": "object",
         "properties": {
-          "page": {
-            "minimum": 0,
-            "type": "integer",
-            "format": "int32"
-          },
-          "size": {
-            "minimum": 1,
-            "type": "integer",
-            "format": "int32"
-          },
-          "sort": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
+          "page": { "minimum": 0, "type": "integer", "format": "int32", "default": 0 },
+          "size": { "minimum": 1, "type": "integer", "format": "int32", "default": 10 },
+          "sort": { "type": "array", "items": { "type": "string" }, "example": ["publishedAt,desc"] }
         }
       },
       "GlobalResponsePageNewsBookmarkResponse": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/PageNewsBookmarkResponse"
-          }
+          "status": { "type": "integer", "format": "int32" },
+          "message": { "type": "string" },
+          "data": { "$ref": "#/components/schemas/PageNewsBookmarkResponse" }
         }
       },
       "NewsBookmarkResponse": {
         "type": "object",
         "properties": {
-          "articleId": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "title": {
-            "type": "string"
-          },
-          "sourceName": {
-            "type": "string"
-          },
-          "category": {
-            "type": "string"
-          },
-          "publishedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "bookmarkedAt": {
-            "type": "string",
-            "format": "date-time"
-          }
+          "articleId": { "type": "integer", "format": "int64" },
+          "title": { "type": "string" },
+          "sourceName": { "type": "string" },
+          "category": { "type": "string" },
+          "publishedAt": { "type": "string", "format": "date-time" },
+          "bookmarkedAt": { "type": "string", "format": "date-time" }
         }
       },
       "PageNewsBookmarkResponse": {
         "type": "object",
         "properties": {
-          "totalElements": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "totalPages": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "first": {
-            "type": "boolean"
-          },
-          "last": {
-            "type": "boolean"
-          },
-          "size": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "content": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NewsBookmarkResponse"
-            }
-          },
-          "number": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "sort": {
-            "$ref": "#/components/schemas/SortObject"
-          },
-          "pageable": {
-            "$ref": "#/components/schemas/PageableObject"
-          },
-          "numberOfElements": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "empty": {
-            "type": "boolean"
-          }
+          "totalElements": { "type": "integer", "format": "int64" },
+          "totalPages": { "type": "integer", "format": "int32" },
+          "first": { "type": "boolean" },
+          "last": { "type": "boolean" },
+          "size": { "type": "integer", "format": "int32" },
+          "content": { "type": "array", "items": { "$ref": "#/components/schemas/NewsBookmarkResponse" } },
+          "number": { "type": "integer", "format": "int32" },
+          "sort": { "$ref": "#/components/schemas/SortObject" },
+          "pageable": { "$ref": "#/components/schemas/PageableObject" },
+          "numberOfElements": { "type": "integer", "format": "int32" },
+          "empty": { "type": "boolean" }
         }
       },
       "PageableObject": {
         "type": "object",
         "properties": {
-          "offset": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "sort": {
-            "$ref": "#/components/schemas/SortObject"
-          },
-          "pageNumber": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "pageSize": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "unpaged": {
-            "type": "boolean"
-          },
-          "paged": {
-            "type": "boolean"
-          }
+          "offset": { "type": "integer", "format": "int64" },
+          "sort": { "$ref": "#/components/schemas/SortObject" },
+          "pageNumber": { "type": "integer", "format": "int32" },
+          "pageSize": { "type": "integer", "format": "int32" },
+          "unpaged": { "type": "boolean" },
+          "paged": { "type": "boolean" }
         }
       },
       "SortObject": {
         "type": "object",
         "properties": {
-          "empty": {
-            "type": "boolean"
-          },
-          "unsorted": {
-            "type": "boolean"
-          },
-          "sorted": {
-            "type": "boolean"
-          }
+          "empty": { "type": "boolean" },
+          "unsorted": { "type": "boolean" },
+          "sorted": { "type": "boolean" }
         }
       },
       "GlobalResponsePageTermListResponse": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/PageTermListResponse"
-          }
+          "status": { "type": "integer", "format": "int32" },
+          "message": { "type": "string" },
+          "data": { "$ref": "#/components/schemas/PageTermListResponse" }
         }
       },
       "PageTermListResponse": {
         "type": "object",
         "properties": {
-          "totalElements": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "totalPages": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "first": {
-            "type": "boolean"
-          },
-          "last": {
-            "type": "boolean"
-          },
-          "size": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "content": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/TermListResponse"
-            }
-          },
-          "number": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "sort": {
-            "$ref": "#/components/schemas/SortObject"
-          },
-          "pageable": {
-            "$ref": "#/components/schemas/PageableObject"
-          },
-          "numberOfElements": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "empty": {
-            "type": "boolean"
-          }
+          "totalElements": { "type": "integer", "format": "int64" },
+          "totalPages": { "type": "integer", "format": "int32" },
+          "first": { "type": "boolean" },
+          "last": { "type": "boolean" },
+          "size": { "type": "integer", "format": "int32" },
+          "content": { "type": "array", "items": { "$ref": "#/components/schemas/TermListResponse" } },
+          "number": { "type": "integer", "format": "int32" },
+          "sort": { "$ref": "#/components/schemas/SortObject" },
+          "pageable": { "$ref": "#/components/schemas/PageableObject" },
+          "numberOfElements": { "type": "integer", "format": "int32" },
+          "empty": { "type": "boolean" }
         }
       },
       "TermListResponse": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "name": {
-            "type": "string"
-          },
-          "path": {
-            "type": "string"
-          },
-          "simpleDefinition": {
-            "type": "string"
-          },
-          "difficultyLevel": {
-            "type": "integer",
-            "format": "int32"
-          }
+          "id": { "type": "integer", "format": "int64" },
+          "name": { "type": "string" },
+          "path": { "type": "string", "description": "ltree 경로 (예: finance.stock.etf)" },
+          "simpleDefinition": { "type": "string" },
+          "difficultyLevel": { "type": "integer", "format": "int32", "description": "1(입문)~5(전문)" }
         }
       },
       "FinancialTerm": {
         "type": "object",
         "properties": {
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "name": {
-            "type": "string"
-          },
-          "path": {
-            "type": "string"
-          },
-          "definition": {
-            "type": "string"
-          },
-          "simpleDefinition": {
-            "type": "string"
-          },
-          "difficultyLevel": {
-            "type": "integer",
-            "format": "int32"
-          }
+          "id": { "type": "integer", "format": "int64" },
+          "name": { "type": "string" },
+          "path": { "type": "string", "description": "ltree 경로" },
+          "definition": { "type": "string", "description": "전체 설명" },
+          "simpleDefinition": { "type": "string", "description": "쉬운 설명 (팝업용)" },
+          "difficultyLevel": { "type": "integer", "format": "int32" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
         }
       },
       "GlobalResponseFinancialTerm": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/FinancialTerm"
-          }
+          "status": { "type": "integer", "format": "int32" },
+          "message": { "type": "string" },
+          "data": { "$ref": "#/components/schemas/FinancialTerm" }
         }
       },
       "GlobalResponseListFinancialTerm": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/FinancialTerm"
-            }
-          }
+          "status": { "type": "integer", "format": "int32" },
+          "message": { "type": "string" },
+          "data": { "type": "array", "items": { "$ref": "#/components/schemas/FinancialTerm" } }
         }
       },
       "GlobalResponseSpendingDashboardResponse": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/SpendingDashboardResponse"
-          }
+          "status": { "type": "integer", "format": "int32" },
+          "message": { "type": "string" },
+          "data": { "$ref": "#/components/schemas/SpendingDashboardResponse" }
         }
       },
       "SpendingDashboardResponse": {
         "type": "object",
         "properties": {
-          "month": {
-            "type": "string",
-            "description": "조회 월 (2026-03)"
-          },
-          "categoryTotals": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "number",
-              "description": "카테고리별 합계"
-            },
-            "description": "카테고리별 합계"
-          },
-          "totalAmount": {
-            "type": "number",
-            "description": "총 지출액"
-          }
-        },
-        "description": "소비 대시보드 응답"
+          "month": { "type": "string", "description": "조회 월 (yyyy-MM)", "example": "2026-05" },
+          "categoryTotals": { "type": "object", "additionalProperties": { "type": "number" }, "description": "카테고리별 합계 (원)" },
+          "totalAmount": { "type": "number", "description": "총 지출액 (원)" }
+        }
       },
       "GlobalResponsePolicyDetailResponse": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/PolicyDetailResponse"
-          }
+          "status": { "type": "integer", "format": "int32" },
+          "message": { "type": "string" },
+          "data": { "$ref": "#/components/schemas/PolicyDetailResponse" }
         }
       },
       "PolicyDetailResponse": {
         "type": "object",
+        "description": "정책 상세 응답",
         "properties": {
-          "id": {
-            "type": "integer",
-            "description": "정책 ID",
-            "format": "int64"
-          },
-          "title": {
-            "type": "string",
-            "description": "정책명"
-          },
-          "description": {
-            "type": "string",
-            "description": "상세 설명"
-          },
-          "summary": {
-            "type": "string",
-            "description": "AI 요약"
-          },
-          "organization": {
-            "type": "string",
-            "description": "기관명"
-          },
-          "regionCode": {
-            "type": "string",
-            "description": "지역 코드"
-          },
-          "ageMin": {
-            "type": "integer",
-            "description": "대상 나이 (최소)",
-            "format": "int32"
-          },
-          "ageMax": {
-            "type": "integer",
-            "description": "대상 나이 (최대)",
-            "format": "int32"
-          },
-          "incomeCriteria": {
-            "type": "string",
-            "description": "소득 기준"
-          },
-          "startDate": {
-            "type": "string",
-            "description": "시작일",
-            "format": "date"
-          },
-          "endDate": {
-            "type": "string",
-            "description": "마감일",
-            "format": "date"
-          },
-          "applicationUrl": {
-            "type": "string",
-            "description": "신청 URL"
-          },
-          "isBookmarked": {
-            "type": "boolean",
-            "description": "즐겨찾기 여부"
-          }
-        },
-        "description": "정책 상세 응답"
+          "id": { "type": "integer", "format": "int64" },
+          "title": { "type": "string", "description": "정책명" },
+          "description": { "type": "string", "description": "상세 설명" },
+          "summary": { "type": "string", "description": "AI 요약" },
+          "organization": { "type": "string", "description": "기관명" },
+          "regionCode": { "type": "string", "description": "지역 코드 (null=전국)" },
+          "ageMin": { "type": "integer", "format": "int32", "description": "대상 최소 나이" },
+          "ageMax": { "type": "integer", "format": "int32", "description": "대상 최대 나이" },
+          "incomeCriteria": { "type": "string", "description": "소득 기준" },
+          "startDate": { "type": "string", "format": "date" },
+          "endDate": { "type": "string", "format": "date", "description": "마감일 (null=상시)" },
+          "applicationUrl": { "type": "string", "description": "신청 URL" },
+          "isBookmarked": { "type": "boolean", "description": "즐겨찾기 여부 (userId 미전달 시 false)" }
+        }
       },
       "GlobalResponsePagePolicyListResponse": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/PagePolicyListResponse"
-          }
+          "status": { "type": "integer", "format": "int32" },
+          "message": { "type": "string" },
+          "data": { "$ref": "#/components/schemas/PagePolicyListResponse" }
         }
       },
       "PagePolicyListResponse": {
         "type": "object",
         "properties": {
-          "totalElements": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "totalPages": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "first": {
-            "type": "boolean"
-          },
-          "last": {
-            "type": "boolean"
-          },
-          "size": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "content": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PolicyListResponse"
-            }
-          },
-          "number": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "sort": {
-            "$ref": "#/components/schemas/SortObject"
-          },
-          "pageable": {
-            "$ref": "#/components/schemas/PageableObject"
-          },
-          "numberOfElements": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "empty": {
-            "type": "boolean"
-          }
+          "totalElements": { "type": "integer", "format": "int64" },
+          "totalPages": { "type": "integer", "format": "int32" },
+          "first": { "type": "boolean" },
+          "last": { "type": "boolean" },
+          "size": { "type": "integer", "format": "int32" },
+          "content": { "type": "array", "items": { "$ref": "#/components/schemas/PolicyListResponse" } },
+          "number": { "type": "integer", "format": "int32" },
+          "sort": { "$ref": "#/components/schemas/SortObject" },
+          "pageable": { "$ref": "#/components/schemas/PageableObject" },
+          "numberOfElements": { "type": "integer", "format": "int32" },
+          "empty": { "type": "boolean" }
         }
       },
       "PolicyListResponse": {
         "type": "object",
+        "description": "정책 목록 응답",
         "properties": {
-          "id": {
-            "type": "integer",
-            "description": "정책 ID",
-            "format": "int64"
-          },
-          "title": {
-            "type": "string",
-            "description": "정책명"
-          },
-          "summary": {
-            "type": "string",
-            "description": "AI 요약"
-          },
-          "organization": {
-            "type": "string",
-            "description": "기관명"
-          },
-          "endDate": {
-            "type": "string",
-            "description": "마감일",
-            "format": "date"
-          },
-          "ageMin": {
-            "type": "integer",
-            "description": "대상 나이 (최소)",
-            "format": "int32"
-          },
-          "ageMax": {
-            "type": "integer",
-            "description": "대상 나이 (최대)",
-            "format": "int32"
-          }
-        },
-        "description": "정책 목록 응답"
+          "id": { "type": "integer", "format": "int64" },
+          "title": { "type": "string" },
+          "summary": { "type": "string" },
+          "organization": { "type": "string" },
+          "endDate": { "type": "string", "format": "date", "description": "마감일" },
+          "ageMin": { "type": "integer", "format": "int32" },
+          "ageMax": { "type": "integer", "format": "int32" }
+        }
       },
       "GlobalResponsePageNewsListResponse": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/PageNewsListResponse"
-          }
+          "status": { "type": "integer", "format": "int32" },
+          "message": { "type": "string" },
+          "data": { "$ref": "#/components/schemas/PageNewsListResponse" }
         }
       },
       "NewsListResponse": {
         "type": "object",
+        "description": "뉴스 목록 응답",
         "properties": {
-          "id": {
-            "type": "integer",
-            "description": "기사 ID",
-            "format": "int64"
-          },
-          "title": {
-            "type": "string",
-            "description": "제목"
-          },
-          "sourceName": {
-            "type": "string",
-            "description": "출처"
-          },
-          "category": {
-            "type": "string",
-            "description": "카테고리"
-          },
-          "summary": {
-            "type": "string",
-            "description": "AI 요약 (3줄)"
-          },
-          "publishedAt": {
-            "type": "string",
-            "description": "발행일",
-            "format": "date-time"
-          }
-        },
-        "description": "뉴스 목록 응답"
+          "id": { "type": "integer", "format": "int64", "description": "기사 ID" },
+          "title": { "type": "string" },
+          "sourceName": { "type": "string", "description": "출처 (한국경제 등)" },
+          "category": { "type": "string" },
+          "summary": { "type": "string", "description": "AI 3줄 요약" },
+          "publishedAt": { "type": "string", "format": "date-time" }
+        }
       },
       "PageNewsListResponse": {
         "type": "object",
         "properties": {
-          "totalElements": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "totalPages": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "first": {
-            "type": "boolean"
-          },
-          "last": {
-            "type": "boolean"
-          },
-          "size": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "content": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NewsListResponse"
-            }
-          },
-          "number": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "sort": {
-            "$ref": "#/components/schemas/SortObject"
-          },
-          "pageable": {
-            "$ref": "#/components/schemas/PageableObject"
-          },
-          "numberOfElements": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "empty": {
-            "type": "boolean"
-          }
+          "totalElements": { "type": "integer", "format": "int64" },
+          "totalPages": { "type": "integer", "format": "int32" },
+          "first": { "type": "boolean" },
+          "last": { "type": "boolean" },
+          "size": { "type": "integer", "format": "int32" },
+          "content": { "type": "array", "items": { "$ref": "#/components/schemas/NewsListResponse" } },
+          "number": { "type": "integer", "format": "int32" },
+          "sort": { "$ref": "#/components/schemas/SortObject" },
+          "pageable": { "$ref": "#/components/schemas/PageableObject" },
+          "numberOfElements": { "type": "integer", "format": "int32" },
+          "empty": { "type": "boolean" }
         }
       },
       "GlobalResponseNewsDetailResponse": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/NewsDetailResponse"
-          }
+          "status": { "type": "integer", "format": "int32" },
+          "message": { "type": "string" },
+          "data": { "$ref": "#/components/schemas/NewsDetailResponse" }
         }
       },
       "NewsDetailResponse": {
         "type": "object",
+        "description": "뉴스 상세 응답",
         "properties": {
-          "id": {
-            "type": "integer",
-            "description": "기사 ID",
-            "format": "int64"
-          },
-          "title": {
-            "type": "string",
-            "description": "제목"
-          },
-          "content": {
-            "type": "string",
-            "description": "원문"
-          },
-          "sourceName": {
-            "type": "string",
-            "description": "출처명"
-          },
-          "sourceUrl": {
-            "type": "string",
-            "description": "원문 URL"
-          },
-          "category": {
-            "type": "string",
-            "description": "카테고리"
-          },
-          "publishedAt": {
-            "type": "string",
-            "description": "발행일",
-            "format": "date-time"
-          },
-          "summary": {
-            "type": "string",
-            "description": "AI 3줄 요약"
-          },
-          "modelVersion": {
-            "type": "string",
-            "description": "요약 모델 버전"
-          },
+          "id": { "type": "integer", "format": "int64" },
+          "title": { "type": "string" },
+          "content": { "type": "string", "description": "원문 전체" },
+          "sourceName": { "type": "string" },
+          "sourceUrl": { "type": "string", "description": "원문 URL" },
+          "category": { "type": "string" },
+          "publishedAt": { "type": "string", "format": "date-time" },
+          "summary": { "type": "string", "description": "AI 3줄 요약" },
+          "modelVersion": { "type": "string", "description": "요약 모델 버전" },
           "termHighlights": {
             "type": "array",
-            "description": "본문 내 용어 하이라이트 목록",
-            "items": {
-              "$ref": "#/components/schemas/TermHighlightDto"
-            }
+            "description": "본문 내 금융 용어 위치 목록. positionStart~positionEnd 범위의 텍스트에 팝업을 붙이는 용도.",
+            "items": { "$ref": "#/components/schemas/TermHighlightDto" }
           }
-        },
-        "description": "뉴스 상세 응답"
+        }
       },
       "TermHighlightDto": {
         "type": "object",
+        "description": "본문 내 용어 하이라이트 정보",
         "properties": {
-          "termId": {
-            "type": "integer",
-            "description": "용어 ID",
-            "format": "int64"
-          },
-          "termName": {
-            "type": "string",
-            "description": "용어명"
-          },
-          "simpleDefinition": {
-            "type": "string",
-            "description": "쉬운 설명"
-          },
-          "positionStart": {
-            "type": "integer",
-            "description": "본문 시작 위치",
-            "format": "int32"
-          },
-          "positionEnd": {
-            "type": "integer",
-            "description": "본문 끝 위치",
-            "format": "int32"
-          }
-        },
-        "description": "용어 하이라이트 정보"
+          "termId": { "type": "integer", "format": "int64" },
+          "termName": { "type": "string" },
+          "simpleDefinition": { "type": "string", "description": "팝업에 표시할 쉬운 설명" },
+          "positionStart": { "type": "integer", "format": "int32", "description": "본문 문자 시작 인덱스" },
+          "positionEnd": { "type": "integer", "format": "int32", "description": "본문 문자 끝 인덱스" }
+        }
       },
       "GlobalResponseListNewsListResponse": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/NewsListResponse"
-            }
-          }
+          "status": { "type": "integer", "format": "int32" },
+          "message": { "type": "string" },
+          "data": { "type": "array", "items": { "$ref": "#/components/schemas/NewsListResponse" } }
         }
       },
       "GlobalResponsePageGuide": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/PageGuide"
-          }
+          "status": { "type": "integer", "format": "int32" },
+          "message": { "type": "string" },
+          "data": { "$ref": "#/components/schemas/PageGuide" }
         }
       },
       "Guide": {
         "type": "object",
         "properties": {
-          "createdAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "id": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "guideType": {
-            "type": "string"
-          },
-          "topic": {
-            "type": "string"
-          },
-          "title": {
-            "type": "string"
-          },
-          "content": {
-            "type": "string"
-          },
-          "difficultyLevel": {
-            "type": "integer",
-            "format": "int32"
-          }
+          "id": { "type": "integer", "format": "int64" },
+          "guideType": { "type": "string", "description": "STOCK / INSURANCE" },
+          "topic": { "type": "string", "description": "소주제" },
+          "title": { "type": "string" },
+          "content": { "type": "string", "description": "본문" },
+          "difficultyLevel": { "type": "integer", "format": "int32", "description": "1(입문)~5(전문)" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
         }
       },
       "PageGuide": {
         "type": "object",
         "properties": {
-          "totalElements": {
-            "type": "integer",
-            "format": "int64"
-          },
-          "totalPages": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "first": {
-            "type": "boolean"
-          },
-          "last": {
-            "type": "boolean"
-          },
-          "size": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "content": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Guide"
-            }
-          },
-          "number": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "sort": {
-            "$ref": "#/components/schemas/SortObject"
-          },
-          "pageable": {
-            "$ref": "#/components/schemas/PageableObject"
-          },
-          "numberOfElements": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "empty": {
-            "type": "boolean"
-          }
+          "totalElements": { "type": "integer", "format": "int64" },
+          "totalPages": { "type": "integer", "format": "int32" },
+          "first": { "type": "boolean" },
+          "last": { "type": "boolean" },
+          "size": { "type": "integer", "format": "int32" },
+          "content": { "type": "array", "items": { "$ref": "#/components/schemas/Guide" } },
+          "number": { "type": "integer", "format": "int32" },
+          "sort": { "$ref": "#/components/schemas/SortObject" },
+          "pageable": { "$ref": "#/components/schemas/PageableObject" },
+          "numberOfElements": { "type": "integer", "format": "int32" },
+          "empty": { "type": "boolean" }
         }
       },
       "GlobalResponseGuide": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/Guide"
-          }
+          "status": { "type": "integer", "format": "int32" },
+          "message": { "type": "string" },
+          "data": { "$ref": "#/components/schemas/Guide" }
         }
       },
       "CrawlStatus": {
         "type": "object",
         "properties": {
-          "lastRunAt": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "savedCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "failedCount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "status": {
-            "type": "string"
-          }
+          "lastRunAt": { "type": "string", "format": "date-time" },
+          "savedCount": { "type": "integer", "format": "int32" },
+          "failedCount": { "type": "integer", "format": "int32" },
+          "status": { "type": "string", "description": "NEVER_RUN / RUNNING / SUCCESS / PARTIAL / FAILED" }
         }
       },
       "GlobalResponseCrawlStatus": {
         "type": "object",
         "properties": {
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "message": {
-            "type": "string"
-          },
-          "data": {
-            "$ref": "#/components/schemas/CrawlStatus"
-          }
+          "status": { "type": "integer", "format": "int32" },
+          "message": { "type": "string" },
+          "data": { "$ref": "#/components/schemas/CrawlStatus" }
         }
       }
     },
     "securitySchemes": {
       "bearerAuth": {
         "type": "http",
-        "description": "JWT Access Token을 입력하세요 (Bearer 접두사 불필요)",
+        "description": "JWT Access Token. 로그인/회원가입 후 발급된 accessToken을 입력하세요 (Bearer 접두사 불필요).",
         "scheme": "bearer",
         "bearerFormat": "JWT"
       }

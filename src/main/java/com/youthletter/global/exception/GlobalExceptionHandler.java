@@ -2,6 +2,7 @@ package com.youthletter.global.exception;
 
 import com.youthletter.global.response.GlobalResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.catalina.connector.ClientAbortException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -60,6 +61,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
                 .body(GlobalResponse.error(4004, "접근 권한이 없습니다"));
+    }
+
+    /**
+     * 브라우저가 응답 수신 전 연결을 끊은 경우 (리다이렉트 등) — 정상 동작이므로 무시
+     */
+    @ExceptionHandler(ClientAbortException.class)
+    protected void handleClientAbort(ClientAbortException e) {
+        // Broken pipe: 클라이언트가 먼저 연결을 끊은 것 — 로그 불필요
     }
 
     /**

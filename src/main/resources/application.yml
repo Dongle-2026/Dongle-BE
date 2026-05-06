@@ -109,7 +109,9 @@ jwt:
 # FE Next.js 개발 서버: http://localhost:3000
 # /auth/callback 페이지에서 accessToken + refreshToken 쿼리 파라미터를 파싱해 localStorage에 저장
 oauth2:
-  redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:3000/auth/callback}
+  # test.html(localhost:8080)로 테스트 시 기본값 사용
+  # 프론트엔드(localhost:3000)와 연동 시: OAUTH2_REDIRECT_URI=http://localhost:3000/auth/callback
+  redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:8080/auth/callback.html}
 
 # ── AI Service (Node.js) 내부 호출 ──
 ai-service:

@@ -60,6 +60,7 @@ public class SecurityConfig {
                     "/v3/api-docs/**",
                     "/actuator/health",
                     "/*.html",
+                    "/auth/callback.html",
                     "/favicon.ico",
                     "/error",
                     "/login.html"

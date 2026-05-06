@@ -41,7 +41,7 @@ public class AuthService {
 
         String accessToken = jwtTokenProvider.createAccessToken(user.getId(), user.getEmail(), user.getRole());
         String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
-        return new TokenResponse(accessToken, refreshToken);
+        return new TokenResponse(accessToken, refreshToken, user.getNickname());
     }
 
     @Transactional
@@ -58,7 +58,7 @@ public class AuthService {
 
         String newAccessToken  = jwtTokenProvider.createAccessToken(user.getId(), user.getEmail(), user.getRole());
         String newRefreshToken = jwtTokenProvider.createRefreshToken(user.getId());
-        return new TokenResponse(newAccessToken, newRefreshToken);
+        return new TokenResponse(newAccessToken, newRefreshToken, user.getNickname());
     }
 
     @Transactional(readOnly = true)
@@ -75,7 +75,7 @@ public class AuthService {
 
         String accessToken = jwtTokenProvider.createAccessToken(user.getId(), user.getEmail(), user.getRole());
         String refreshToken = jwtTokenProvider.createRefreshToken(user.getId());
-        return new TokenResponse(accessToken, refreshToken);
+        return new TokenResponse(accessToken, refreshToken, user.getNickname());
     }
 
     @Transactional
