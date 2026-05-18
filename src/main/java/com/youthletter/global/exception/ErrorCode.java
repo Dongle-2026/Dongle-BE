@@ -31,6 +31,8 @@ public enum ErrorCode {
 
     // ── 뉴스 (42xx) ──
     ARTICLE_NOT_FOUND(HttpStatus.NOT_FOUND, 4200, "뉴스 기사를 찾을 수 없습니다"),
+    CARD_NEWS_NOT_FOUND(HttpStatus.NOT_FOUND, 4201, "카드뉴스를 찾을 수 없습니다"),
+    CARD_NEWS_ALREADY_EXISTS(HttpStatus.CONFLICT, 4202, "이미 생성된 카드뉴스가 있습니다"),
 
     // ── 용어 (43xx) ──
     TERM_NOT_FOUND(HttpStatus.NOT_FOUND, 4300, "금융 용어를 찾을 수 없습니다"),

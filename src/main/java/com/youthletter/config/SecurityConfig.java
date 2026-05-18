@@ -2,6 +2,7 @@ package com.youthletter.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.youthletter.global.auth.jwt.JwtAuthenticationFilter;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import com.youthletter.global.auth.oauth.CustomOAuth2UserService;
 import com.youthletter.global.auth.oauth.OAuth2AuthenticationFailureHandler;
 import com.youthletter.global.auth.oauth.OAuth2AuthenticationSuccessHandler;
@@ -22,6 +23,7 @@ import java.util.Map;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -53,6 +55,9 @@ public class SecurityConfig {
                     "/api/policies",
                     "/api/policies/{policyId}",
                     "/api/stocks/{ticker}",
+                    "/api/card-news",
+                    "/api/card-news/{id}",
+                    "/api/card-news/article/{articleId}",
                     "/api/guides/**",
                     "/oauth2/**",
                     "/login/oauth2/**",
