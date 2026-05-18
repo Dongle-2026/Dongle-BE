@@ -54,7 +54,7 @@ spring:
 
   # ── PostgreSQL ──
   datasource:
-    url: jdbc:postgresql://localhost:5432/youthletter
+    url: jdbc:postgresql://localhost:15432/youthletter
     username: ${DB_USERNAME:youthletter}
     password: ${DB_PASSWORD:youthletter1234}
     driver-class-name: org.postgresql.Driver
@@ -106,11 +106,9 @@ jwt:
   refresh-token-expiration: 604800000  # 7일 (ms)
 
 # ── OAuth2 프론트엔드 리다이렉트 ──
-# FE Next.js 개발 서버: http://localhost:3000
-# /auth/callback 페이지에서 accessToken + refreshToken 쿼리 파라미터를 파싱해 localStorage에 저장
+# FE(Next.js) 실행 중: OAUTH2_REDIRECT_URI=http://localhost:3001/auth/callback
+# FE 없이 백엔드만 테스트: 기본값 localhost:8080/auth/callback.html 사용
 oauth2:
-  # test.html(localhost:8080)로 테스트 시 기본값 사용
-  # 프론트엔드(localhost:3000)와 연동 시: OAUTH2_REDIRECT_URI=http://localhost:3000/auth/callback
   redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:8080/auth/callback.html}
 
 # ── AI Service (Node.js) 내부 호출 ──
