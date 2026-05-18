@@ -16,6 +16,9 @@
     <p id="msg">로그인 처리 중...</p>
   </div>
   <script>
+    const FRONTEND_ORIGIN = 'http://localhost:3000';
+    const FRONTEND_CALLBACK = FRONTEND_ORIGIN + '/auth/callback';
+
     const params = new URLSearchParams(window.location.search);
     const accessToken  = params.get('accessToken');
     const refreshToken = params.get('refreshToken');
@@ -23,10 +26,30 @@
 
     if (error) {
       document.getElementById('msg').textContent = '로그인 실패: ' + error;
+
     } else if (accessToken && refreshToken) {
+      // 1. localhost:8080 localStorage에 저장 → test.html에서 바로 사용 가능
       localStorage.setItem('accessToken', accessToken);
       localStorage.setItem('refreshToken', refreshToken);
-      window.location.replace('/test.html');
+
+      // 2. 프론트엔드(localhost:3000)가 실행 중이면 거기에도 토큰 전달
+      //    no-cors 모드: 응답 내용은 못 읽지만 서버가 살아있으면 resolve
+      fetch(FRONTEND_ORIGIN + '/favicon.ico', {
+        mode: 'no-cors',
+        signal: AbortSignal.timeout(800)
+      })
+      .then(() => {
+        // 프론트엔드 실행 중 → 프론트엔드 콜백으로 포워딩 (프론트도 로그인 처리)
+        const dest = FRONTEND_CALLBACK
+          + '?accessToken=' + encodeURIComponent(accessToken)
+          + '&refreshToken=' + encodeURIComponent(refreshToken);
+        window.location.replace(dest);
+      })
+      .catch(() => {
+        // 프론트엔드 미실행 → 테스트 콘솔로 이동
+        window.location.replace('/test.html');
+      });
+
     } else {
       document.getElementById('msg').textContent = '토큰을 받지 못했습니다.';
     }
