@@ -5,12 +5,17 @@ import com.youthletter.domain.crawler.service.HankyungCrawlerService;
 import com.youthletter.domain.news.client.AiServiceClient;
 import com.youthletter.domain.news.client.dto.AiProcessRequest;
 import com.youthletter.domain.news.client.dto.AiProcessResponse;
+import com.youthletter.domain.news.entity.ArticleTermHighlight;
 import com.youthletter.domain.news.entity.NewsArticle;
 import com.youthletter.domain.news.entity.NewsSummary;
+import com.youthletter.domain.news.repository.ArticleTermHighlightRepository;
 import com.youthletter.domain.news.repository.NewsArticleRepository;
 import com.youthletter.domain.news.repository.NewsSummaryRepository;
+import com.youthletter.domain.term.entity.FinancialTerm;
+import com.youthletter.domain.term.repository.FinancialTermRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +33,11 @@ public class NewsProcessingService {
     private final AiServiceClient aiServiceClient;
     private final NewsArticleRepository newsArticleRepository;
     private final NewsSummaryRepository newsSummaryRepository;
+    private final FinancialTermRepository financialTermRepository;
+    private final ArticleTermHighlightRepository articleTermHighlightRepository;
+
+    @Value("${ai-service.model-version:qwen3:8b}")
+    private String modelVersion;
 
     public record CrawlStatus(
             LocalDateTime lastRunAt,
@@ -92,10 +102,13 @@ public class NewsProcessingService {
                                     .article(saved)
                                     .summaryText(aiResponse.summary())
                                     .summaryVersion(1)
-                                    .modelVersion("stub")
+                                    .modelVersion(modelVersion)
                                     .build()
                     );
                 }
+
+                saveTermHighlights(saved, aiResponse.terms());
+                saveEmbedding(saved.getId(), aiResponse.embedding());
 
                 log.info("[Pipeline] 저장 완료: {}", saved.getTitle());
                 savedCount++;
@@ -109,5 +122,42 @@ public class NewsProcessingService {
         lastStatus.set(new CrawlStatus(LocalDateTime.now(), savedCount, failedCount,
                 failedCount == 0 ? "SUCCESS" : "PARTIAL"));
         return savedCount;
+    }
+
+    private void saveTermHighlights(NewsArticle article, List<AiProcessResponse.TermDto> terms) {
+        if (terms == null || terms.isEmpty()) return;
+        for (AiProcessResponse.TermDto dto : terms) {
+            try {
+                FinancialTerm term = financialTermRepository.findByName(dto.term())
+                        .orElseGet(() -> financialTermRepository.save(
+                                FinancialTerm.builder()
+                                        .name(dto.term())
+                                        .path("finance")
+                                        .definition(dto.explanation())
+                                        .simpleDefinition(dto.explanation())
+                                        .difficultyLevel(1)
+                                        .build()
+                        ));
+                articleTermHighlightRepository.save(
+                        ArticleTermHighlight.builder()
+                                .article(article)
+                                .term(term)
+                                .positionStart(dto.startIdx())
+                                .positionEnd(dto.endIdx())
+                                .build()
+                );
+            } catch (Exception e) {
+                log.warn("[Pipeline] 용어 저장 실패: {} - {}", dto.term(), e.getMessage());
+            }
+        }
+    }
+
+    private void saveEmbedding(Long articleId, List<Float> embedding) {
+        if (embedding == null || embedding.isEmpty()) return;
+        try {
+            newsArticleRepository.updateEmbedding(articleId, embedding.toString());
+        } catch (Exception e) {
+            log.warn("[Pipeline] 임베딩 저장 실패: articleId={} - {}", articleId, e.getMessage());
+        }
     }
 }

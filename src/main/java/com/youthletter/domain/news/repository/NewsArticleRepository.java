@@ -4,6 +4,7 @@ import com.youthletter.domain.news.entity.NewsArticle;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -37,4 +38,9 @@ public interface NewsArticleRepository extends JpaRepository<NewsArticle, Long> 
      */
     @Query("SELECT a FROM NewsArticle a WHERE a.crawledAt >= :startOfDay ORDER BY a.publishedAt DESC")
     List<NewsArticle> findTodayArticles(@Param("startOfDay") LocalDateTime startOfDay, Pageable pageable);
+
+    @Modifying
+    @Query(value = "UPDATE news_articles SET embedding = CAST(:embedding AS vector) WHERE id = :id",
+           nativeQuery = true)
+    void updateEmbedding(@Param("id") Long id, @Param("embedding") String embedding);
 }

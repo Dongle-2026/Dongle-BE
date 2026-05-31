@@ -114,7 +114,8 @@ oauth2:
 # ── AI Service (Node.js) 내부 호출 ──
 ai-service:
   base-url: http://localhost:3000
-  use-stub: true   # 혜린이 API 완성 후 false로 변경
+  use-stub: false
+  model-version: qwen3:8b
 
 # ── 로깅 ──
 logging:
