@@ -56,7 +56,7 @@ public class AiServiceClient {
         return new AiProcessResponse(
                 stubSummary,
                 List.of(),
-                Collections.nCopies(1536, 0.0f)
+                Collections.nCopies(768, 0.0f)
         );
     }
 }
