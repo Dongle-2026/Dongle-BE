@@ -50,17 +50,42 @@ public class AiServiceClient {
     }
 
     private <T> T post(String path, Object request, Class<T> type) {
+        String requestId = java.util.UUID.randomUUID().toString();
+        long started = System.nanoTime();
         try {
-            T result = aiServiceWebClient.post().uri(path).bodyValue(request).retrieve()
+            T result = aiServiceWebClient.post().uri(path).header("X-Request-ID", requestId).bodyValue(request).retrieve()
                     .bodyToMono(type).timeout(Duration.ofSeconds(timeoutSeconds)).block();
             if (result == null) throw new BusinessException(ErrorCode.AI_SERVICE_ERROR);
+            log.info("AI request complete: requestId={}, path={}, durationMs={}", requestId, path,
+                    (System.nanoTime() - started) / 1_000_000);
             return result;
         } catch (BusinessException e) {
             throw e;
         } catch (RuntimeException e) {
-            log.warn("AI request failed: path={}, type={}", path, e.getClass().getSimpleName());
-            throw new BusinessException(ErrorCode.AI_SERVICE_ERROR);
+            String code = "AI_TRANSPORT_ERROR";
+            int status = 0;
+            if (e instanceof org.springframework.web.reactive.function.client.WebClientResponseException response) {
+                status = response.getStatusCode().value();
+                code = safeErrorCode(response.getResponseBodyAsString());
+            }
+            boolean timeout = "OLLAMA_TIMEOUT".equals(code);
+            for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+                if (cause instanceof java.util.concurrent.TimeoutException) timeout = true;
+            }
+            log.warn("AI request failed: requestId={}, path={}, status={}, code={}, durationMs={}",
+                    requestId, path, status, code, (System.nanoTime() - started) / 1_000_000);
+            throw new BusinessException(timeout ? ErrorCode.AI_SERVICE_TIMEOUT : ErrorCode.AI_SERVICE_ERROR);
         }
+    }
+
+    static String safeErrorCode(String body) {
+        try {
+            String code = new com.fasterxml.jackson.databind.ObjectMapper().readTree(body).path("error").asText();
+            return java.util.Set.of("OLLAMA_TIMEOUT", "OLLAMA_UNAVAILABLE", "OLLAMA_ERROR", "AI_BUSY",
+                    "INVALID_MODEL_JSON", "INVALID_ANALYSIS", "INVALID_TERM", "INVALID_EMBEDDING",
+                    "INVALID_CARDS", "UNSUPPORTED_NUMBER", "INVALID_ADVICE", "INVALID_ARTICLE",
+                    "INVALID_FACTS", "UNAUTHORIZED").contains(code) ? code : "AI_UNKNOWN_ERROR";
+        } catch (Exception ignored) { return "AI_UNKNOWN_ERROR"; }
     }
 
     public boolean isStubMode() { return useStub; }

@@ -1,11 +1,22 @@
 import express from 'express';
 import { pathToFileURL } from 'node:url';
-import { timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual, randomUUID } from 'node:crypto';
 import { createAi, AiError } from './ai.js';
 
-export function createApp(ai = createAi(), token = process.env.AI_SERVICE_TOKEN ?? '') {
+export function createApp(ai = createAi({ observe: event => console.info(JSON.stringify(event)) }), token = process.env.AI_SERVICE_TOKEN ?? '', log = event => console.info(JSON.stringify(event))) {
   const app = express();
   app.disable('x-powered-by');
+  app.use((req, res, next) => {
+    const supplied = req.get('X-Request-ID') ?? '';
+    const requestId = /^[a-f0-9-]{36}$/.test(supplied) ? supplied : randomUUID();
+    const started = performance.now();
+    res.set('X-Request-ID', requestId);
+    res.on('finish', () => {
+      try { log({ requestId, route: req.route?.path ?? 'UNMATCHED', status: res.statusCode,
+        code: res.locals.errorCode ?? 'OK', durationMs: Math.round(performance.now() - started) }); } catch { /* 관측 실패 분리 */ }
+    });
+    next();
+  });
   app.use((req, res, next) => {
     if (token) {
       const actual = Buffer.from(req.get('X-AI-Service-Token') ?? '');
@@ -23,14 +34,15 @@ export function createApp(ai = createAi(), token = process.env.AI_SERVICE_TOKEN 
   let busy = false;
   for (const [path, method] of [['process', 'process'], ['card-news', 'cards'], ['spending-insight', 'insight']]) {
     app.post(`/api/ai/${path}`, async (req, res) => {
-      if (busy) return res.status(429).json({ error: 'AI_BUSY' });
+      if (busy) { res.locals.errorCode = 'AI_BUSY'; return res.status(429).json({ error: 'AI_BUSY' }); }
       busy = true;
       try { res.json(await ai[method](req.body)); } finally { busy = false; }
     });
   }
   app.use((err, req, res, next) => {
     const status = err instanceof AiError ? err.status : err.status === 400 || err.status === 413 ? err.status : 500;
-    res.status(status).json({ error: err instanceof AiError ? err.code : 'INVALID_REQUEST_OR_INTERNAL_ERROR' });
+    res.locals.errorCode = err instanceof AiError ? err.code : 'INVALID_REQUEST_OR_INTERNAL_ERROR';
+    res.status(status).json({ error: res.locals.errorCode });
   });
   return app;
 }

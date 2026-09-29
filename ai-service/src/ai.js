@@ -46,17 +46,24 @@ export function validateCards(value, source) {
 
 export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434',
   model = process.env.OLLAMA_CHAT_MODEL ?? 'qwen3:8b', embedModel = process.env.OLLAMA_EMBED_MODEL ?? 'nomic-embed-text',
-  timeoutMs = Number(process.env.OLLAMA_TIMEOUT_MS ?? 120000) } = {}) {
+  timeoutMs = Number(process.env.OLLAMA_TIMEOUT_MS ?? 120000), observe = () => {} } = {}) {
   async function call(path, body) {
+    const started = performance.now();
+    let status = 0;
+    let code = 'OK';
     try {
       const response = await fetchImpl(`${baseUrl}${path}`, { method: body ? 'POST' : 'GET',
         headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined,
         signal: AbortSignal.timeout(timeoutMs) });
+      status = response.status ?? 200;
       if (!response.ok) throw new AiError('OLLAMA_ERROR', 503);
       return await response.json();
     } catch (error) {
-      if (error instanceof AiError) throw error;
-      throw new AiError(error.name === 'TimeoutError' ? 'OLLAMA_TIMEOUT' : 'OLLAMA_UNAVAILABLE', 503);
+      code = error instanceof AiError ? error.code : error.name === 'TimeoutError' ? 'OLLAMA_TIMEOUT' : 'OLLAMA_UNAVAILABLE';
+      throw error instanceof AiError ? error : new AiError(code, 503);
+    } finally {
+      // 입력 본문, 프롬프트, 생성문, 토큰은 관측 데이터에 포함하지 않는다.
+      try { observe({ stage: path, status, code, durationMs: Math.round(performance.now() - started) }); } catch { /* 로깅 장애가 생성을 실패시키지 않는다. */ }
     }
   }
   async function generate(schema, instruction, data) {

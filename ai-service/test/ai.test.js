@@ -4,6 +4,23 @@ import { createAi, validateCards, sentences, articleInput } from '../src/ai.js';
 
 const article = { title: '금리 안내', content: '기준금리는 3%입니다. 청년 지원을 안내합니다.' };
 const source = sentences(article.content);
+test('모델 타임아웃은 단계와 코드만 기록한다', async () => {
+  const events = [];
+  const ai = createAi({ observe: event => events.push(event), fetchImpl: async () => {
+    throw new DOMException('sensitive upstream text', 'TimeoutError');
+  } });
+  await assert.rejects(() => ai.process(article), /OLLAMA_TIMEOUT/);
+  assert.equal(events[0].stage, '/api/chat');
+  assert.equal(events[0].code, 'OLLAMA_TIMEOUT');
+  assert.equal(events[0].status, 0);
+  assert.equal(JSON.stringify(events).includes('sensitive'), false);
+  assert.equal(JSON.stringify(events).includes(article.content), false);
+});
+test('관측 처리 실패는 정상 모델 응답을 실패시키지 않는다', async () => {
+  const ai = createAi({ observe: () => { throw new Error('logger'); },
+    fetchImpl: async () => ({ ok: true, json: async () => ({ models: [] }) }) });
+  assert.equal((await ai.health()).status, 'MISSING_MODELS');
+});
 const cards = () => ({ cards: Array.from({ length: 5 }, () => ({ templateType: 'T01', title: '금리 안내', body: '기준금리는 3%입니다.', sourceSentenceIds: [1] })) });
 test('기사 입력 공백과 과도한 길이를 거부한다', () => {
   assert.throws(() => articleInput({ title: 'a', content: ' ' }));
