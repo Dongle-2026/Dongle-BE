@@ -13,7 +13,11 @@ public interface SpendingEventRepository extends JpaRepository<SpendingEvent, Lo
     /**
      * 특정 소비 레코드의 이벤트 이력 (Event Sourcing 재생용)
      */
-    List<SpendingEvent> findBySpendingIdOrderByCreatedAtAsc(Long spendingId);
+    @Query("select e from SpendingEvent e where e.spendingId = :spendingId order by e.createdAt asc, e.id asc")
+    List<SpendingEvent> findBySpendingIdOrderByCreatedAtAsc(@Param("spendingId") Long spendingId);
+
+    @Query(value="SELECT nextval('spending_record_id_seq')", nativeQuery=true)
+    long nextSpendingId();
 
     /**
      * 사용자의 기간별 소비 이벤트 조회

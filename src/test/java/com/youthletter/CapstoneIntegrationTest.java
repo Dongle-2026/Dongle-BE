@@ -24,6 +24,7 @@ class CapstoneIntegrationTest {
     @org.springframework.beans.factory.annotation.Autowired NewsArticleRepository articles;
     @org.springframework.beans.factory.annotation.Autowired RecommendationRepository recommendations;
     @org.springframework.beans.factory.annotation.Autowired SpendingEventRepository events;
+    @org.springframework.beans.factory.annotation.Autowired com.youthletter.domain.spending.service.SpendingService spending;
     @org.springframework.beans.factory.annotation.Autowired CardNewsWriter writer;
     @org.springframework.beans.factory.annotation.Autowired CardNewsRepository cards;
     @jakarta.persistence.PersistenceContext jakarta.persistence.EntityManager em;
@@ -55,6 +56,18 @@ class CapstoneIntegrationTest {
     }
     void event(long id, String type, LocalDate date, int amount) {
         jdbc.update("INSERT INTO spending_events(user_id,event_type,spending_id,amount,category,spent_at) VALUES (?, ?, ?, ?, 'FOOD', ?)", user, type, id, amount, date);
+    }
+    @Test void spendingUsesDatabaseIdsAndDeletionRemainsFinal() {
+        var request = new com.youthletter.domain.spending.dto.SpendingCreateRequest(java.math.BigDecimal.TEN,
+                "FOOD", null, LocalDate.now(), null);
+        Long first = spending.createSpending(user, request);
+        Long second = spending.createSpending(user, request);
+        assertThat(second).isGreaterThan(first);
+        spending.deleteSpending(user, first);
+        spending.deleteSpending(user, first);
+        assertThat(events.findBySpendingIdOrderByCreatedAtAsc(first)).hasSize(2);
+        assertThatThrownBy(() -> spending.updateSpending(user, first, request))
+                .isInstanceOf(com.youthletter.global.exception.BusinessException.class);
     }
     @Test void recommendationExcludesReadAndWorksWithoutVectors() {
         Long read = article("읽은 기사", "LOAN");

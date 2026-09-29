@@ -19,7 +19,7 @@ public class NotificationService {
     private final PolicyNotificationRepository notificationRepository;
 
     /**
-     * 내 알림 목록 (미발송 우선, 최신순)
+     * 내 알림 목록 (읽지 않은 항목 우선, 최신순)
      */
     public List<NotificationResponse> getMyNotifications(Long userId) {
         return notificationRepository.findByUserIdOrderBySentAndCreatedAt(userId).stream()
@@ -28,7 +28,7 @@ public class NotificationService {
     }
 
     /**
-     * 단건 읽음 처리 (markAsSent)
+     * 단건 읽음 처리 (발송 상태와 독립)
      */
     @Transactional
     public void markAsRead(Long userId, Long notificationId) {
@@ -39,7 +39,7 @@ public class NotificationService {
             throw new BusinessException(ErrorCode.ACCESS_DENIED);
         }
 
-        notification.markAsSent();
+        notification.markAsRead();
     }
 
     /**
@@ -48,7 +48,7 @@ public class NotificationService {
     @Transactional
     public int markAllAsRead(Long userId) {
         List<PolicyNotification> unread = notificationRepository.findUnsentByUserId(userId);
-        unread.forEach(PolicyNotification::markAsSent);
+        unread.forEach(PolicyNotification::markAsRead);
         return unread.size();
     }
 }

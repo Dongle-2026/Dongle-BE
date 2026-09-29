@@ -24,6 +24,7 @@ public interface PolicyNotificationRepository extends JpaRepository<PolicyNotifi
     List<PolicyNotification> findUnsentDueNotifications(@Param("today") LocalDate today);
 
     boolean existsByUserIdAndPolicyId(Long userId, Long policyId);
+    boolean existsByUserIdAndPolicyIdAndNotifyBeforeDays(Long userId, Long policyId, Integer days);
 
     /**
      * 사용자의 알림 목록 (미발송 우선, 최신순)
@@ -31,13 +32,13 @@ public interface PolicyNotificationRepository extends JpaRepository<PolicyNotifi
     @Query(value = """
             SELECT * FROM policy_notifications
             WHERE user_id = :userId
-            ORDER BY is_sent ASC, created_at DESC
+            ORDER BY is_read ASC, created_at DESC
             """, nativeQuery = true)
     List<PolicyNotification> findByUserIdOrderBySentAndCreatedAt(@Param("userId") Long userId);
 
     /**
      * 미발송 알림 목록 (일괄 읽음 처리용)
      */
-    @Query("SELECT n FROM PolicyNotification n WHERE n.user.id = :userId AND n.isSent = false")
+    @Query("SELECT n FROM PolicyNotification n WHERE n.user.id = :userId AND n.read = false")
     List<PolicyNotification> findUnsentByUserId(@Param("userId") Long userId);
 }

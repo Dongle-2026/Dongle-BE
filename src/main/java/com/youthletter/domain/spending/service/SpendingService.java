@@ -15,7 +15,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 @RequiredArgsConstructor
@@ -29,14 +28,13 @@ public class SpendingService {
     private final UserRepository userRepository;
     private final com.youthletter.domain.news.client.AiServiceClient aiClient;
 
-    private final AtomicLong spendingIdGenerator = new AtomicLong(System.currentTimeMillis());
 
     // ── CRUD ──────────────────────────────────────────────────────────────────
 
     @Transactional
     public Long createSpending(Long userId, SpendingCreateRequest request) {
         User user = findUser(userId);
-        long spendingId = spendingIdGenerator.incrementAndGet();
+        long spendingId = eventRepository.nextSpendingId();
 
         eventRepository.save(SpendingEvent.builder()
                 .user(user)
@@ -60,6 +58,9 @@ public class SpendingService {
         if (events.isEmpty()) throw new BusinessException(ErrorCode.SPENDING_NOT_FOUND);
         if (!events.get(0).getUser().getId().equals(userId)) throw new BusinessException(ErrorCode.SPENDING_NOT_OWNED);
 
+        if ("DELETED".equals(events.get(events.size() - 1).getEventType()))
+            throw new BusinessException(ErrorCode.SPENDING_NOT_FOUND);
+
         eventRepository.save(SpendingEvent.builder()
                 .user(user)
                 .eventType("UPDATED")
@@ -81,6 +82,7 @@ public class SpendingService {
         if (!events.get(0).getUser().getId().equals(userId)) throw new BusinessException(ErrorCode.SPENDING_NOT_OWNED);
 
         SpendingEvent latest = events.get(events.size() - 1);
+        if ("DELETED".equals(latest.getEventType())) return; // 중복 삭제는 성공으로 처리한다.
         eventRepository.save(SpendingEvent.builder()
                 .user(user)
                 .eventType("DELETED")
@@ -141,7 +143,7 @@ public class SpendingService {
         SpendingBudget budget = budgetRepository.findByUserId(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.BUDGET_NOT_FOUND));
 
-        String currentMonth = YearMonth.now().toString();
+        String currentMonth = YearMonth.now(java.time.ZoneOffset.UTC).toString();
         SpendingDashboardResponse dashboard = getDashboard(userId, currentMonth);
         BigDecimal spent = dashboard.totalAmount() != null ? dashboard.totalAmount() : BigDecimal.ZERO;
 
@@ -179,7 +181,7 @@ public class SpendingService {
     // ── 내부 ──────────────────────────────────────────────────────────────────
 
     private User findUser(Long userId) {
-        return userRepository.findById(userId)
+        return userRepository.findLockedById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
     }
 }

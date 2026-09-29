@@ -64,7 +64,8 @@ class SpendingServiceTest {
         @Test
         @DisplayName("정상 등록 - CREATED 이벤트가 저장되고 spendingId가 반환된다")
         void success() {
-            given(userRepository.findById(1L)).willReturn(Optional.of(sampleUser));
+            given(userRepository.findLockedById(1L)).willReturn(Optional.of(sampleUser));
+            given(eventRepository.nextSpendingId()).willReturn(123L);
             given(eventRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
 
             SpendingCreateRequest req = new SpendingCreateRequest(
@@ -79,7 +80,7 @@ class SpendingServiceTest {
         @Test
         @DisplayName("존재하지 않는 유저 - USER_NOT_FOUND 예외")
         void userNotFound() {
-            given(userRepository.findById(99L)).willReturn(Optional.empty());
+            given(userRepository.findLockedById(99L)).willReturn(Optional.empty());
 
             SpendingCreateRequest req = new SpendingCreateRequest(
                     BigDecimal.valueOf(5000), "TRANSPORT", null, LocalDate.now(), null);
@@ -100,7 +101,7 @@ class SpendingServiceTest {
         @DisplayName("정상 수정 - UPDATED 이벤트가 저장된다")
         void success() {
             SpendingEvent original = buildEvent(1L, "CREATED", BigDecimal.valueOf(10000), "FOOD");
-            given(userRepository.findById(1L)).willReturn(Optional.of(sampleUser));
+            given(userRepository.findLockedById(1L)).willReturn(Optional.of(sampleUser));
             given(eventRepository.findBySpendingIdOrderByCreatedAtAsc(100L))
                     .willReturn(List.of(original));
             given(eventRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
@@ -116,7 +117,7 @@ class SpendingServiceTest {
         @Test
         @DisplayName("존재하지 않는 소비 ID - SPENDING_NOT_FOUND 예외")
         void notFound() {
-            given(userRepository.findById(1L)).willReturn(Optional.of(sampleUser));
+            given(userRepository.findLockedById(1L)).willReturn(Optional.of(sampleUser));
             given(eventRepository.findBySpendingIdOrderByCreatedAtAsc(999L))
                     .willReturn(List.of());
 
@@ -139,7 +140,7 @@ class SpendingServiceTest {
         @DisplayName("정상 삭제 - DELETED 이벤트가 저장된다")
         void success() {
             SpendingEvent original = buildEvent(1L, "CREATED", BigDecimal.valueOf(20000), "SHOPPING");
-            given(userRepository.findById(1L)).willReturn(Optional.of(sampleUser));
+            given(userRepository.findLockedById(1L)).willReturn(Optional.of(sampleUser));
             given(eventRepository.findBySpendingIdOrderByCreatedAtAsc(200L))
                     .willReturn(List.of(original));
             given(eventRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
@@ -207,7 +208,7 @@ class SpendingServiceTest {
         @Test
         @DisplayName("예산 최초 설정 - 새 SpendingBudget 저장")
         void createNew() {
-            given(userRepository.findById(1L)).willReturn(Optional.of(sampleUser));
+            given(userRepository.findLockedById(1L)).willReturn(Optional.of(sampleUser));
             given(budgetRepository.findByUserId(1L)).willReturn(Optional.empty());
             given(budgetRepository.save(any())).willAnswer(inv -> inv.getArgument(0));
 
@@ -221,7 +222,7 @@ class SpendingServiceTest {
         void update() {
             SpendingBudget existing = SpendingBudget.builder()
                     .user(sampleUser).monthlyBudget(300_000L).build();
-            given(userRepository.findById(1L)).willReturn(Optional.of(sampleUser));
+            given(userRepository.findLockedById(1L)).willReturn(Optional.of(sampleUser));
             given(budgetRepository.findByUserId(1L)).willReturn(Optional.of(existing));
 
             spendingService.upsertBudget(1L, new SpendingBudgetRequest(600_000L));
@@ -244,6 +245,22 @@ class SpendingServiceTest {
     }
 
     // ── 헬퍼 ──────────────────────────────────────────────────────────────────
+    @Test void deletedSpendingCannotBeRevivedByUpdate() {
+        given(userRepository.findLockedById(1L)).willReturn(Optional.of(sampleUser));
+        given(eventRepository.findBySpendingIdOrderByCreatedAtAsc(100L)).willReturn(List.of(
+                buildEvent(1L,"DELETED",BigDecimal.TEN,"FOOD")));
+        assertThatThrownBy(() -> spendingService.updateSpending(1L,100L,
+                new SpendingCreateRequest(BigDecimal.ONE,"FOOD",null,LocalDate.now(),null)))
+                .isInstanceOf(BusinessException.class);
+        org.mockito.Mockito.verify(eventRepository, org.mockito.Mockito.never()).save(any());
+    }
+    @Test void repeatedDeleteDoesNotAppendEvent() {
+        given(userRepository.findLockedById(1L)).willReturn(Optional.of(sampleUser));
+        given(eventRepository.findBySpendingIdOrderByCreatedAtAsc(100L)).willReturn(List.of(
+                buildEvent(1L,"DELETED",BigDecimal.TEN,"FOOD")));
+        spendingService.deleteSpending(1L,100L);
+        org.mockito.Mockito.verify(eventRepository, org.mockito.Mockito.never()).save(any());
+    }
 
     private SpendingEvent buildEvent(Long userId, String type, BigDecimal amount, String category) {
         return SpendingEvent.builder()

@@ -1,5 +1,7 @@
 # 돈글돈글 백엔드·AI 연결 실무 가이드
 
+> 2026-09-29 추가: 신규 생성 요청은 [비동기 작업 API](AI_JOBS.md)를 권장한다. V16~V18 DB 적용 및 최신 연동 상태는 [연결 현황](INTEGRATION_STATUS.md)을 먼저 확인한다.
+
 기준: 2026-09-28. 먼저 `IMPLEMENTATION_CHECKLIST.md`, 다음 이 문서, 마지막 `DEVELOPMENT_DECISIONS.md`를 읽는다. 기존 제안서의 과거 성과와 이번 실행 결과는 구별한다.
 
 ## 1. 연결 구조와 각 서버의 책임

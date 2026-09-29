@@ -21,15 +21,19 @@ public class PolicyScheduler {
     private final PolicyRepository policyRepository;
     private final PolicyBookmarkRepository bookmarkRepository;
     private final PolicyNotificationRepository notificationRepository;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     /**
      * 매일 09:00 — 마감 D-7, D-3, D-1 정책을 북마크한 사용자에게 알림 생성.
-     * 중복 발송 방지: is_sent = false인 건만 조회해서 처리 후 markAsSent().
+     * 알림 생성만 수행한다. 실제 발송 성공 여부는 푸시 전송 계층에서 갱신해야 한다.
      */
-    @Scheduled(cron = "0 0 9 * * *")
+    @Scheduled(cron = "${policy.notification-cron:0 0 9 * * *}", zone="UTC")
     @Transactional
     public void sendDeadlineNotifications() {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(java.time.ZoneOffset.UTC);
+        // 여러 서버의 동일 스케줄 실행을 직렬화한다.
+        // 정책 알림은 일 단위 소량 작업이므로 하나의 트랜잭션으로 처리한다.
+        jdbc.execute("SELECT pg_advisory_xact_lock(20260930)");
         int[] notifyDays = {7, 3, 1};
 
         for (int daysLeft : notifyDays) {
@@ -40,7 +44,7 @@ public class PolicyScheduler {
                 var p = (com.youthletter.domain.policy.entity.Policy) policy;
                 bookmarkRepository.findByPolicyId(p.getId()).forEach(bookmark -> {
                     boolean alreadyScheduled = notificationRepository
-                            .existsByUserIdAndPolicyId(bookmark.getUser().getId(), p.getId());
+                            .existsByUserIdAndPolicyIdAndNotifyBeforeDays(bookmark.getUser().getId(), p.getId(), daysLeft);
                     if (!alreadyScheduled) {
                         notificationRepository.save(PolicyNotification.builder()
                                 .user(bookmark.getUser())
@@ -59,7 +63,7 @@ public class PolicyScheduler {
                     notification.getUser().getId(),
                     notification.getPolicy().getId(),
                     notification.getNotifyBeforeDays());
-            notification.markAsSent();
+            // FCM 전송 전에는 발송 완료로 표시하지 않는다.
         });
 
         log.info("[PolicyScheduler] 오늘({}) 처리된 알림: {}건", today, due.size());

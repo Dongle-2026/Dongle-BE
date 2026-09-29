@@ -33,6 +33,10 @@ public class PolicyNotification extends BaseEntity {
 
     @Column(name = "is_sent", nullable = false)
     private Boolean isSent;
+    @Column(name = "is_read", nullable = false)
+    private boolean read;
+    @Column(name = "read_at")
+    private LocalDateTime readAt;
 
     @Column(name = "notified_at")
     private LocalDateTime notifiedAt;
@@ -47,6 +51,9 @@ public class PolicyNotification extends BaseEntity {
 
     public void markAsSent() {
         this.isSent = true;
-        this.notifiedAt = LocalDateTime.now();
+        this.notifiedAt = LocalDateTime.now(java.time.ZoneOffset.UTC);
+    }
+    public void markAsRead() {
+        if (!read) { read = true; readAt = LocalDateTime.now(java.time.ZoneOffset.UTC); }
     }
 }
