@@ -23,4 +23,15 @@ class ApiSecurityIntegrationTest {
     @Test void invalidDateReturns400() throws Exception {
         mvc.perform(get("/api/news").param("date","2026-99-99")).andExpect(status().isBadRequest());
     }
+    @Test void jobsRequireAdminAndValidatePayload() throws Exception {
+        mvc.perform(get("/api/admin/ai/jobs/1")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/admin/ai/jobs").with(user("test").roles("USER"))
+                .contentType("application/json").content("{\"articleId\":1,\"kind\":\"CARD\"}"))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/api/admin/ai/jobs").with(user("admin").roles("ADMIN"))
+                .contentType("application/json").content("{\"articleId\":-1,\"kind\":\"CARD\"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(get("/api/admin/ai/jobs/9223372036854775807").with(user("admin").roles("ADMIN")))
+                .andExpect(status().isNotFound());
+    }
 }

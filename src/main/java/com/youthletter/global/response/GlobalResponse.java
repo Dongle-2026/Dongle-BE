@@ -42,6 +42,9 @@ public class GlobalResponse<T> {
     }
 
     // ── 에러 응답 ──
+    public static <T> GlobalResponse<T> accepted(T data) {
+        return new GlobalResponse<>(202, "accepted", data);
+    }
 
     public static GlobalResponse<Void> error(int status, String message) {
         return new GlobalResponse<>(status, message, null);
