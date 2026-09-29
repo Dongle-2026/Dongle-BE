@@ -22,7 +22,7 @@ public class HealthCheckController {
     private final RedisTemplate<String, Object> redisTemplate;
 
     @Operation(summary = "전체 헬스 체크", description = "서버, DB, Redis 연결 상태를 확인합니다")
-    @GetMapping("/actuator/health")
+    @GetMapping({"/actuator/health", "/api/health"})
     public GlobalResponse<Map<String, Object>> healthCheck() {
         Map<String, Object> health = new LinkedHashMap<>();
         health.put("status", "UP");

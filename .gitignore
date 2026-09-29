@@ -26,6 +26,7 @@ Thumbs.db
 ### Logs ###
 *.log
 logs/
+node_modules/
 
 ### Docker volumes (로컬) ###
 docker/postgres/data/

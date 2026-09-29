@@ -31,34 +31,31 @@ public class CardNewsService {
     private final CardNewsCardRepository cardNewsCardRepository;
     private final NewsArticleRepository articleRepository;
     private final CardNewsStubGenerator stubGenerator;
+    private final com.youthletter.domain.news.client.AiServiceClient aiClient;
+    private final CardNewsValidator validator;
+    private final CardNewsWriter writer;
 
     // ── 생성 ──────────────────────────────────────────────────────
 
-    @Transactional
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     public CardNewsGenerateResponse generate(Long articleId) {
         NewsArticle article = articleRepository.findById(articleId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ARTICLE_NOT_FOUND));
 
-        // 이미 생성된 카드뉴스가 있으면 재생성(기존 삭제 후 재생성)
-        cardNewsRepository.findByArticleId(articleId)
-                .ifPresent(cardNewsRepository::delete);
+        // stub 모드: AI Service 없이 개발하는 팀원을 위해 정적 카드로 동일한 저장 흐름을 사용한다.
+        if (aiClient.isStubMode()) {
+            var stubCards = stubGenerator.generate(null, article).stream()
+                    .map(c -> new com.youthletter.domain.news.client.dto.AiCardResponse.Card(
+                            c.getCardOrder(), c.getTemplateType(), c.getTitle(), c.getBody(),
+                            c.getSubBody(), c.getHighlight(), List.of()))
+                    .toList();
+            return writer.save(articleId, new com.youthletter.domain.news.client.dto.AiCardResponse("stub", "stub", stubCards));
+        }
 
-        CardNews cardNews = CardNews.builder()
-                .article(article)
-                .totalCards(0)
-                .status(CardNewsStatus.DRAFT)
-                .build();
-        cardNewsRepository.save(cardNews);
-
-        // stub 모드: AI 연동 완료 후 aiServiceClient 호출로 교체
-        List<CardNewsCard> cards = stubGenerator.generate(cardNews, article);
-        cardNewsCardRepository.saveAll(cards);
-
-        cardNews.updateTotalCards(cards.size());
-        cardNews.publish();
-
-        log.info("카드뉴스 생성 완료: articleId={}, totalCards={}", articleId, cards.size());
-        return CardNewsGenerateResponse.from(cardNews);
+        var result = aiClient.generateCards(new com.youthletter.domain.news.client.dto.AiProcessRequest(
+                article.getSourceUrl(), article.getTitle(), article.getContent(), article.getCategory()));
+        validator.validate(result, article.getContent());
+        return writer.save(articleId, result);
     }
 
     // ── 목록 조회 ─────────────────────────────────────────────────

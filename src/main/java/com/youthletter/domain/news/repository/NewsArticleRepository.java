@@ -14,6 +14,16 @@ import java.util.Optional;
 
 public interface NewsArticleRepository extends JpaRepository<NewsArticle, Long> {
 
+    @Query("""
+        SELECT a FROM NewsArticle a WHERE (:category IS NULL OR a.category = :category)
+          AND (:keyword IS NULL OR lower(a.title) LIKE lower(concat('%', :keyword, '%'))
+               OR lower(a.content) LIKE lower(concat('%', :keyword, '%')))
+          AND (cast(:start as timestamp) IS NULL OR a.publishedAt >= :start)
+          AND (cast(:end as timestamp) IS NULL OR a.publishedAt < :end)
+        """)
+    Page<NewsArticle> search(@Param("category") String category, @Param("keyword") String keyword,
+                            @Param("start") LocalDateTime start, @Param("end") LocalDateTime end, Pageable pageable);
+
     /**
      * 카테고리별 뉴스 목록 (홈 화면)
      * Pageable로 published_at DESC 정렬 + 페이지네이션

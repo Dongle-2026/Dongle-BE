@@ -16,7 +16,9 @@ public record CardNewsDetailResponse(
         int totalCards,
         CardNewsStatus status,
         LocalDateTime createdAt,
-        List<CardNewsCardResponse> cards
+        List<CardNewsCardResponse> cards,
+        String modelVersion,
+        String promptVersion
 ) {
     public static CardNewsDetailResponse from(CardNews cardNews) {
         List<CardNewsCardResponse> cardResponses = cardNews.getCards().stream()
@@ -32,6 +34,8 @@ public record CardNewsDetailResponse(
                 .status(cardNews.getStatus())
                 .createdAt(cardNews.getCreatedAt())
                 .cards(cardResponses)
+                .modelVersion(cardNews.getModelVersion())
+                .promptVersion(cardNews.getPromptVersion())
                 .build();
     }
 }

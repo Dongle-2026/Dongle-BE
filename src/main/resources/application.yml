@@ -19,11 +19,23 @@ spring:
       pool:
         size: 3
 
+  data:
+    web:
+      pageable:
+        max-page-size: 100
+
   # ── Jackson 직렬화 ──
   jackson:
     serialization:
       write-dates-as-timestamps: false  # ISO-8601 형식
     default-property-inclusion: non_null
+
+ai-service:
+  base-url: ${AI_SERVICE_BASE_URL:http://127.0.0.1:3000}
+  use-stub: ${AI_USE_STUB:false}
+  model-version: ${AI_MODEL_VERSION:qwen3:8b}
+  token: ${AI_SERVICE_TOKEN:}
+  timeout-seconds: ${AI_TIMEOUT_SECONDS:250}
 
 # ── Swagger ──
 springdoc:
@@ -113,9 +125,7 @@ oauth2:
 
 # ── AI Service (Node.js) 내부 호출 ──
 ai-service:
-  base-url: http://localhost:3000
-  use-stub: false
-  model-version: qwen3:8b
+  base-url: ${AI_SERVICE_BASE_URL:http://127.0.0.1:3000}
 
 # ── 로깅 ──
 logging:
@@ -161,7 +171,7 @@ oauth2:
   redirect-uri: ${OAUTH2_REDIRECT_URI:https://youthletter.com/auth/callback}
 
 ai-service:
-  base-url: http://ai-service:3000  # Docker 네트워크 내 서비스명
+  base-url: ${AI_SERVICE_BASE_URL:http://ai-service:3000}
 
 logging:
   level:

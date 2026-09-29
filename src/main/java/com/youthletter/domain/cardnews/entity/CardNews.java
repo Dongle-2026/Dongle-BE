@@ -32,6 +32,23 @@ public class CardNews extends BaseTimeEntity {
     @Column(nullable = false, length = 20)
     private CardNewsStatus status;
 
+    @Column(name = "model_version", length = 100)
+    private String modelVersion;
+
+    @Column(name = "prompt_version", length = 100)
+    private String promptVersion;
+
+    public void recordGeneration(String model, String prompt) {
+        this.modelVersion = model;
+        this.promptVersion = prompt;
+    }
+
+    public void replaceCards(List<CardNewsCard> replacement) {
+        cards.clear();
+        cards.addAll(replacement);
+        totalCards = replacement.size();
+    }
+
     @OneToMany(mappedBy = "cardNews", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("cardOrder ASC")
     private List<CardNewsCard> cards = new ArrayList<>();

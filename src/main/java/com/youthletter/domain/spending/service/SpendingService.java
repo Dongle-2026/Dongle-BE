@@ -27,6 +27,7 @@ public class SpendingService {
     private final SpendingBudgetRepository budgetRepository;
     private final SpendingInsightRepository insightRepository;
     private final UserRepository userRepository;
+    private final com.youthletter.domain.news.client.AiServiceClient aiClient;
 
     private final AtomicLong spendingIdGenerator = new AtomicLong(System.currentTimeMillis());
 
@@ -105,14 +106,7 @@ public class SpendingService {
     }
 
     public SpendingDashboardResponse getDashboard(Long userId, String month) {
-        SpendingSnapshot snapshot = snapshotRepository
-                .findByUserIdAndSnapshotMonth(userId, month)
-                .orElse(null);
-
-        if (snapshot != null) {
-            return SpendingDashboardResponse.fromSnapshot(snapshot);
-        }
-
+        // 스냅샷 갱신 파이프라인이 없으므로 수정 후 오래된 합계를 반환하지 않는다.
         YearMonth ym = YearMonth.parse(month);
         List<Object[]> aggregated = eventRepository
                 .aggregateByCategory(userId, ym.atDay(1), ym.atEndOfMonth());
@@ -156,10 +150,30 @@ public class SpendingService {
 
     // ── AI 인사이트 (stub) ────────────────────────────────────────────────────
 
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     public SpendingAiInsightResponse getAiInsight(Long userId) {
-        LocalDate end = LocalDate.now();
-        LocalDate start = end.minusDays(29);
-        return SpendingAiInsightResponse.stub(start, end);
+        YearMonth month = YearMonth.now(java.time.ZoneOffset.UTC);
+        var current = getDashboard(userId, month.toString());
+        var previous = getDashboard(userId, month.minusMonths(1).toString());
+        String facts = "이번 달 기록된 소비는 " + current.totalAmount().toPlainString()
+                + "원이며, 지난달 기록된 소비는 " + previous.totalAmount().toPlainString() + "원입니다. ";
+        String advice = "등록한 내역이 빠짐없는지 확인하고 카테고리별 지출을 점검해 보세요.";
+        String model = "rule-based-v1";
+        if (current.totalAmount().signum() > 0 && !aiClient.isStubMode()) {
+            try {
+                var response = aiClient.insight(new com.youthletter.domain.news.client.dto.AiInsightRequest(
+                        month.toString(), current.totalAmount(), previous.totalAmount(), current.categoryTotals()));
+                if (response.advice() != null && !response.advice().isBlank() && response.advice().length() <= 600
+                        && !response.advice().matches("(?s).*\\d.*")
+                        && response.modelVersion() != null && !response.modelVersion().isBlank()) {
+                    advice = response.advice();
+                    model = response.modelVersion();
+                }
+            } catch (com.youthletter.global.exception.BusinessException ignored) {
+                // 수치는 유지하고 규칙 기반 안내만 반환한다.
+            }
+        }
+        return new SpendingAiInsightResponse(month.atDay(1), LocalDate.now(java.time.ZoneOffset.UTC), facts + advice, model);
     }
 
     // ── 내부 ──────────────────────────────────────────────────────────────────

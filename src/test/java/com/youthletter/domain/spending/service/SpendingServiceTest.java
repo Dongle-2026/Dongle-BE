@@ -38,6 +38,7 @@ class SpendingServiceTest {
     @Mock SpendingBudgetRepository budgetRepository;
     @Mock SpendingInsightRepository insightRepository;
     @Mock UserRepository userRepository;
+    @Mock com.youthletter.domain.news.client.AiServiceClient aiClient;
 
     @InjectMocks SpendingService spendingService;
 
@@ -158,8 +159,6 @@ class SpendingServiceTest {
         @Test
         @DisplayName("스냅샷 없을 때 - 이벤트에서 집계한 결과 반환")
         void aggregateFromEvents() {
-            given(snapshotRepository.findByUserIdAndSnapshotMonth(1L, "2026-05"))
-                    .willReturn(Optional.empty());
             given(eventRepository.aggregateByCategory(eq(1L), any(), any()))
                     .willReturn(List.of(
                             new Object[]{"FOOD", BigDecimal.valueOf(150000)},
@@ -239,7 +238,8 @@ class SpendingServiceTest {
         SpendingAiInsightResponse resp = spendingService.getAiInsight(1L);
 
         assertThat(resp.insightText()).isNotBlank();
-        assertThat(resp.modelVersion()).isEqualTo("stub-v1.0");
+        assertThat(resp.modelVersion()).isEqualTo("rule-based-v1");
+        assertThat(resp.insightText()).contains("0원").doesNotContain("15%");
         assertThat(resp.analysisEnd()).isEqualTo(LocalDate.now());
     }
 
@@ -254,5 +254,23 @@ class SpendingServiceTest {
                 .category(category)
                 .spentAt(LocalDate.now())
                 .build();
+    }
+
+    @Test void aiFailureUsesActualTotals() {
+        given(eventRepository.aggregateByCategory(eq(1L), any(), any())).willReturn(
+                java.util.Collections.singletonList(new Object[]{"FOOD", BigDecimal.valueOf(12000)}));
+        given(aiClient.insight(any())).willThrow(new BusinessException(ErrorCode.AI_SERVICE_ERROR));
+        var result = spendingService.getAiInsight(1L);
+        assertThat(result.insightText()).contains("12000원");
+        assertThat(result.modelVersion()).isEqualTo("rule-based-v1");
+    }
+
+    @Test void numericAdviceIsRejected() {
+        given(eventRepository.aggregateByCategory(eq(1L), any(), any())).willReturn(
+                java.util.Collections.singletonList(new Object[]{"FOOD", BigDecimal.valueOf(20000)}));
+        given(aiClient.insight(any())).willReturn(new com.youthletter.domain.news.client.dto.AiInsightResponse("99% 줄이세요", "qwen3:8b"));
+        var result = spendingService.getAiInsight(1L);
+        assertThat(result.insightText()).contains("20000원").doesNotContain("99%");
+        assertThat(result.modelVersion()).isEqualTo("rule-based-v1");
     }
 }

@@ -25,11 +25,12 @@ public interface SpendingEventRepository extends JpaRepository<SpendingEvent, Lo
      * 월별 목록: 해당 월의 최신 이벤트 기준 유효 소비 레코드
      */
     @Query(value = """
-        SELECT DISTINCT ON (spending_id) *
-        FROM spending_events
-        WHERE user_id = :userId
-          AND spent_at BETWEEN :startDate AND :endDate
-        ORDER BY spending_id, created_at DESC
+        SELECT * FROM (
+            SELECT DISTINCT ON (spending_id) * FROM spending_events
+            WHERE user_id = :userId ORDER BY spending_id, created_at DESC, id DESC
+        ) latest
+        WHERE spent_at BETWEEN :startDate AND :endDate AND event_type <> 'DELETED'
+        ORDER BY spent_at DESC, id DESC
         """, nativeQuery = true)
     List<SpendingEvent> findCurrentStateByUserAndPeriod(@Param("userId") Long userId,
                                                          @Param("startDate") LocalDate startDate,
@@ -39,25 +40,20 @@ public interface SpendingEventRepository extends JpaRepository<SpendingEvent, Lo
      * 최근 6개월 월별 지출 합계 (LAG 윈도우 함수)
      */
     @Query(value = """
-        SELECT
-            TO_CHAR(month_date, 'YYYY-MM') AS month,
-            total_amount,
-            LAG(total_amount) OVER (ORDER BY month_date) AS prev_amount
-        FROM (
-            SELECT
-                DATE_TRUNC('month', spent_at) AS month_date,
-                SUM(amount) AS total_amount
-            FROM (
-                SELECT DISTINCT ON (spending_id) amount, spent_at
-                FROM spending_events
-                WHERE user_id = :userId
-                  AND spent_at >= CURRENT_DATE - INTERVAL '6 months'
-                ORDER BY spending_id, created_at DESC
-            ) latest
-            WHERE TRUE
-            GROUP BY month_date
-        ) monthly
-        ORDER BY month_date
+        WITH latest AS (
+            SELECT DISTINCT ON (spending_id) * FROM spending_events
+            WHERE user_id = :userId ORDER BY spending_id, created_at DESC, id DESC
+        ), months AS (
+            SELECT generate_series(date_trunc('month', CURRENT_DATE) - INTERVAL '5 months',
+                                   date_trunc('month', CURRENT_DATE), INTERVAL '1 month') AS month_date
+        ), monthly AS (
+            SELECT m.month_date, COALESCE(SUM(l.amount), 0) AS total_amount
+            FROM months m LEFT JOIN latest l ON l.event_type <> 'DELETED'
+              AND l.spent_at >= m.month_date AND l.spent_at < m.month_date + INTERVAL '1 month'
+            GROUP BY m.month_date
+        )
+        SELECT TO_CHAR(month_date, 'YYYY-MM'), total_amount,
+               LAG(total_amount) OVER (ORDER BY month_date) FROM monthly ORDER BY month_date
         """, nativeQuery = true)
     List<Object[]> findMonthlyTrend(@Param("userId") Long userId);
 
@@ -70,12 +66,12 @@ public interface SpendingEventRepository extends JpaRepository<SpendingEvent, Lo
             SELECT DISTINCT ON (spending_id) *
             FROM spending_events
             WHERE user_id = :userId
-              AND spent_at BETWEEN :startDate AND :endDate
-            ORDER BY spending_id, created_at DESC
+            ORDER BY spending_id, created_at DESC, id DESC
         )
         SELECT category, SUM(amount) as total
         FROM latest_events
         WHERE event_type != 'DELETED'
+          AND spent_at BETWEEN :startDate AND :endDate
         GROUP BY category
         """, nativeQuery = true)
     List<Object[]> aggregateByCategory(@Param("userId") Long userId,

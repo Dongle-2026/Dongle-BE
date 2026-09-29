@@ -33,9 +33,11 @@ public class NewsController {
     public ResponseEntity<GlobalResponse<Page<NewsListResponse>>> getNewsList(
             @Parameter(description = "카테고리 (ECONOMY, STOCK, INSURANCE, LOAN, POLICY, YOUTH)")
             @RequestParam(required = false) String category,
-            @PageableDefault(size = 10, sort = "publishedAt", direction = Sort.Direction.DESC)
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate date,
+            @PageableDefault(size = 20, sort = "publishedAt", direction = Sort.Direction.DESC)
             Pageable pageable) {
-        return ResponseEntity.ok(GlobalResponse.ok(newsService.getNewsList(category, pageable)));
+        return ResponseEntity.ok(GlobalResponse.ok(newsService.getNewsList(category, keyword, date, pageable)));
     }
 
     @Operation(summary = "오늘의 뉴스 홈 브리핑", description = "오늘 수집된 최신 12건. 로그인 시 관심 카테고리 우선 정렬.")

@@ -2,6 +2,13 @@ package com.youthletter.domain.news.client;
 
 import com.youthletter.domain.news.client.dto.AiProcessRequest;
 import com.youthletter.domain.news.client.dto.AiProcessResponse;
+import com.youthletter.domain.news.client.dto.AiCardResponse;
+import com.youthletter.domain.news.client.dto.AiInsightRequest;
+import com.youthletter.domain.news.client.dto.AiInsightResponse;
+import com.youthletter.global.exception.BusinessException;
+import com.youthletter.global.exception.ErrorCode;
+import java.time.Duration;
+import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,6 +28,41 @@ public class AiServiceClient {
     @Value("${ai-service.use-stub:true}")
     private boolean useStub;
 
+    @Value("${ai-service.timeout-seconds:250}")
+    private long timeoutSeconds = 250;
+
+    public AiCardResponse generateCards(AiProcessRequest request) {
+        return post("/api/ai/card-news", request, AiCardResponse.class);
+    }
+
+    public AiInsightResponse insight(AiInsightRequest request) {
+        return post("/api/ai/spending-insight", request, AiInsightResponse.class);
+    }
+
+    public Map<String, Object> health() {
+        try {
+            return aiServiceWebClient.get().uri("/health").retrieve()
+                    .bodyToMono(new org.springframework.core.ParameterizedTypeReference<Map<String, Object>>() {})
+                    .timeout(Duration.ofSeconds(5)).block();
+        } catch (RuntimeException e) {
+            return Map.of("status", "DOWN", "stubMode", useStub);
+        }
+    }
+
+    private <T> T post(String path, Object request, Class<T> type) {
+        try {
+            T result = aiServiceWebClient.post().uri(path).bodyValue(request).retrieve()
+                    .bodyToMono(type).timeout(Duration.ofSeconds(timeoutSeconds)).block();
+            if (result == null) throw new BusinessException(ErrorCode.AI_SERVICE_ERROR);
+            return result;
+        } catch (BusinessException e) {
+            throw e;
+        } catch (RuntimeException e) {
+            log.warn("AI request failed: path={}, type={}", path, e.getClass().getSimpleName());
+            throw new BusinessException(ErrorCode.AI_SERVICE_ERROR);
+        }
+    }
+
     public boolean isStubMode() { return useStub; }
     public void setStubMode(boolean stubMode) { this.useStub = stubMode; }
 
@@ -37,12 +79,14 @@ public class AiServiceClient {
 
         log.info("[AiServiceClient] AI Service 호출: {}", request.title());
 
-        return aiServiceWebClient.post()
-                .uri("/api/ai/process")
-                .bodyValue(request)
-                .retrieve()
-                .bodyToMono(AiProcessResponse.class)
-                .block();
+        AiProcessResponse response = post("/api/ai/process", request, AiProcessResponse.class);
+        if (response.summary() == null || response.summary().isBlank() || response.embedding() == null
+                || response.embedding().size() != 768
+                || response.embedding().stream().anyMatch(v -> v == null || !Float.isFinite(v))
+                || response.embedding().stream().allMatch(v -> v == 0)) {
+            throw new BusinessException(ErrorCode.AI_SERVICE_ERROR);
+        }
+        return response;
     }
 
     /**

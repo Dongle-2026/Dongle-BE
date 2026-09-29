@@ -44,7 +44,7 @@ public class CardNewsController {
     )
     @GetMapping
     public ResponseEntity<GlobalResponse<Page<CardNewsListResponse>>> getList(
-            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC)
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC)
             Pageable pageable) {
         return ResponseEntity.ok(GlobalResponse.ok(cardNewsService.getList(pageable)));
     }

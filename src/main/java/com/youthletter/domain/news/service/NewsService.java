@@ -50,9 +50,15 @@ public class NewsService {
     // ── 목록 조회 ───────────────────────────────────────────────
 
     public Page<NewsListResponse> getNewsList(String category, Pageable pageable) {
-        Page<NewsArticle> articles = (category != null && !category.isBlank())
-                ? articleRepository.findByCategory(category, pageable)
-                : articleRepository.findAllByOrderByPublishedAtDesc(pageable);
+        return getNewsList(category, null, null, pageable);
+    }
+
+    public Page<NewsListResponse> getNewsList(String category, String keyword, LocalDate date, Pageable pageable) {
+        Page<NewsArticle> articles = articleRepository.search(
+                category == null || category.isBlank() ? null : category.trim(),
+                keyword == null || keyword.isBlank() ? null : keyword.trim(),
+                date == null ? null : date.atStartOfDay(),
+                date == null ? null : date.plusDays(1).atStartOfDay(), pageable);
 
         return articles.map(article -> {
             String summary = summaryRepository

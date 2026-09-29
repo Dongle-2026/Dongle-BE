@@ -43,6 +43,14 @@ public class CardNewsCard extends BaseEntity {
     @Column(name = "image_url", columnDefinition = "TEXT")
     private String imageUrl;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @Column(name = "source_sentence_ids", columnDefinition = "jsonb")
+    private java.util.List<Integer> sourceSentenceIds;
+
+    public void setSourceSentenceIds(java.util.List<Integer> ids) {
+        this.sourceSentenceIds = java.util.List.copyOf(ids);
+    }
+
     @Builder
     public CardNewsCard(CardNews cardNews, int cardOrder, CardTemplateType templateType,
                         String title, String body, String subBody, String highlight) {

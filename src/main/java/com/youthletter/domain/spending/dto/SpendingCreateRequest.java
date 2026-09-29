@@ -11,13 +11,13 @@ import java.time.LocalDate;
 @Schema(description = "소비 기록 생성/수정 요청")
 public record SpendingCreateRequest(
         @Schema(description = "금액", example = "15000")
-        @NotNull @Positive BigDecimal amount,
+        @NotNull @Positive @jakarta.validation.constraints.Digits(integer = 10, fraction = 2) BigDecimal amount,
 
         @Schema(description = "카테고리", example = "FOOD")
-        @NotBlank String category,
+        @NotBlank @jakarta.validation.constraints.Size(max = 30) String category,
 
         @Schema(description = "설명", example = "점심 식사")
-        String description,
+        @jakarta.validation.constraints.Size(max = 200) String description,
 
         @Schema(description = "소비 날짜", example = "2026-03-24")
         @NotNull LocalDate spentAt,

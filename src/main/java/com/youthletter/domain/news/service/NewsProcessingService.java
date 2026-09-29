@@ -32,9 +32,8 @@ public class NewsProcessingService {
     private final HankyungCrawlerService crawlerService;
     private final AiServiceClient aiServiceClient;
     private final NewsArticleRepository newsArticleRepository;
-    private final NewsSummaryRepository newsSummaryRepository;
-    private final FinancialTermRepository financialTermRepository;
-    private final ArticleTermHighlightRepository articleTermHighlightRepository;
+    private final NewsAiWriter writer;
+    private final java.util.concurrent.atomic.AtomicBoolean running = new java.util.concurrent.atomic.AtomicBoolean();
 
     @Value("${ai-service.model-version:qwen3:8b}")
     private String modelVersion;
@@ -56,7 +55,7 @@ public class NewsProcessingService {
     /**
      * 6시간마다 자동 실행: 크롤링 -> AI 처리 -> DB 저장
      */
-    @Scheduled(cron = "0 0 */6 * * *")
+    @Scheduled(cron = "${crawler.cron:0 0 */6 * * *}")
     public void scheduledProcess() {
         log.info("[Pipeline] 뉴스 크롤링 스케줄 시작");
         processAll();
@@ -66,8 +65,9 @@ public class NewsProcessingService {
      * 크롤링 -> AI 처리 -> DB 저장 파이프라인.
      * 수동 트리거(AdminCrawlController)에서도 호출.
      */
-    @Transactional
     public int processAll() {
+        if (!running.compareAndSet(false, true)) throw new com.youthletter.global.exception.BusinessException(com.youthletter.global.exception.ErrorCode.CRAWLING_ERROR);
+        try {
         lastStatus.set(new CrawlStatus(LocalDateTime.now(), 0, 0, "RUNNING"));
 
         List<CrawledArticleDto> articles = crawlerService.crawl();
@@ -85,32 +85,8 @@ public class NewsProcessingService {
                         new AiProcessRequest(article.url(), article.title(),
                                 article.content(), article.category()));
 
-                NewsArticle saved = newsArticleRepository.save(
-                        NewsArticle.builder()
-                                .sourceUrl(article.url())
-                                .sourceName("한국경제")
-                                .title(article.title())
-                                .content(article.content())
-                                .category(article.category())
-                                .publishedAt(article.publishedAt())
-                                .build()
-                );
-
-                if (aiResponse.summary() != null && !aiResponse.summary().isBlank()) {
-                    newsSummaryRepository.save(
-                            NewsSummary.builder()
-                                    .article(saved)
-                                    .summaryText(aiResponse.summary())
-                                    .summaryVersion(1)
-                                    .modelVersion(modelVersion)
-                                    .build()
-                    );
-                }
-
-                saveTermHighlights(saved, aiResponse.terms());
-                saveEmbedding(saved.getId(), aiResponse.embedding());
-
-                log.info("[Pipeline] 저장 완료: {}", saved.getTitle());
+                writer.create(article, aiResponse, aiServiceClient.isStubMode() ? "stub" : modelVersion);
+                log.info("[Pipeline] 저장 완료: {}", article.title());
                 savedCount++;
             } catch (Exception e) {
                 log.error("[Pipeline] 기사 처리 실패: {} - {}", article.url(), e.getMessage());
@@ -122,42 +98,13 @@ public class NewsProcessingService {
         lastStatus.set(new CrawlStatus(LocalDateTime.now(), savedCount, failedCount,
                 failedCount == 0 ? "SUCCESS" : "PARTIAL"));
         return savedCount;
-    }
-
-    private void saveTermHighlights(NewsArticle article, List<AiProcessResponse.TermDto> terms) {
-        if (terms == null || terms.isEmpty()) return;
-        for (AiProcessResponse.TermDto dto : terms) {
-            try {
-                FinancialTerm term = financialTermRepository.findByName(dto.term())
-                        .orElseGet(() -> financialTermRepository.save(
-                                FinancialTerm.builder()
-                                        .name(dto.term())
-                                        .path("finance")
-                                        .definition(dto.explanation())
-                                        .simpleDefinition(dto.explanation())
-                                        .difficultyLevel(1)
-                                        .build()
-                        ));
-                articleTermHighlightRepository.save(
-                        ArticleTermHighlight.builder()
-                                .article(article)
-                                .term(term)
-                                .positionStart(dto.startIdx())
-                                .positionEnd(dto.endIdx())
-                                .build()
-                );
-            } catch (Exception e) {
-                log.warn("[Pipeline] 용어 저장 실패: {} - {}", dto.term(), e.getMessage());
-            }
+        } catch (RuntimeException e) {
+            var previous = lastStatus.get();
+            lastStatus.set(new CrawlStatus(LocalDateTime.now(), previous.savedCount(), previous.failedCount(), "FAILED"));
+            throw e;
+        } finally {
+            running.set(false);
         }
     }
 
-    private void saveEmbedding(Long articleId, List<Float> embedding) {
-        if (embedding == null || embedding.isEmpty()) return;
-        try {
-            newsArticleRepository.updateEmbedding(articleId, embedding.toString());
-        } catch (Exception e) {
-            log.warn("[Pipeline] 임베딩 저장 실패: articleId={} - {}", articleId, e.getMessage());
-        }
-    }
 }

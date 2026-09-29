@@ -14,7 +14,8 @@ public record CardNewsCardResponse(
         String body,
         String subBody,
         String highlight,
-        String imageUrl
+        String imageUrl,
+        java.util.List<Integer> sourceSentenceIds
 ) {
     public static CardNewsCardResponse from(CardNewsCard card) {
         return CardNewsCardResponse.builder()
@@ -27,6 +28,7 @@ public record CardNewsCardResponse(
                 .subBody(card.getSubBody())
                 .highlight(card.getHighlight())
                 .imageUrl(card.getImageUrl())
+                .sourceSentenceIds(card.getSourceSentenceIds())
                 .build();
     }
 }
