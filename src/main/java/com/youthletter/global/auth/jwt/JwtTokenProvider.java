@@ -54,6 +54,8 @@ public class JwtTokenProvider {
                 .subject(String.valueOf(userId))
                 .claim("email", email)
                 .claim("role", role)
+                .claim("tokenType", "access")
+                .id(java.util.UUID.randomUUID().toString())
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + accessTokenExpiration))
                 .signWith(secretKey)
@@ -69,6 +71,8 @@ public class JwtTokenProvider {
         Date now = new Date();
         String refreshToken = Jwts.builder()
                 .subject(String.valueOf(userId))
+                .claim("tokenType", "refresh")
+                .id(java.util.UUID.randomUUID().toString())
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + refreshTokenExpiration))
                 .signWith(secretKey)
@@ -106,10 +110,15 @@ public class JwtTokenProvider {
             return true;
         } catch (ExpiredJwtException e) {
             log.warn("만료된 JWT 토큰");
-        } catch (JwtException e) {
-            log.warn("유효하지 않은 JWT 토큰: {}", e.getMessage());
+        } catch (JwtException | IllegalArgumentException e) {
+            log.warn("유효하지 않은 JWT 토큰");
         }
         return false;
+    }
+
+    public boolean validateAccessToken(String token) {
+        if (!validateToken(token)) return false;
+        return "access".equals(parseClaims(token).get("tokenType", String.class));
     }
 
     public Long getUserIdFromToken(String token) {
@@ -119,6 +128,7 @@ public class JwtTokenProvider {
     // ── Refresh Token ─────────────────────────────────────────
 
     public boolean validateRefreshToken(Long userId, String refreshToken) {
+        if (!validateToken(refreshToken) || !"refresh".equals(parseClaims(refreshToken).get("tokenType", String.class))) return false;
         String stored = (String) redisTemplate.opsForValue().get(REFRESH_PREFIX + userId);
         return refreshToken.equals(stored);
     }

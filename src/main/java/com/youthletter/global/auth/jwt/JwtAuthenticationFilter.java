@@ -23,6 +23,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final com.youthletter.domain.user.repository.UserRepository users;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -31,11 +32,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = resolveToken(request);
 
         if (StringUtils.hasText(token)
-                && jwtTokenProvider.validateToken(token)
+                && jwtTokenProvider.validateAccessToken(token)
                 && !jwtTokenProvider.isBlacklisted(token)) {
-            Authentication authentication = jwtTokenProvider.getAuthentication(token);
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-            log.debug("Security Context에 '{}' 인증 정보를 저장했습니다", authentication.getName());
+            Long userId = jwtTokenProvider.getUserIdFromToken(token);
+            // soft-deleted 계정과 변경된 권한을 매 요청 반영한다.
+            users.findById(userId).ifPresent(user -> {
+                var principal = new CustomUserPrincipal(user.getId(), user.getEmail());
+                Authentication authentication = new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        principal, "", java.util.List.of(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_" + user.getRole())));
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            });
         }
 
         filterChain.doFilter(request, response);

@@ -73,4 +73,17 @@ public class NewsController {
         boolean bookmarked = newsService.toggleBookmark(principal.getUserId(), articleId);
         return ResponseEntity.ok(GlobalResponse.ok(Map.of("bookmarked", bookmarked)));
     }
+
+    @GetMapping("/{articleId}/bookmark")
+    public GlobalResponse<Map<String, Boolean>> bookmarkStatus(@AuthenticationPrincipal CustomUserPrincipal principal, @PathVariable Long articleId) {
+        return GlobalResponse.ok(Map.of("bookmarked", newsService.isBookmarked(principal.getUserId(), articleId)));
+    }
+    @PutMapping("/{articleId}/bookmark")
+    public GlobalResponse<Map<String, Boolean>> saveBookmark(@AuthenticationPrincipal CustomUserPrincipal principal, @PathVariable Long articleId) {
+        return GlobalResponse.ok(Map.of("bookmarked", newsService.setBookmark(principal.getUserId(), articleId, true)));
+    }
+    @DeleteMapping("/{articleId}/bookmark")
+    public GlobalResponse<Map<String, Boolean>> removeBookmark(@AuthenticationPrincipal CustomUserPrincipal principal, @PathVariable Long articleId) {
+        return GlobalResponse.ok(Map.of("bookmarked", newsService.setBookmark(principal.getUserId(), articleId, false)));
+    }
 }

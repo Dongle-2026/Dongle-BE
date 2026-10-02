@@ -241,7 +241,7 @@ class SpendingServiceTest {
         assertThat(resp.insightText()).isNotBlank();
         assertThat(resp.modelVersion()).isEqualTo("rule-based-v1");
         assertThat(resp.insightText()).contains("0원").doesNotContain("15%");
-        assertThat(resp.analysisEnd()).isEqualTo(LocalDate.now());
+        assertThat(resp.analysisEnd()).isEqualTo(LocalDate.now(java.time.ZoneOffset.UTC));
     }
 
     // ── 헬퍼 ──────────────────────────────────────────────────────────────────

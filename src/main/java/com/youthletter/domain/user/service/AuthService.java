@@ -20,6 +20,7 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final com.youthletter.domain.notification.repository.DeviceTokenRepository devices;
 
     @Transactional
     public TokenResponse signup(SignupRequest request) {
@@ -50,12 +51,11 @@ public class AuthService {
             throw new BusinessException(ErrorCode.INVALID_TOKEN, "유효하지 않은 Refresh Token입니다");
         }
         Long userId = jwtTokenProvider.getUserIdFromToken(refreshToken);
+        User user = userRepository.findLockedById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         if (!jwtTokenProvider.validateRefreshToken(userId, refreshToken)) {
             throw new BusinessException(ErrorCode.INVALID_TOKEN, "만료되었거나 유효하지 않은 Refresh Token입니다");
         }
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
-
         String newAccessToken  = jwtTokenProvider.createAccessToken(user.getId(), user.getEmail(), user.getRole());
         String newRefreshToken = jwtTokenProvider.createRefreshToken(user.getId());
         return new TokenResponse(newAccessToken, newRefreshToken, user.getNickname());
@@ -80,6 +80,7 @@ public class AuthService {
 
     @Transactional
     public void logout(Long userId, String accessToken) {
+        devices.deleteByUserId(userId);
         if (accessToken != null) {
             jwtTokenProvider.blacklistAccessToken(accessToken);
         }
@@ -91,6 +92,7 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         user.softDelete();
+        devices.deleteByUserId(userId);
         if (accessToken != null) {
             jwtTokenProvider.blacklistAccessToken(accessToken);
         }
