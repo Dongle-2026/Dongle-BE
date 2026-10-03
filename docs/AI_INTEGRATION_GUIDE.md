@@ -79,7 +79,7 @@ npm start
 | OLLAMA_BASE_URL | http://127.0.0.1:11434 | 모델 실행 서버 |
 | OLLAMA_CHAT_MODEL | qwen3:8b | 생성 모델 |
 | OLLAMA_EMBED_MODEL | nomic-embed-text | 임베딩 모델 |
-| OLLAMA_TIMEOUT_MS | 120000 | 모델 호출 1회 제한 |
+| OLLAMA_TIMEOUT_MS | 180000 | 모델 호출 1회 제한. 카드 검증 실패 시 최대 두 번 호출하므로 Spring 제한은 기본 370초 |
 | AI_SERVICE_TOKEN | 빈 값 | 로컬 외 바인딩 시 필수 |
 
 동시에 한 생성 요청만 처리한다. 처리 중 다른 요청은 429 `AI_BUSY`를 반환한다. 이것은 영속 작업 큐가 아니다. 소규모 개발 장비에서 추론이 겹쳐 메모리가 부족해지는 문제를 막는 초기 구현이다.

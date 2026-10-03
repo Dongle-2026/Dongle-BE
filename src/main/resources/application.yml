@@ -35,7 +35,7 @@ ai-service:
   use-stub: ${AI_USE_STUB:false}
   model-version: ${AI_MODEL_VERSION:qwen3:8b}
   token: ${AI_SERVICE_TOKEN:}
-  timeout-seconds: ${AI_TIMEOUT_SECONDS:250}
+  timeout-seconds: ${AI_TIMEOUT_SECONDS:370}
 
 # ── Swagger ──
 springdoc:

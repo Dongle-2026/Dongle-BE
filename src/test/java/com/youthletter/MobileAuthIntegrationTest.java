@@ -20,6 +20,7 @@ class MobileAuthIntegrationTest {
     @org.springframework.beans.factory.annotation.Autowired JwtTokenProvider tokens;
     @org.springframework.beans.factory.annotation.Autowired JdbcTemplate jdbc;
     @org.springframework.beans.factory.annotation.Autowired NewsService news;
+    @org.springframework.beans.factory.annotation.Autowired com.fasterxml.jackson.databind.ObjectMapper json;
     Long userId;
     @BeforeEach void setup() {
         String key = UUID.randomUUID().toString();
@@ -53,5 +54,48 @@ class MobileAuthIntegrationTest {
         news.setBookmark(userId,article,false);
         news.setBookmark(userId,article,false);
         assertThat(news.isBookmarked(userId,article)).isFalse();
+    }
+
+    @Test void appJourneySignupReadSaveReissueAndLogout() throws Exception {
+        String key = UUID.randomUUID().toString();
+        Long registeredId = null;
+        try {
+            String body = json.writeValueAsString(java.util.Map.of("email", key+"@test.invalid",
+                    "password", "integration-test-password", "name", "통합테스트", "nickname", key.substring(0,20)));
+            var signup = mvc.perform(post("/api/auth/signup").contentType("application/json").content(body))
+                    .andExpect(status().isCreated()).andReturn();
+            var session = json.readTree(signup.getResponse().getContentAsString()).get("data");
+            String access = session.get("accessToken").asText();
+            String refresh = session.get("refreshToken").asText();
+            registeredId = tokens.getUserIdFromToken(access);
+            Long article = jdbc.queryForObject("INSERT INTO news_articles(source_url,source_name,title,content,category) VALUES (?,'test','title','body','YOUTH') RETURNING id",Long.class,key);
+            String bearer = "Bearer " + access;
+            mvc.perform(get("/api/news").param("keyword","title"))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.content").isArray());
+            mvc.perform(get("/api/news/"+article+"/bookmark")).andExpect(status().isUnauthorized());
+            mvc.perform(put("/api/news/"+article+"/bookmark").header("Authorization",bearer))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.bookmarked").value(true));
+            mvc.perform(put("/api/news/"+article+"/bookmark").header("Authorization",bearer))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.bookmarked").value(true));
+            mvc.perform(get("/api/users/me/bookmarks").header("Authorization",bearer))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(1));
+            mvc.perform(post("/api/news/"+article+"/read").header("Authorization",bearer))
+                    .andExpect(status().isOk());
+            mvc.perform(get("/api/users/me/learning-stats").header("Authorization",bearer))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.readNewsCount").value(1));
+            var renewed = mvc.perform(post("/api/auth/reissue").contentType("application/json")
+                    .content(json.writeValueAsString(java.util.Map.of("refreshToken",refresh))))
+                    .andExpect(status().isOk()).andReturn();
+            var next = json.readTree(renewed.getResponse().getContentAsString()).get("data");
+            assertThat(tokens.validateRefreshToken(registeredId,refresh)).isFalse();
+            String newAccess = next.get("accessToken").asText();
+            mvc.perform(post("/api/auth/logout").header("Authorization","Bearer "+newAccess))
+                    .andExpect(status().isOk());
+            mvc.perform(get("/api/users/me").header("Authorization","Bearer "+newAccess))
+                    .andExpect(status().isUnauthorized());
+            assertThat(tokens.validateRefreshToken(registeredId,next.get("refreshToken").asText())).isFalse();
+        } finally {
+            if (registeredId != null) tokens.deleteRefreshToken(registeredId);
+        }
     }
 }

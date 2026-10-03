@@ -4,6 +4,28 @@ import { createAi, validateCards, sentences, articleInput } from '../src/ai.js';
 
 const article = { title: '금리 안내', content: '기준금리는 3%입니다. 청년 지원을 안내합니다.' };
 const source = sentences(article.content);
+test('JSON 스키마와 제한된 출력량을 모델에 전달한다', async () => {
+  const ai = createAi({ fetchImpl: async (url, init) => {
+    if (url.endsWith('/chat')) {
+      const request = JSON.parse(init.body);
+      assert.equal(request.format.type, 'object');
+      assert.equal(request.format.properties.summary.maxLength, undefined);
+      assert.equal(request.format.properties.terms.type, 'array');
+      assert.deepEqual(request.format.required, ['summary', 'terms']);
+      assert.equal(request.think, false);
+      assert.equal(request.options.num_predict, 1000);
+      return { ok: true, json: async () => ({ message: { content: '{"summary":"요약","terms":[]}' } }) };
+    }
+    return { ok: true, json: async () => ({ embeddings: [Array(768).fill(0.01)] }) };
+  } });
+  assert.equal((await ai.process(article)).summary, '요약');
+});
+test('출력 토큰 한도에 도달한 결과는 저장 후보에서 제외한다', async () => {
+  const ai = createAi({ fetchImpl: async () => ({ok:true,json:async()=>({
+    done_reason:'length',message:{content:'{"summary":"요약","terms":[]}'}
+  })}) });
+  await assert.rejects(()=>ai.process(article), /MODEL_OUTPUT_TRUNCATED/);
+});
 test('모델 타임아웃은 단계와 코드만 기록한다', async () => {
   const events = [];
   const ai = createAi({ observe: event => events.push(event), fetchImpl: async () => {
