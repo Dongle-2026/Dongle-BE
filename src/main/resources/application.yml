@@ -43,6 +43,19 @@ ai-service:
   token: ${AI_SERVICE_TOKEN:}
   timeout-seconds: ${AI_TIMEOUT_SECONDS:370}
 
+# ── 모바일 소셜 로그인 (앱이 보낸 idToken 검증) ──
+# audiences가 비어 있는 제공자는 503(설정 안 됨)으로 거부한다.
+mobile-oauth:
+  providers:
+    google:
+      jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs
+      issuers: https://accounts.google.com,accounts.google.com
+      audiences: ${GOOGLE_MOBILE_CLIENT_IDS:}   # iOS/Android/웹 OAuth 클라이언트 ID, 쉼표 구분
+    kakao:
+      jwk-set-uri: https://kauth.kakao.com/.well-known/jwks.json
+      issuers: https://kauth.kakao.com
+      audiences: ${KAKAO_APP_KEYS:}             # 카카오 앱 키(네이티브 앱 키 등), 쉼표 구분. OIDC 활성화 필요
+
 # ── Swagger ──
 springdoc:
   swagger-ui:
