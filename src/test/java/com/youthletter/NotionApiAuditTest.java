@@ -75,7 +75,7 @@ class NotionApiAuditTest {
 
     @ParameterizedTest(name="{0} {1} {2} declared={3}")
     @CsvSource({
-        "A1,POST,/api/auth/oauth/{provider},false",
+        "A1,POST,/api/auth/oauth/{provider},true",
         "A2,POST,/api/auth/refresh,true",
         "A3,POST,/api/auth/logout,true",
         "A4,GET,/api/news,true",
@@ -119,7 +119,9 @@ class NotionApiAuditTest {
         var result = mvc.perform(call).andReturn();
         int status = result.getResponse().getStatus();
         System.out.println("NOTION_AUDIT "+id+" "+method+" "+path+" registered="+exists+" HTTP="+status);
-        if (exists) assertThat(status).isEqualTo(200);
+        // A1은 실제 제공자 idToken이 필요하므로 경로 도달(빈 본문 검증 400)만 확인. 서명 검증은 MobileOAuthIdTokenIntegrationTest.
+        if (id.equals("A1")) assertThat(status).isEqualTo(400);
+        else if (exists) assertThat(status).isEqualTo(200);
         else assertThat(status).isGreaterThanOrEqualTo(400);
     }
 

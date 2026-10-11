@@ -20,6 +20,9 @@ public enum ErrorCode {
     TOKEN_EXPIRED(HttpStatus.UNAUTHORIZED, 4002, "토큰이 만료되었습니다"),
     INVALID_TOKEN(HttpStatus.UNAUTHORIZED, 4003, "유효하지 않은 토큰입니다"),
     ACCESS_DENIED(HttpStatus.FORBIDDEN, 4004, "접근 권한이 없습니다"),
+    OAUTH_PROVIDER_UNSUPPORTED(HttpStatus.BAD_REQUEST, 4005, "지원하지 않는 로그인 제공자입니다"),
+    INVALID_ID_TOKEN(HttpStatus.UNAUTHORIZED, 4006, "소셜 로그인 토큰을 확인할 수 없습니다"),
+    OAUTH_EMAIL_ALREADY_REGISTERED(HttpStatus.CONFLICT, 4007, "이미 가입된 이메일입니다. 기존 로그인 방식으로 로그인해 주세요"),
 
     // ── 사용자 (41xx) ──
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, 4100, "사용자를 찾을 수 없습니다"),
@@ -64,7 +67,9 @@ public enum ErrorCode {
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, 5000, "서버 내부 오류가 발생했습니다"),
     AI_SERVICE_ERROR(HttpStatus.SERVICE_UNAVAILABLE, 5001, "AI 서비스에 연결할 수 없습니다"),
     AI_SERVICE_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, 5002, "AI 서비스 응답 시간이 초과되었습니다"),
-    CRAWLING_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, 5003, "뉴스 크롤링 중 오류가 발생했습니다");
+    CRAWLING_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, 5003, "뉴스 크롤링 중 오류가 발생했습니다"),
+    OAUTH_PROVIDER_NOT_CONFIGURED(HttpStatus.SERVICE_UNAVAILABLE, 5004, "소셜 로그인 설정이 아직 완료되지 않았습니다"),
+    OAUTH_PROVIDER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, 5005, "소셜 로그인 서버에 연결할 수 없습니다");
 
     private final HttpStatus httpStatus;
     private final int code;
