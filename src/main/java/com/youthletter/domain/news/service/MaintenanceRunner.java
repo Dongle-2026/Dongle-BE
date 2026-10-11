@@ -31,6 +31,10 @@ public class MaintenanceRunner implements ApplicationRunner {
     @Value("${ops.run:}")
     private String tasks;
 
+    /** titles 작업을 이 id 다음부터 시작(429로 중단된 곳부터 이어서) */
+    @Value("${ops.titles-after-id:0}")
+    private String titlesAfterId;
+
     @Value("${ops.exit-after-run:true}")
     private boolean exitAfterRun;
 
@@ -41,15 +45,15 @@ public class MaintenanceRunner implements ApplicationRunner {
         for (String task : todo) {
             switch (task) {
                 case "titles" -> {
-                    long after = 0;
+                    long after = Long.parseLong(titlesAfterId);
                     int total = 0;
                     ThumbnailBackfillService.TitleResult r;
                     do {
                         r = thumbnailService.refreshTitles(after, ThumbnailBackfillService.MAX_BATCH);
                         total += r.updated();
                         after = r.lastId();
-                    } while (r.checked() == ThumbnailBackfillService.MAX_BATCH);
-                    log.info("[Ops] 제목 정정 합계 {}건", total);
+                    } while (!r.rateLimited() && r.checked() == ThumbnailBackfillService.MAX_BATCH);
+                    log.info("[Ops] 제목 정정 합계 {}건{}", total, r.rateLimited() ? " (원문 429로 중단, 마지막 처리 id=" + r.lastId() + ")" : "");
                 }
                 case "reclassify" -> log.info("[Ops] 카테고리 재분류: {}건 변경", categoryService.reclassifyAll());
                 case "thumbnails" -> {
@@ -59,8 +63,8 @@ public class MaintenanceRunner implements ApplicationRunner {
                         r = thumbnailService.backfill(ThumbnailBackfillService.MAX_BATCH);
                         total += r.updated();
                         log.info("[Ops] 썸네일 배치: 확인 {}, 채움 {}, 이미지 없음 {}, 실패 {}", r.checked(), r.updated(), r.notFound(), r.failed());
-                    } while (r.updated() > 0 && r.checked() == ThumbnailBackfillService.MAX_BATCH);
-                    log.info("[Ops] 썸네일 채움 합계 {}건", total);
+                    } while (!r.rateLimited() && r.updated() > 0 && r.checked() == ThumbnailBackfillService.MAX_BATCH);
+                    log.info("[Ops] 썸네일 채움 합계 {}건{}", total, r.rateLimited() ? " (원문 429로 중단)" : "");
                 }
                 default -> log.warn("[Ops] 알 수 없는 작업: {}", task);
             }

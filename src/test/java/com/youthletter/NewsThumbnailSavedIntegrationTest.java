@@ -104,4 +104,22 @@ class NewsThumbnailSavedIntegrationTest {
         }
         mvc.perform(post("/api/admin/news/thumbnails").header("Authorization", bearer)).andExpect(status().isForbidden());
     }
+
+    @Test void backfillStopsOnRateLimit() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        java.util.concurrent.atomic.AtomicInteger hits = new java.util.concurrent.atomic.AtomicInteger();
+        server.createContext("/limited", ex -> { hits.incrementAndGet(); ex.sendResponseHeaders(429, -1); ex.close(); });
+        server.start();
+        try {
+            jdbc.update("UPDATE news_articles SET thumbnail_url = coalesce(thumbnail_url, 'http://preset/x.jpg') WHERE thumbnail_url IS NULL");
+            String base = "http://127.0.0.1:" + server.getAddress().getPort();
+            for (int i = 0; i < 3; i++) article(null, base + "/limited?" + i + m);
+            var result = backfill.backfill(10);
+            assertThat(result.rateLimited()).isTrue();
+            assertThat(hits.get()).isEqualTo(1); // 429 이후 더 요청하지 않음
+            assertThat(result.updated()).isZero();
+        } finally {
+            server.stop(0);
+        }
+    }
 }
