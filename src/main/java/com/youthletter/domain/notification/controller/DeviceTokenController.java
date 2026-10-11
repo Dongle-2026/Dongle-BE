@@ -12,11 +12,11 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class DeviceTokenController {
     private final DeviceTokenService service;
-    public record Request(@NotBlank @Size(max=100) String deviceId,
+    public record DeviceTokenRequest(@NotBlank @Size(max=100) String deviceId,
                           @NotBlank @Size(max=2048) String token,
                           @NotBlank @Pattern(regexp="IOS|ANDROID") String platform) {}
     @PutMapping
-    public GlobalResponse<Void> register(@AuthenticationPrincipal CustomUserPrincipal principal, @Valid @RequestBody Request request) {
+    public GlobalResponse<Void> register(@AuthenticationPrincipal CustomUserPrincipal principal, @Valid @RequestBody DeviceTokenRequest request) {
         service.register(principal.getUserId(), request.deviceId(), request.token(), request.platform());
         return GlobalResponse.ok();
     }
