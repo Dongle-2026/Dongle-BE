@@ -79,7 +79,7 @@ public class MeController {
     /** 푸시 토큰 등록. PUT /api/users/me/devices와 같은 upsert(같은 deviceId면 토큰 교체). */
     @PostMapping("/devices")
     public GlobalResponse<Void> registerDevice(@AuthenticationPrincipal CustomUserPrincipal principal,
-                                               @Valid @RequestBody DeviceTokenController.Request request) {
+                                               @Valid @RequestBody DeviceTokenController.DeviceTokenRequest request) {
         deviceTokenService.register(principal.getUserId(), request.deviceId(), request.token(), request.platform());
         return GlobalResponse.ok();
     }

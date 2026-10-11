@@ -15,12 +15,12 @@ import org.springframework.web.bind.annotation.*;
 public class MobileOAuthController {
     private final MobileOAuthService service;
 
-    public record Request(@NotBlank @Size(max = 8192) String idToken, @Size(max = 256) String nonce) {}
+    public record MobileLoginRequest(@NotBlank @Size(max = 8192) String idToken, @Size(max = 256) String nonce) {}
 
     @Operation(summary = "모바일 소셜 로그인", description = "provider=kakao|google. 앱 SDK가 받은 idToken 검증 후 JWT 발급. newUser=true면 최초 가입")
     @PostMapping("/api/auth/oauth/{provider}")
     public GlobalResponse<MobileOAuthService.LoginResult> login(@PathVariable String provider,
-                                                                @Valid @RequestBody Request request) {
+                                                                @Valid @RequestBody MobileLoginRequest request) {
         return GlobalResponse.ok(service.login(provider, request.idToken(), request.nonce()));
     }
 }

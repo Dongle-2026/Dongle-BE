@@ -15,9 +15,9 @@ import jakarta.validation.constraints.*;
 @RequiredArgsConstructor
 public class AiJobController {
     private final AiJobService service;
-    public record Request(@NotNull @Positive Long articleId, @NotNull AiJobService.Kind kind) {}
+    public record AiJobRequest(@NotNull @Positive Long articleId, @NotNull AiJobService.Kind kind) {}
     @PostMapping
-    public ResponseEntity<GlobalResponse<AiJobService.Job>> enqueue(@Valid @RequestBody Request request) {
+    public ResponseEntity<GlobalResponse<AiJobService.Job>> enqueue(@Valid @RequestBody AiJobRequest request) {
         return ResponseEntity.accepted().body(GlobalResponse.accepted(service.enqueue(request.articleId(), request.kind())));
     }
     @GetMapping("/{id}")
