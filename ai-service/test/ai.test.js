@@ -104,12 +104,12 @@ test('퀴즈 3문제를 근거 문장과 함께 검증해 반환한다', async (
       goodQuiz({ question: '가입 대상 나이는?', choices: ['만 19~34세', '만 40세 이상', '제한 없음', '만 15세 이하'], answerIndex: 0, explanation: '만 19~34세 청년이 대상이다.', sourceSentenceIds: [3, 3] })] }) } }) };
   } });
   const result = await ai.quiz(quizArticle);
-  assert.equal(result.promptVersion, 'quiz-v3');
+  assert.equal(result.promptVersion, 'quiz-v4-concept');
   assert.equal(calls, 2);
   assert.equal(result.quizzes.length, 3);
   assert.deepEqual(result.quizzes[2].sourceSentenceIds, [3]);
   assert.equal(requested.format.properties.quizzes.items.properties.choices.minItems, undefined);
-  assert.equal(requested.options.num_predict, 1400);
+  assert.equal(requested.options.num_predict, 1100);
 });
 test('퀴즈 검증: 개수·중복 보기·정답 범위·근거 없는 숫자를 거부한다', () => {
   const three = (q) => ({ quizzes: [q, goodQuiz({ question: 'b' }), goodQuiz({ question: 'c' })] });
@@ -172,4 +172,10 @@ test('해설의 숫자는 기사 안에만 있으면 되고, 질문·정답의 �
   assert.throws(() => validateQuizzes(three(goodQuiz({ explanation: '2025년부터 5년 만기다.' })), quizSource), /UNSUPPORTED_NUMBER/);
   // 정답 보기의 숫자가 근거 문장(1번)에 없고 다른 문장에만 있음 → 거부
   assert.throws(() => validateQuizzes(three(goodQuiz({ choices: ['1년', '3년', '2.4만원', '10년'] })), quizSource), /UNSUPPORTED_NUMBER/);
+});
+
+test('100분의 N과 N%는 같은 값으로 인정한다', () => {
+  assert.deepEqual(unsupportedNumbers('당월 보험료의 100% 이상', '당월 보험료의 100분의 100 이상인 경우'), []);
+  assert.deepEqual(unsupportedNumbers('30% 이상', '100분의 30 이상'), []);
+  assert.deepEqual(unsupportedNumbers('50% 이상', '100분의 30 이상'), ['50%']);
 });
