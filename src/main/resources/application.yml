@@ -41,7 +41,7 @@ ai-service:
   use-stub: ${AI_USE_STUB:false}
   model-version: ${AI_MODEL_VERSION:qwen3:8b}
   token: ${AI_SERVICE_TOKEN:}
-  timeout-seconds: ${AI_TIMEOUT_SECONDS:370}
+  timeout-seconds: ${AI_TIMEOUT_SECONDS:540}  # 퀴즈는 생성+자기검증 최대 4회 호출. 작업 리스(10분)보다 짧게
 
 # ── 모바일 소셜 로그인 (앱이 보낸 idToken 검증) ──
 # audiences가 비어 있는 제공자는 503(설정 안 됨)으로 거부한다.

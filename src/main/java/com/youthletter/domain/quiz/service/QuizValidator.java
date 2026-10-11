@@ -24,6 +24,10 @@ public class QuizValidator {
                     || q.sourceSentenceIds() == null || q.sourceSentenceIds().isEmpty()
                     || q.sourceSentenceIds().stream().anyMatch(id -> id == null || id < 1 || id > sentenceCount)
                     || !questions.add(q.question().strip())) throw invalid();
+            List<String> sentences = QuizText.sentences(articleContent);
+            String evidence = String.join(" ", q.sourceSentenceIds().stream().map(id -> sentences.get(id - 1)).toList());
+            if (!com.youthletter.global.util.NumberEvidence.unsupported(
+                    q.question() + " " + q.choices().get(q.answerIndex()) + " " + q.explanation(), evidence).isEmpty()) throw invalid();
         }
     }
 
