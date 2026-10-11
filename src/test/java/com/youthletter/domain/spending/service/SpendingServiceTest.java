@@ -278,7 +278,7 @@ class SpendingServiceTest {
                 java.util.Collections.singletonList(new Object[]{"FOOD", BigDecimal.valueOf(12000)}));
         given(aiClient.insight(any())).willThrow(new BusinessException(ErrorCode.AI_SERVICE_ERROR));
         var result = spendingService.getAiInsight(1L);
-        assertThat(result.insightText()).contains("12000원");
+        assertThat(result.insightText()).contains("12,000원");
         assertThat(result.modelVersion()).isEqualTo("rule-based-v1");
     }
 
@@ -287,7 +287,7 @@ class SpendingServiceTest {
                 java.util.Collections.singletonList(new Object[]{"FOOD", BigDecimal.valueOf(20000)}));
         given(aiClient.insight(any())).willReturn(new com.youthletter.domain.news.client.dto.AiInsightResponse("99% 줄이세요", "qwen3:8b"));
         var result = spendingService.getAiInsight(1L);
-        assertThat(result.insightText()).contains("20000원").doesNotContain("99%");
+        assertThat(result.insightText()).contains("20,000원").doesNotContain("99%");
         assertThat(result.modelVersion()).isEqualTo("rule-based-v1");
     }
 }
