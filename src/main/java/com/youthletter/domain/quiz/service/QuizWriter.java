@@ -21,7 +21,8 @@ public class QuizWriter {
         if (Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM quizzes WHERE article_id=?)", Boolean.class, articleId)))
             return false;
         int order = 1;
-        for (AiQuizResponse.Item q : response.quizzes()) {
+        for (AiQuizResponse.Item original : response.quizzes()) {
+            AiQuizResponse.Item q = shuffled(original);
             jdbc.update("""
                     INSERT INTO quizzes(article_id, quiz_order, question, choices, answer_index, explanation,
                                         source_sentence_ids, model_version, prompt_version)
@@ -31,6 +32,14 @@ public class QuizWriter {
                     response.modelVersion(), response.promptVersion());
         }
         return true;
+    }
+
+    /** 모델은 정답을 같은 자리에 두는 경향이 있어(실측: 3문제 모두 2번) 저장 전에 보기 순서를 섞는다. */
+    static AiQuizResponse.Item shuffled(AiQuizResponse.Item q) {
+        java.util.List<String> choices = new java.util.ArrayList<>(q.choices());
+        String answer = choices.get(q.answerIndex());
+        java.util.Collections.shuffle(choices, java.util.concurrent.ThreadLocalRandom.current());
+        return new AiQuizResponse.Item(q.question(), choices, choices.indexOf(answer), q.explanation(), q.sourceSentenceIds());
     }
 
     private String json(Object value) {

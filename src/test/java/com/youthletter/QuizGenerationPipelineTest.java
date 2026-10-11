@@ -60,6 +60,12 @@ class QuizGenerationPipelineTest {
                 .andExpect(jsonPath("$.data.quizzes.length()").value(3))
                 .andExpect(jsonPath("$.data.quizzes[0].question").value("문제1"));
         verify(ai, times(1)).generateQuiz(any());
+        // 보기를 섞어도 정답 보기 텍스트는 유지된다(item()의 정답은 "나")
+        for (var row : jdbc.queryForList("SELECT choices::text AS c, answer_index AS a FROM quizzes WHERE article_id=?", articleId)) {
+            java.util.List<String> choices = new com.fasterxml.jackson.databind.ObjectMapper().readValue((String) row.get("c"), new com.fasterxml.jackson.core.type.TypeReference<>() {});
+            assertThat(choices).containsExactlyInAnyOrder("가", "나", "다", "라");
+            assertThat(choices.get(((Number) row.get("a")).intValue())).isEqualTo("나");
+        }
     }
 
     @Test void invalidModelOutputIsNotSaved() throws Exception {
