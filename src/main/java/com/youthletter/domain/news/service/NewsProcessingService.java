@@ -70,7 +70,7 @@ public class NewsProcessingService {
         try {
         lastStatus.set(new CrawlStatus(LocalDateTime.now(), 0, 0, "RUNNING"));
 
-        List<CrawledArticleDto> articles = crawlerService.crawl();
+        List<CrawledArticleDto> articles = crawlerService.crawl(newsArticleRepository::existsBySourceUrl);
         int savedCount = 0;
         int failedCount = 0;
 
