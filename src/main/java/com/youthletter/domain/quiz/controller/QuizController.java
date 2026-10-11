@@ -34,6 +34,13 @@ public class QuizController {
         return GlobalResponse.ok(quizService.answer(principal.getUserId(), quizId, request));
     }
 
+    @Operation(summary = "정답 보기", description = "한 번 이상 제출한 문제만 가능. 본 뒤에는 그 문제로 꿀을 받을 수 없음")
+    @PostMapping("/api/quizzes/{quizId}/reveal")
+    public GlobalResponse<QuizRevealResponse> reveal(@AuthenticationPrincipal CustomUserPrincipal principal,
+                                                     @PathVariable Long quizId) {
+        return GlobalResponse.ok(quizService.reveal(principal.getUserId(), quizId));
+    }
+
     @Operation(summary = "꿀단지 히트맵", description = "최근 days일(기본 126, 최대 365), 한국 날짜")
     @GetMapping("/api/me/activity")
     public GlobalResponse<List<ActivityDayResponse>> activity(@AuthenticationPrincipal CustomUserPrincipal principal,
