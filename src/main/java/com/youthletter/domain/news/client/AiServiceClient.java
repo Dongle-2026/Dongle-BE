@@ -28,8 +28,8 @@ public class AiServiceClient {
     @Value("${ai-service.use-stub:true}")
     private boolean useStub;
 
-    @Value("${ai-service.timeout-seconds:370}")
-    private long timeoutSeconds = 370;
+    @Value("${ai-service.timeout-seconds:540}")
+    private long timeoutSeconds = 540;
 
     public AiCardResponse generateCards(AiProcessRequest request) {
         return post("/api/ai/card-news", request, AiCardResponse.class);

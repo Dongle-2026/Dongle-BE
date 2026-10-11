@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAi, validateCards, validateQuizzes, checkSelfSolved, sentences, articleInput } from '../src/ai.js';
+import { createAi, validateCards, validateQuizzes, checkSelfSolved, unsupportedNumbers, retryHint, sentences, articleInput } from '../src/ai.js';
 
 const article = { title: '금리 안내', content: '기준금리는 3%입니다. 청년 지원을 안내합니다.' };
 const source = sentences(article.content);
@@ -104,7 +104,7 @@ test('퀴즈 3문제를 근거 문장과 함께 검증해 반환한다', async (
       goodQuiz({ question: '가입 대상 나이는?', choices: ['만 19~34세', '만 40세 이상', '제한 없음', '만 15세 이하'], answerIndex: 0, explanation: '만 19~34세 청년이 대상이다.', sourceSentenceIds: [3, 3] })] }) } }) };
   } });
   const result = await ai.quiz(quizArticle);
-  assert.equal(result.promptVersion, 'quiz-v2-selfcheck');
+  assert.equal(result.promptVersion, 'quiz-v3');
   assert.equal(calls, 2);
   assert.equal(result.quizzes.length, 3);
   assert.deepEqual(result.quizzes[2].sourceSentenceIds, [3]);
@@ -141,4 +141,25 @@ test('자기 풀이 정답이 다르면 다시 출제하고, 또 다르면 저�
   assert.equal(calls, 4); // 출제+풀이 2회
   assert.throws(() => checkSelfSolved([goodQuiz()], { answers: [] }), /QUIZ_SELF_CHECK_FAILED/);
   assert.equal(checkSelfSolved([goodQuiz()], { answers: [2] }).length, 1);
+});
+
+test('숫자 근거: 단위까지 같은 덩어리여야 하고 잘린·지어낸 숫자는 거부한다', () => {
+  assert.deepEqual(unsupportedNumbers('새 기준선은 519만원', '약 519만원이 새 기준선이 된다.'), []);
+  assert.deepEqual(unsupportedNumbers('6월 17일 시행', '오는 6월17일부터 시행된다.'), []);
+  assert.deepEqual(unsupportedNumbers('1,490.6원', '1490.6원에 마쳤다'), []);
+  assert.deepEqual(unsupportedNumbers('2025년 6월 17일', '오는 6월17일부터 시행된다.'), ['2025']);
+  assert.deepEqual(unsupportedNumbers('평균 21만 원', '평균 21만9000 원을 추가'), ['21만']);
+  assert.deepEqual(unsupportedNumbers('17년 만에', '2017년 이후'), ['17']);
+});
+test('재시도 때 거부된 숫자를 구체적으로 알려준다', async () => {
+  const bad = JSON.stringify({ quizzes: [goodQuiz({ explanation: '2025년 5년 만기다.' }), goodQuiz({ question: 'b' }), goodQuiz({ question: 'c' })] });
+  const prompts = [];
+  const ai = createAi({ fetchImpl: async (url, init) => {
+    prompts.push(JSON.parse(init.body).messages[1].content);
+    return { ok: true, json: async () => ({ message: { content: bad } }) };
+  } });
+  await assert.rejects(() => ai.quiz(quizArticle), /UNSUPPORTED_NUMBER/);
+  assert.equal(prompts.length, 2);
+  assert.match(prompts[1], /1번 문제의 숫자 2025는 근거 문장에 없다/);
+  assert.match(retryHint({ code: 'QUIZ_SELF_CHECK_FAILED' }, '문제'), /정답을 하나로 고를 수 없었다/);
 });

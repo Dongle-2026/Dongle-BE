@@ -46,7 +46,7 @@ class QuizGenerationPipelineTest {
     int quizzes() { return jdbc.queryForObject("SELECT count(*) FROM quizzes WHERE article_id=?", Integer.class, articleId); }
 
     @Test void firstViewQueuesOneJobAndWorkerPublishesQuizzes() throws Exception {
-        when(ai.generateQuiz(any())).thenReturn(new AiQuizResponse("m", "quiz-v1", List.of(item("문제1"), item("문제2"), item("문제3"))));
+        when(ai.generateQuiz(any())).thenReturn(new AiQuizResponse("m", "quiz-v1", List.of(item("첫째 문제"), item("둘째 문제"), item("셋째 문제"))));
         for (int i = 0; i < 2; i++)
             mvc.perform(get("/api/news/" + articleId + "/body")).andExpect(status().isOk())
                     .andExpect(jsonPath("$.data.quizStatus").value("GENERATING"));
@@ -58,7 +58,7 @@ class QuizGenerationPipelineTest {
         mvc.perform(get("/api/news/" + articleId + "/body")).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.quizStatus").value("READY"))
                 .andExpect(jsonPath("$.data.quizzes.length()").value(3))
-                .andExpect(jsonPath("$.data.quizzes[0].question").value("문제1"));
+                .andExpect(jsonPath("$.data.quizzes[0].question").value("첫째 문제"));
         verify(ai, times(1)).generateQuiz(any());
         // 보기를 섞어도 정답 보기 텍스트는 유지된다(item()의 정답은 "나")
         for (var row : jdbc.queryForList("SELECT choices::text AS c, answer_index AS a FROM quizzes WHERE article_id=?", articleId)) {

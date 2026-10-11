@@ -1,5 +1,5 @@
 export class AiError extends Error {
-  constructor(code, status = 502) { super(code); this.code = code; this.status = status; }
+  constructor(code, status = 502, detail = null) { super(code); this.code = code; this.status = status; this.detail = detail; }
 }
 
 const string = (max) => ({ type: 'string', minLength: 1, maxLength: max });
@@ -31,6 +31,21 @@ export function generationSchema(schema) {
     .map(([key, value]) => [key, generationSchema(value)]));
 }
 
+// 숫자 근거 확인. 만·억·조·천 단위까지 한 덩어리로 보고, 근거 문장에 같은 덩어리가 앞뒤 경계와 함께 있어야 한다.
+// 예) "21만"은 근거 "21만9000"에서 잘린 숫자이므로 불인정, "2025년"은 근거에 2025가 없으면 불인정.
+const NUMBER_TOKEN = /\d[\d,.]*(?:[만억조천]\d[\d,.]*)*[만억조천]?(?:%|퍼센트)?/g;
+const normalizeNumber = (t) => t.replace(/,/g, '');
+export function unsupportedNumbers(text, evidence) {
+  const ev = evidence.replace(/,/g, '');
+  return [...new Set((text.match(NUMBER_TOKEN) ?? []).map(normalizeNumber))].filter(token => {
+    for (let i = ev.indexOf(token); i >= 0; i = ev.indexOf(token, i + 1)) {
+      const before = ev[i - 1] ?? '', after = ev[i + token.length] ?? '';
+      if (!/[\d.]/.test(before) && !/[\d만억조천]/.test(after)) return false; // 경계가 맞는 일치가 있음
+    }
+    return true;
+  });
+}
+
 export function articleInput(input) {
   if (!input || typeof input.title !== 'string' || !input.title.trim() || input.title.length > 300
       || typeof input.content !== 'string' || !input.content.trim() || input.content.length > 16000) {
@@ -54,8 +69,8 @@ export function validateCards(value, source) {
       throw new AiError('INVALID_CARDS');
     }
     const evidence = card.sourceSentenceIds.map(id => source[id - 1].text).join(' ');
-    const numbers = `${card.title} ${card.body}`.match(/\d[\d,.]*(?:%|퍼센트)?/g) ?? [];
-    if (numbers.some(n => !evidence.includes(n))) throw new AiError('UNSUPPORTED_NUMBER');
+    const bad = unsupportedNumbers(`${card.title} ${card.body}`, evidence);
+    if (bad.length) throw new AiError('UNSUPPORTED_NUMBER', 502, { item: index + 1, numbers: bad });
     return { cardOrder: index + 1, templateType: card.templateType, title: card.title, body: card.body,
       subBody: null, highlight: null, sourceSentenceIds: [...new Set(card.sourceSentenceIds)] };
   });
@@ -74,7 +89,7 @@ export function checkSelfSolved(quizzes, solved) {
 
 export function validateQuizzes(value, source) {
   if (!Array.isArray(value?.quizzes) || value.quizzes.length !== 3) throw new AiError('INVALID_QUIZ');
-  const quizzes = value.quizzes.map(q => {
+  const quizzes = value.quizzes.map((q, quizIndex) => {
     const text = (v, max) => typeof v === 'string' && v.trim().length > 0 && v.length <= max;
     if (!text(q.question, 120) || !text(q.explanation, 150) || !Array.isArray(q.choices) || q.choices.length !== 4
         || q.choices.some(c => !text(c, 60)) || new Set(q.choices.map(c => c.trim())).size !== 4
@@ -84,8 +99,8 @@ export function validateQuizzes(value, source) {
       throw new AiError('INVALID_QUIZ');
     }
     const evidence = q.sourceSentenceIds.map(id => source[id - 1].text).join(' ');
-    const numbers = `${q.question} ${q.choices[q.answerIndex]} ${q.explanation}`.match(/\d[\d,.]*(?:%|퍼센트)?/g) ?? [];
-    if (numbers.some(n => !evidence.includes(n))) throw new AiError('UNSUPPORTED_NUMBER');
+    const bad = unsupportedNumbers(`${q.question} ${q.choices[q.answerIndex]} ${q.explanation}`, evidence);
+    if (bad.length) throw new AiError('UNSUPPORTED_NUMBER', 502, { item: quizIndex + 1, numbers: bad });
     return { question: q.question.trim(), choices: q.choices.map(c => c.trim()), answerIndex: q.answerIndex,
       explanation: q.explanation.trim(), sourceSentenceIds: [...new Set(q.sourceSentenceIds)] };
   });
@@ -93,9 +108,18 @@ export function validateQuizzes(value, source) {
   return quizzes;
 }
 
+// 재시도 때 무엇이 틀렸는지 구체적으로 알려준다(같은 실수 반복 방지).
+export function retryHint(error, kind) {
+  if (error?.code === 'UNSUPPORTED_NUMBER' && error.detail) {
+    return ` 이전 출력 ${error.detail.item}번 ${kind}의 숫자 ${error.detail.numbers.join(', ')}는 근거 문장에 없다. 기사에 없는 연도·날짜·숫자를 만들거나 반올림·축약하지 말고 근거 문장의 표기를 그대로 쓰거나 숫자를 빼라.`;
+  }
+  if (error?.code === 'QUIZ_SELF_CHECK_FAILED') return ' 이전 출력은 기사만으로 정답을 하나로 고를 수 없었다. 기사 문장에 정답이 명확히 적힌 사실만 묻고 오답 보기는 기사 내용과 분명히 다르게 하라.';
+  return ' 이전 출력 검증 실패. 글자수·보기 중복·근거 ID를 재확인하라.';
+}
+
 export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434',
   model = process.env.OLLAMA_CHAT_MODEL ?? 'qwen3:8b', embedModel = process.env.OLLAMA_EMBED_MODEL ?? 'nomic-embed-text',
-  timeoutMs = Number(process.env.OLLAMA_TIMEOUT_MS ?? 180000), observe = () => {} } = {}) {
+  timeoutMs = Number(process.env.OLLAMA_TIMEOUT_MS ?? 240000), observe = () => {} } = {}) {
   async function call(path, body) {
     const started = performance.now();
     let status = 0;
@@ -154,34 +178,36 @@ export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_
     async cards(input) {
       articleInput(input);
       const source = sentences(input.content);
-      const instruction = '정확히 5장 카드: 핵심, 요약, 배경, 용어, 확인 순서. 각 카드 sourceSentenceIds는 제공된 문장 id로만 작성한다. 근거 없는 영향은 추측하지 않는다. 짧게: title 15자, body 40자 이내. 각 카드 templateType은 T01~T10. 부연 설명 금지.';
-      let cards;
+      const instruction = '정확히 5장 카드: 핵심, 요약, 배경, 용어, 확인 순서. 각 카드 sourceSentenceIds는 제공된 문장 id로만 작성한다. 근거 없는 영향은 추측하지 않는다. 짧게: title 15자, body 40자 이내. 숫자는 근거 문장 표기 그대로(반올림·축약 금지). 각 카드 templateType은 T01~T10. 부연 설명 금지.';
+      let cards, hint = '';
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
-          cards = validateCards(await generate(cardSchema, instruction + (attempt ? ' 이전 출력 검증 실패. 글자수·수치·근거 ID를 재확인하라.' : ''), { title: input.title, sentences: source }, 1600), source);
+          cards = validateCards(await generate(cardSchema, instruction + hint, { title: input.title, sentences: source }, 1600), source);
           break;
         } catch (error) {
           if (attempt || error.status === 503) throw error;
+          hint = retryHint(error, '카드');
         }
       }
-      return { modelVersion: model, promptVersion: 'card-v2-compact', cards };
+      return { modelVersion: model, promptVersion: 'card-v3', cards };
     },
     async quiz(input) {
       articleInput(input);
       const source = sentences(input.content);
-      const instruction = '기사 이해도 확인용 4지선다 퀴즈 정확히 3문제. 각 문제는 제공된 문장 id(sourceSentenceIds)에 근거한다. 보기 4개는 서로 다르고 정답은 1개, answerIndex는 0~3. 오답 보기는 그럴듯하지만 기사 내용과 다르게. 질문 60자, 보기 30자, 해설 80자 이내. 기사에 없는 사실·숫자 금지. 투자 권유 금지.';
-      let quizzes;
+      const instruction = '기사 이해도 확인용 4지선다 퀴즈 정확히 3문제. 각 문제는 제공된 문장 id(sourceSentenceIds)에 근거한다. 보기 4개는 서로 다르고 정답은 1개, answerIndex는 0~3. 오답 보기는 그럴듯하지만 기사 내용과 다르게. 질문 60자, 보기 30자, 해설 80자 이내. 숫자·날짜는 근거 문장 표기 그대로(연도 추가·반올림·축약 금지). 기사에 없는 사실·숫자 금지. 투자 권유 금지.';
+      let quizzes, hint = '';
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
-          quizzes = validateQuizzes(await generate(quizSchema, instruction + (attempt ? ' 이전 출력 검증 실패. 정답이 기사 근거와 정확히 일치하는지, 보기 중복·숫자 근거·글자수를 재확인하라.' : ''), { title: input.title, sentences: source }, 1400), source);
+          quizzes = validateQuizzes(await generate(quizSchema, instruction + hint, { title: input.title, sentences: source }, 1400), source);
           const exam = quizzes.map(q => ({ question: q.question, choices: q.choices }));
           checkSelfSolved(quizzes, await generate(solveSchema, '기사 문장만 근거로 각 문제의 정답 보기 번호(0~3)를 answers 배열에 순서대로 고른다. 기사로 판단할 수 없으면 가장 근거가 강한 보기를 고른다.', { sentences: source, quizzes: exam }, 200));
           break;
         } catch (error) {
           if (attempt || error.status === 503) throw error;
+          hint = retryHint(error, '문제');
         }
       }
-      return { modelVersion: model, promptVersion: 'quiz-v2-selfcheck', quizzes };
+      return { modelVersion: model, promptVersion: 'quiz-v3', quizzes };
     },
     async insight(input) {
       // 숫자는 Spring에서 문장화한다. 모델은 숫자 없는 일반 행동 제안만 작성한다.
