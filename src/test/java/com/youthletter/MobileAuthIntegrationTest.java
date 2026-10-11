@@ -60,10 +60,20 @@ class MobileAuthIntegrationTest {
         String marker = UUID.randomUUID().toString();
         Long article = jdbc.queryForObject("INSERT INTO news_articles(source_url,source_name,title,content,category) VALUES (?,'test',?,'body','YOUTH') RETURNING id", Long.class, marker, marker);
         String bearer = "Bearer " + tokens.createAccessToken(userId, "test@test.invalid", "USER");
+        for (String path : java.util.List.of("/api/me", "/api/me/stats", "/api/me/saved-news")) {
+            mvc.perform(get(path)).andExpect(status().isUnauthorized());
+            mvc.perform(get(path).header("Authorization", bearer)).andExpect(status().isOk());
+        }
+        mvc.perform(get("/api/me").header("Authorization", bearer))
+                .andExpect(jsonPath("$.data.id").value(userId));
+        mvc.perform(get("/api/me/stats").header("Authorization", bearer))
+                .andExpect(jsonPath("$.data.readNewsCount").value(0));
         for (String action : java.util.List.of("save", "unsave")) {
             mvc.perform(post("/api/news/"+article+"/"+action)).andExpect(status().isUnauthorized());
             for (int i=0; i<2; i++) mvc.perform(post("/api/news/"+article+"/"+action).header("Authorization", bearer))
                     .andExpect(status().isOk()).andExpect(jsonPath("$.data.bookmarked").value(action.equals("save")));
+            mvc.perform(get("/api/me/saved-news").header("Authorization", bearer))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.totalElements").value(action.equals("save") ? 1 : 0));
         }
         mvc.perform(get("/api/news/search").param("q",marker)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.content[0].id").value(article));
