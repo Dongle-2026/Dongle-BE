@@ -122,6 +122,9 @@ class QuizHoneyIntegrationTest {
         JsonNode again = data(answer(bearer, q, "{\"selectedIndex\":1}").andExpect(status().isOk()));
         assertThat(again.get("earnedHoney").asInt()).isZero();
         assertThat(again.get("alreadySolved").asBoolean()).isTrue();
+        assertThat(right.get("totalHoney").asLong()).isEqualTo(10);
+        assertThat(again.get("totalHoney").asLong()).isEqualTo(10);
+        assertThat(wrong.get("totalHoney").asLong()).isZero();
         assertThat(ledger(userId)).isEqualTo(10);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM quiz_attempts WHERE user_id=?", Integer.class, userId)).isEqualTo(3);
         assertThat(data(answer(otherBearer, q, "{\"selectedIndex\":1}")).get("earnedHoney").asInt()).isEqualTo(10); // 사용자별
@@ -150,7 +153,9 @@ class QuizHoneyIntegrationTest {
                 .andExpect(jsonPath("$.data.todayCompleted").value(true))
                 .andExpect(jsonPath("$.data.totalHoney").value(60))
                 .andExpect(jsonPath("$.data.totalQuizCount").value(1))
-                .andExpect(jsonPath("$.data.readNewsCount").value(1));
+                .andExpect(jsonPath("$.data.readNewsCount").value(1))
+                .andExpect(jsonPath("$.data.todayHoney").value(15)) // 2일 전 45꿀은 제외
+                .andExpect(jsonPath("$.data.correctCount").value(1));
         mvc.perform(get("/api/me/stats").header("Authorization", otherBearer))
                 .andExpect(jsonPath("$.data.todayCompleted").value(false)).andExpect(jsonPath("$.data.totalHoney").value(0));
 
