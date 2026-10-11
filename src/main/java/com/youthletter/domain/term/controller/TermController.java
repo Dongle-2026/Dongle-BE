@@ -19,6 +19,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Tag(name = "Terms", description = "금융 용어 사전 API")
 @RestController
@@ -54,6 +55,22 @@ public class TermController {
             @PathVariable Long termId) {
         termService.learnTerm(principal.getUserId(), termId);
         return ResponseEntity.ok(GlobalResponse.ok("용어 학습 완료", null));
+    }
+
+    @Operation(summary = "용어 저장", description = "반복 호출해도 저장 상태 유지. 학습 이력과 별개")
+    @PostMapping("/{termId}/save")
+    public GlobalResponse<Map<String, Boolean>> saveTerm(
+            @AuthenticationPrincipal CustomUserPrincipal principal,
+            @PathVariable Long termId) {
+        return GlobalResponse.ok(Map.of("bookmarked", termService.setTermBookmark(principal.getUserId(), termId, true)));
+    }
+
+    @Operation(summary = "용어 저장 해제", description = "반복 호출해도 해제 상태 유지. 학습 이력은 지우지 않음")
+    @PostMapping("/{termId}/unsave")
+    public GlobalResponse<Map<String, Boolean>> unsaveTerm(
+            @AuthenticationPrincipal CustomUserPrincipal principal,
+            @PathVariable Long termId) {
+        return GlobalResponse.ok(Map.of("bookmarked", termService.setTermBookmark(principal.getUserId(), termId, false)));
     }
 
     @Operation(summary = "용어 검색 (전문 검색)", description = "tsvector 기반")

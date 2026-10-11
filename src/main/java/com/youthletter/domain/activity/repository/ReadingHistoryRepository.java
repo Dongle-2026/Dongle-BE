@@ -1,6 +1,9 @@
 package com.youthletter.domain.activity.repository;
 
+import com.youthletter.domain.activity.dto.ReadHistoryResponse;
 import com.youthletter.domain.activity.entity.ReadingHistory;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.jpa.repository.Modifying;
@@ -32,4 +35,15 @@ public interface ReadingHistoryRepository extends JpaRepository<ReadingHistory, 
     @Query(value = "SELECT DISTINCT (read_at AT TIME ZONE 'Asia/Seoul')::DATE FROM reading_history WHERE user_id = :userId ORDER BY (read_at AT TIME ZONE 'Asia/Seoul')::DATE DESC",
            nativeQuery = true)
     List<Date> findDistinctReadDatesByUserId(@Param("userId") Long userId);
+
+    @Query(value = """
+        SELECT new com.youthletter.domain.activity.dto.ReadHistoryResponse(
+            a.id, a.title, a.sourceName, a.category, a.publishedAt, max(r.readAt))
+        FROM ReadingHistory r JOIN r.article a
+        WHERE r.user.id = :userId
+        GROUP BY a.id, a.title, a.sourceName, a.category, a.publishedAt
+        ORDER BY max(r.readAt) DESC, a.id DESC
+        """,
+        countQuery = "SELECT count(DISTINCT r.article.id) FROM ReadingHistory r WHERE r.user.id = :userId")
+    Page<ReadHistoryResponse> findReadHistory(@Param("userId") Long userId, Pageable pageable);
 }

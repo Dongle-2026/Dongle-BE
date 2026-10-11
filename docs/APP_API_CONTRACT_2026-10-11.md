@@ -62,6 +62,12 @@ message 문구는 API에 따라 달라질 수 있으며 로직 분기에 사용�
 | 내 정보 | GET /api/me | 아래 프로필 예시 |
 | 학습 통계 | GET /api/me/stats | readNewsCount, learnedTermCount, consecutiveLearningDays |
 | 저장 뉴스 | GET /api/me/saved-news?page=0&size=10 | Page<뉴스 북마크>, articleId를 화면 id로 변환 |
+| 용어 저장 | POST /api/terms/{termId}/save | {bookmarked:true}, 반복 호출 안전. 학습 완료(learn)와 별개 |
+| 용어 해제 | POST /api/terms/{termId}/unsave | {bookmarked:false}, 학습 이력은 지우지 않음 |
+| 저장 용어 | GET /api/me/saved-terms?page=0&size=10 | Page: termId, name, definition, simpleDefinition, path, difficultyLevel, savedAt. 최근 저장 순 |
+| 최근 읽음 | GET /api/me/read-history?page=0&size=10 | Page: articleId, title, sourceName, category, publishedAt, lastReadAt. 기사별 1건, 최근 읽은 순 |
+| 기기 등록 | POST /api/me/devices, JSON {deviceId, token, platform: IOS/ANDROID} | 같은 deviceId면 토큰 교체. 등록 성공≠실제 푸시 수신 |
+| 회원 탈퇴 | DELETE /api/me | soft delete + 토큰 무효화 + 기기 삭제. 이후 같은 토큰은 401 |
 
 기존 `/api/users/me`, `/api/users/me/learning-stats`, `/api/users/me/bookmarks`,
 `/api/auth/reissue`, PUT/DELETE `/api/news/{id}/bookmark`도 유지한다.
@@ -113,7 +119,7 @@ oauthProvider, joinedAt, profileImageUrl이 이 DTO에 없다. 최신 앱의 Use
 
 ## 4. 신규 설계할 계약 — 아직 구현 완료 아님
 
-### 용어 저장
+### 용어 저장 — 서버 구현 완료(2026-10-11), 위 기본 계약 표 참고
 
 - POST /api/terms/{termId}/save, /unsave: 토큰 필수, 반복 요청 안전.
 - GET /api/me/saved-terms: id, term, definition, category, savedAt 제공 목표.
@@ -144,7 +150,8 @@ oauthProvider, joinedAt, profileImageUrl이 이 DTO에 없다. 최신 앱의 Use
 - [x] 내 정보·기본 학습 통계·저장 뉴스의 노션 경로 추가
 - [ ] 최신 UI와 기존 인증/통신 코드 통합 (아직 merge하지 않음)
 - [ ] 최신 화면에서 목록·검색·상세·저장·읽음 연결
-- [ ] 독립 용어 저장, 최근 읽음, 활동 API 및 화면 연결
+- [x] 독립 용어 저장, 최근 읽음, 기기 등록, 탈퇴 서버 API (V19 term_bookmarks)
+- [ ] 위 API의 화면 연결, 활동(히트맵) API
 - [ ] 프로필 확장, 이미지 저장, 알림 설정
 - [ ] 퀴즈 정책 확정 → 서버 채점 → 최신 퀴즈 화면 연결
 - [ ] OAuth 실제 앱 콜백·제공자 설정
@@ -160,3 +167,10 @@ UI와 로컬 기능을 모두 보존하는 충돌 해결이 필요하다. 단순
 본인 ID·학습 수·저장/해제 후 목록 개수를 검증했다. 원본 DB가 아닌 테스트 DB를 사용했다.
 노션 목록 29개 중 메서드·경로 등록은 현재 11개다. 감사 테스트에는 미구현 경로가
 없음을 확인하는 테스트도 있으므로 전체 통과가 29개 구현 완료를 뜻하지 않는다.
+
+### 추가 검증 (A 그룹: A12·A13·A16·A18·A28·A29)
+
+`RUN_NOTION_API_AUDIT=true ./gradlew test --rerun --no-daemon`: 117건 중 116건 성공, 실제 AI 전용 1건 제외, 실패 0건.
+노션 경로 등록 17/29. 테스트 DB(5433) 대상으로 실제 서버(포트 18081)를 띄워 HTTP 스모크도 확인했다:
+용어 저장 동시 20회 → 200 20건·DB 1행, 익명 401, 없는 용어 404, 읽음 2회 → 이력 1건, 기기 등록 2회 → 1행(최신 토큰),
+DELETE /api/me 후 같은 토큰 401·기기 0건. 스모크 데이터는 삭제했다. 실제 iPhone 화면 연결은 아직 미확인.
