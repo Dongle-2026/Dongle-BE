@@ -17,7 +17,7 @@ import java.util.*;
  * 카테고리·키워드 카드·실시간 트렌드·자동완성.
  * 집계 기준
  * - 카테고리 isNew: 최근 24시간 내 발행(없으면 수집) 기사 존재
- * - 키워드 카드: 최근 7일 기사에 하이라이트된 금융 용어를 기사 수 순으로
+ * - 키워드 카드: 최근 7일 기사에 하이라이트된 금융 용어를 기사 수 순으로(이미지는 그중 최신 기사 썸네일)
  * - 트렌드: 최근 24시간 검색어를 '검색한 사용자 수'로 순위(한 사람이 반복 검색해도 1),
  *   직전 24시간 순위와 비교해 up/down/same
  * - 자동완성: 용어명 앞부분 일치 → 부분 일치 → 트렌드 검색어 앞부분 일치, 중복 제거
@@ -57,7 +57,9 @@ public class SearchService {
     public List<KeywordCardResponse> keywordCards(int limit) {
         return jdbc.query("""
                 SELECT t.id, t.name, count(DISTINCT a.id) AS cnt,
-                       mode() WITHIN GROUP (ORDER BY a.category) AS category
+                       mode() WITHIN GROUP (ORDER BY a.category) AS category,
+                       (array_agg(a.thumbnail_url ORDER BY coalesce(a.published_at, a.crawled_at) DESC)
+                           FILTER (WHERE a.thumbnail_url IS NOT NULL))[1] AS image
                 FROM article_term_highlights h
                 JOIN news_articles a ON a.id = h.article_id
                 JOIN financial_terms t ON t.id = h.term_id
@@ -69,7 +71,7 @@ public class SearchService {
             String categoryName = rs.getString("category");
             String categoryId = NewsCategory.resolve(categoryName).map(NewsCategory::id).orElse(null);
             return new KeywordCardResponse(rs.getLong("id"), rs.getString("name"), categoryId, categoryName,
-                    rs.getLong("cnt"), null);
+                    rs.getLong("cnt"), rs.getString("image"));
         }, clamp(limit, 1, 20));
     }
 

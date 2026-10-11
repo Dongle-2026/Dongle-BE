@@ -13,10 +13,11 @@ public record ReadHistoryResponse(
         String category,
         LocalDateTime publishedAt,
         LocalDateTime lastReadAt,
-        long honey
+        long honey,
+        String thumbnail
 ) {
     public static ReadHistoryResponse of(ReadHistoryRow row, long honey) {
         return new ReadHistoryResponse(row.articleId(), row.title(), row.sourceName(), row.category(),
-                row.publishedAt(), row.lastReadAt(), honey);
+                row.publishedAt(), row.lastReadAt(), honey, row.thumbnailUrl());
     }
 }

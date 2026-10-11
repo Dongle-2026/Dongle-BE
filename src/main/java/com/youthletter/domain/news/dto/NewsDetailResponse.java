@@ -18,7 +18,8 @@ public record NewsDetailResponse(
         @Schema(description = "발행일") LocalDateTime publishedAt,
         @Schema(description = "AI 3줄 요약") String summary,
         @Schema(description = "요약 모델 버전") String modelVersion,
-        @Schema(description = "본문 내 용어 하이라이트 목록") List<TermHighlightDto> termHighlights
+        @Schema(description = "본문 내 용어 하이라이트 목록") List<TermHighlightDto> termHighlights,
+        @Schema(description = "대표 이미지 URL(없으면 생략)") String image
 ) {
     @Schema(description = "용어 하이라이트 정보")
     @Builder

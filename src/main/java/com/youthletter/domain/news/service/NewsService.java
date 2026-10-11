@@ -54,6 +54,11 @@ public class NewsService {
     }
 
     public Page<NewsListResponse> getNewsList(String category, String keyword, LocalDate date, Pageable pageable) {
+        return getNewsList(category, keyword, date, pageable, null);
+    }
+
+    /** userId가 있으면 각 기사에 내 저장 여부(isSaved)를 붙인다. */
+    public Page<NewsListResponse> getNewsList(String category, String keyword, LocalDate date, Pageable pageable, Long userId) {
         Page<NewsArticle> articles = articleRepository.search(
                 category == null || category.isBlank() ? null
                         : com.youthletter.domain.news.category.NewsCategory.resolve(category.trim())
@@ -69,7 +74,14 @@ public class NewsService {
                     .map(NewsSummary::getSummaryText)
                     .orElse(null);
             return NewsListResponse.from(article, summary);
-        });
+        }).map(markSaved(userId, articles.getContent()));
+    }
+
+    private java.util.function.Function<NewsListResponse, NewsListResponse> markSaved(Long userId, List<NewsArticle> articles) {
+        if (userId == null || articles.isEmpty()) return r -> r;
+        java.util.Set<Long> saved = new java.util.HashSet<>(bookmarkRepository.findSavedArticleIds(userId,
+                articles.stream().map(NewsArticle::getId).toList()));
+        return r -> r.withSaved(saved.contains(r.id()));
     }
 
     // ── 상세 조회 ───────────────────────────────────────────────
@@ -111,6 +123,7 @@ public class NewsService {
                 .summary(summary != null ? summary.getSummaryText() : null)
                 .modelVersion(summary != null ? summary.getModelVersion() : null)
                 .termHighlights(highlights)
+                .image(article.getThumbnailUrl())
                 .build();
     }
 
@@ -141,6 +154,7 @@ public class NewsService {
                             .orElse(null);
                     return NewsListResponse.from(a, summary);
                 })
+                .map(markSaved(userId, articles))
                 .toList();
     }
 

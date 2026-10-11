@@ -106,7 +106,8 @@ public class HankyungCrawlerService {
                 title,
                 content,
                 com.youthletter.domain.news.category.NewsCategoryClassifier.classify(title, content).displayName(),
-                LocalDateTime.now()
+                LocalDateTime.now(),
+                ArticleImageExtractor.extract(doc)
         );
     }
 

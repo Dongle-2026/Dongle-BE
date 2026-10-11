@@ -41,7 +41,7 @@ public class NewsController {
             @RequestParam String q,
             @PageableDefault(size = 20, sort = "publishedAt", direction = Sort.Direction.DESC) Pageable pageable) {
         recordSearch(principal, q, pageable);
-        return ResponseEntity.ok(GlobalResponse.ok(newsService.getNewsList(null, q, null, pageable)));
+        return ResponseEntity.ok(GlobalResponse.ok(newsService.getNewsList(null, q, null, pageable, principal == null ? null : principal.getUserId())));
     }
 
     @PostMapping("/{articleId}/save")
@@ -67,7 +67,7 @@ public class NewsController {
             @PageableDefault(size = 20, sort = "publishedAt", direction = Sort.Direction.DESC)
             Pageable pageable) {
         recordSearch(principal, keyword, pageable);
-        return ResponseEntity.ok(GlobalResponse.ok(newsService.getNewsList(category, keyword, date, pageable)));
+        return ResponseEntity.ok(GlobalResponse.ok(newsService.getNewsList(category, keyword, date, pageable, principal == null ? null : principal.getUserId())));
     }
 
     @Operation(summary = "오늘의 뉴스 홈 브리핑", description = "오늘 수집된 최신 12건. 로그인 시 관심 카테고리 우선 정렬.")

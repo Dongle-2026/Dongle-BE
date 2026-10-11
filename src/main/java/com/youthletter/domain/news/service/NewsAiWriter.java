@@ -24,7 +24,8 @@ public class NewsAiWriter {
     @Transactional
     public Long create(CrawledArticleDto dto, AiProcessResponse result, String model) {
         var article = articles.save(NewsArticle.builder().title(dto.title()).content(dto.content())
-                .category(dto.category()).sourceName("한국경제").sourceUrl(dto.url()).publishedAt(dto.publishedAt()).build());
+                .category(dto.category()).sourceName("한국경제").sourceUrl(dto.url()).publishedAt(dto.publishedAt())
+                .thumbnailUrl(dto.thumbnailUrl()).build());
         persist(article, result, model);
         return article.getId();
     }
