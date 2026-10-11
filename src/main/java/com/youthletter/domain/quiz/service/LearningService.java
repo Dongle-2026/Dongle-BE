@@ -78,4 +78,10 @@ public class LearningService {
         Long n = jdbc.queryForObject("SELECT count(DISTINCT quiz_id) FROM quiz_attempts WHERE user_id=?", Long.class, userId);
         return n == null ? 0 : n;
     }
+
+    @Transactional(readOnly = true)
+    public long correctCount(Long userId) {
+        Long n = jdbc.queryForObject("SELECT count(DISTINCT quiz_id) FROM quiz_attempts WHERE user_id=? AND is_correct", Long.class, userId);
+        return n == null ? 0 : n;
+    }
 }

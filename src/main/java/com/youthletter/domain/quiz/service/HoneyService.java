@@ -35,4 +35,11 @@ public class HoneyService {
         Long sum = jdbc.queryForObject("SELECT coalesce(sum(amount), 0) FROM honey_ledger WHERE user_id=?", Long.class, userId);
         return sum == null ? 0 : sum;
     }
+
+    @Transactional(readOnly = true)
+    public long today(Long userId) {
+        Long sum = jdbc.queryForObject("SELECT coalesce(sum(amount), 0) FROM honey_ledger WHERE user_id=? AND earned_on = "
+                + TODAY_KST, Long.class, userId);
+        return sum == null ? 0 : sum;
+    }
 }

@@ -81,7 +81,8 @@ public class UserService {
         long learnedTermCount = termLookupLogRepository.countDistinctTermByUserId(userId);
         int consecutiveDays = computeConsecutiveLearningDays(userId);
         return new LearningStatsResponse(readNewsCount, learnedTermCount, consecutiveDays,
-                learningService.completedToday(userId), honeyService.total(userId), learningService.quizCount(userId));
+                learningService.completedToday(userId), honeyService.total(userId), learningService.quizCount(userId),
+                honeyService.today(userId), learningService.correctCount(userId));
     }
 
     private int computeConsecutiveLearningDays(Long userId) {

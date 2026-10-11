@@ -79,7 +79,7 @@ public class QuizService {
                 userId, quizId, selected, correct);
         int earned = correct ? honeyService.awardQuiz(userId, quizId, key.articleId()) : 0;
         return new QuizAnswerResponse(quizId, selected, correct, earned, correct && earned == 0,
-                correct ? key.answerIndex() : null, correct ? key.explanation() : null);
+                correct ? key.answerIndex() : null, correct ? key.explanation() : null, honeyService.total(userId));
     }
 
     private static int selectedIndex(QuizAnswerRequest request) {
