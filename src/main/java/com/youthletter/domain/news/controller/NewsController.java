@@ -3,6 +3,7 @@ package com.youthletter.domain.news.controller;
 import com.youthletter.domain.news.dto.NewsDetailResponse;
 import com.youthletter.domain.news.dto.NewsListResponse;
 import com.youthletter.domain.news.service.NewsService;
+import com.youthletter.domain.search.service.SearchService;
 import com.youthletter.global.auth.jwt.CustomUserPrincipal;
 import com.youthletter.global.response.GlobalResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,11 +28,19 @@ import java.util.Map;
 public class NewsController {
 
     private final NewsService newsService;
+    private final SearchService searchService;
+
+    /** 트렌드 집계용: 로그인 사용자의 첫 페이지 검색만 기록(다음 페이지 로딩은 같은 검색). */
+    private void recordSearch(CustomUserPrincipal principal, String keyword, Pageable pageable) {
+        if (principal != null && pageable.getPageNumber() == 0) searchService.record(principal.getUserId(), keyword);
+    }
 
     @GetMapping("/search")
     public ResponseEntity<GlobalResponse<Page<NewsListResponse>>> searchNews(
+            @AuthenticationPrincipal CustomUserPrincipal principal,
             @RequestParam String q,
             @PageableDefault(size = 20, sort = "publishedAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        recordSearch(principal, q, pageable);
         return ResponseEntity.ok(GlobalResponse.ok(newsService.getNewsList(null, q, null, pageable)));
     }
 
@@ -50,12 +59,14 @@ public class NewsController {
     @Operation(summary = "뉴스 목록 조회", description = "카테고리/페이지네이션")
     @GetMapping
     public ResponseEntity<GlobalResponse<Page<NewsListResponse>>> getNewsList(
-            @Parameter(description = "카테고리 (ECONOMY, STOCK, INSURANCE, LOAN, POLICY, YOUTH)")
+            @AuthenticationPrincipal CustomUserPrincipal principal,
+            @Parameter(description = "카테고리 id(youth, policy, finance, investment, real-estate, economy, job, saving) 또는 표시명")
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate date,
             @PageableDefault(size = 20, sort = "publishedAt", direction = Sort.Direction.DESC)
             Pageable pageable) {
+        recordSearch(principal, keyword, pageable);
         return ResponseEntity.ok(GlobalResponse.ok(newsService.getNewsList(category, keyword, date, pageable)));
     }
 

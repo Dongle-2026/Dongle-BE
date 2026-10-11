@@ -55,7 +55,10 @@ public class NewsService {
 
     public Page<NewsListResponse> getNewsList(String category, String keyword, LocalDate date, Pageable pageable) {
         Page<NewsArticle> articles = articleRepository.search(
-                category == null || category.isBlank() ? null : category.trim(),
+                category == null || category.isBlank() ? null
+                        : com.youthletter.domain.news.category.NewsCategory.resolve(category.trim())
+                                .map(com.youthletter.domain.news.category.NewsCategory::displayName)
+                                .orElse(category.trim()), // 앱 id(youth)·표시명(청년) 모두 허용, 그 외 값은 기존처럼 그대로 비교
                 keyword == null || keyword.isBlank() ? null : keyword.trim(),
                 date == null ? null : date.atStartOfDay(),
                 date == null ? null : date.plusDays(1).atStartOfDay(), pageable);
