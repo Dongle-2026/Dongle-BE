@@ -11,6 +11,8 @@ class NumberEvidenceTest {
         assertThat(NumberEvidence.unsupported("정산 금액 3조7064억 원, 10% 증가", "총 정산 금액은 3조7064억 원으로 약 10%가 증가")).isEmpty();
         assertThat(NumberEvidence.unsupported("6월 17일 시행", "개정 국민연금법은 오는 6월17일부터 시행된다.")).isEmpty();
         assertThat(NumberEvidence.unsupported("1,490.6원", "1490.6원에 주간 거래를 마쳤다")).isEmpty();
+        assertThat(NumberEvidence.unsupported("당월 보험료의 100% 이상", "당월 보험료의 100분의 100 이상인 경우")).isEmpty();
+        assertThat(NumberEvidence.unsupported("50% 이상", "100분의 30 이상")).containsExactly("50%");
     }
 
     @Test void rejectsInventedTruncatedOrEmbeddedNumbers() {

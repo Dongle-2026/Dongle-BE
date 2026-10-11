@@ -35,8 +35,10 @@ export function generationSchema(schema) {
 // 예) "21만"은 근거 "21만9000"에서 잘린 숫자이므로 불인정, "2025년"은 근거에 2025가 없으면 불인정.
 const NUMBER_TOKEN = /\d[\d,.]*(?:[만억조천]\d[\d,.]*)*[만억조천]?(?:%|퍼센트)?/g;
 const normalizeNumber = (t) => t.replace(/,/g, '');
+// "100분의 30"과 "30%"는 같은 값이므로 근거 쪽 표기를 %로도 인정한다.
+const withPercent = (t) => t.replace(/100분의\s?(\d+(?:\.\d+)?)/g, (m, n) => `${m} ${n}%`);
 export function unsupportedNumbers(text, evidence) {
-  const ev = evidence.replace(/,/g, '');
+  const ev = withPercent(evidence.replace(/,/g, ''));
   return [...new Set((text.match(NUMBER_TOKEN) ?? []).map(normalizeNumber))].filter(token => {
     for (let i = ev.indexOf(token); i >= 0; i = ev.indexOf(token, i + 1)) {
       const before = ev[i - 1] ?? '', after = ev[i + token.length] ?? '';
@@ -196,11 +198,12 @@ export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_
     async quiz(input) {
       articleInput(input);
       const source = sentences(input.content);
-      const instruction = '기사 이해도 확인용 4지선다 퀴즈 정확히 3문제. 각 문제는 제공된 문장 id(sourceSentenceIds)에 근거한다. 보기 4개는 서로 다르고 정답은 1개, answerIndex는 0~3. 오답 보기는 그럴듯하지만 기사 내용과 다르게. 질문 60자, 보기 30자, 해설 80자 이내. 숫자·날짜는 근거 문장 표기 그대로(연도 추가·반올림·축약 금지). 기사에 없는 사실·숫자 금지. 투자 권유 금지.';
+      // 숫자를 묻는 문제는 모델이 표기를 자주 바꿔 검증에 걸리고 출력도 길어진다 → 개념·원인·결과 중심으로 묻는다.
+      const instruction = '기사 이해도 확인용 4지선다 퀴즈 정확히 3문제. 각 문제는 제공된 문장 id(sourceSentenceIds)에 근거한다. 주로 기사의 핵심 개념·원인·결과·대상을 묻고, 숫자를 정답으로 묻는 문제는 최대 1개. 숫자·날짜를 쓰면 근거 문장 표기 그대로(연도 추가·반올림·축약 금지). 보기 4개는 서로 다르고 정답은 1개, answerIndex는 0~3. 오답 보기는 기사 내용과 분명히 다르게(기사 속 다른 사실을 오답으로 쓰지 않는다). 질문 50자, 보기 25자, 해설 60자 이내. 기사에 없는 사실 금지. 투자 권유 금지.';
       let quizzes, hint = '';
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
-          quizzes = validateQuizzes(await generate(quizSchema, instruction + hint, { title: input.title, sentences: source }, 1400), source);
+          quizzes = validateQuizzes(await generate(quizSchema, instruction + hint, { title: input.title, sentences: source }, 1100), source);
           const exam = quizzes.map(q => ({ question: q.question, choices: q.choices }));
           checkSelfSolved(quizzes, await generate(solveSchema, '기사 문장만 근거로 각 문제의 정답 보기 번호(0~3)를 answers 배열에 순서대로 고른다. 기사로 판단할 수 없으면 가장 근거가 강한 보기를 고른다.', { sentences: source, quizzes: exam }, 200));
           break;
@@ -209,7 +212,7 @@ export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_
           hint = retryHint(error, '문제');
         }
       }
-      return { modelVersion: model, promptVersion: 'quiz-v3', quizzes };
+      return { modelVersion: model, promptVersion: 'quiz-v4-concept', quizzes };
     },
     async insight(input) {
       // 숫자는 Spring에서 문장화한다. 모델은 숫자 없는 일반 행동 제안만 작성한다.
