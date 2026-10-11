@@ -28,6 +28,10 @@ public enum ErrorCode {
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, 4103, "이메일 또는 비밀번호가 올바르지 않습니다"),
     OAUTH_ONLY_ACCOUNT(HttpStatus.BAD_REQUEST, 4104, "소셜 로그인 전용 계정입니다. 비밀번호 로그인을 사용할 수 없습니다"),
     INVALID_INPUT(HttpStatus.BAD_REQUEST, 4105, "유효하지 않은 입력값입니다"),
+    PROFILE_IMAGE_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, 4106, "프로필 사진 용량이 너무 큽니다"),
+    UNSUPPORTED_IMAGE_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, 4107, "JPEG, PNG, HEIC, WebP 사진만 올릴 수 있습니다"),
+    INVALID_IMAGE(HttpStatus.BAD_REQUEST, 4108, "사진 파일을 읽을 수 없습니다"),
+    PROFILE_IMAGE_NOT_FOUND(HttpStatus.NOT_FOUND, 4109, "프로필 사진이 없습니다"),
 
     // ── 뉴스 (42xx) ──
     ARTICLE_NOT_FOUND(HttpStatus.NOT_FOUND, 4200, "뉴스 기사를 찾을 수 없습니다"),

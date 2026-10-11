@@ -5,6 +5,12 @@ spring:
   profiles:
     active: local  # 기본 프로필 (IntelliJ 실행 시)
 
+  # ── 업로드 (프로필 사진: 서버에서 512px JPEG로 축소 후 DB 저장) ──
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+
   # ── JPA 공통 설정 ──
   jpa:
     open-in-view: false  # OSIV 비활성화 (성능 + 명시적 트랜잭션 관리)
