@@ -5,12 +5,17 @@ import com.youthletter.domain.crawler.service.HankyungCrawlerService;
 import com.youthletter.domain.news.client.AiServiceClient;
 import com.youthletter.domain.news.client.dto.AiProcessRequest;
 import com.youthletter.domain.news.client.dto.AiProcessResponse;
+import com.youthletter.domain.news.entity.ArticleTermHighlight;
 import com.youthletter.domain.news.entity.NewsArticle;
 import com.youthletter.domain.news.entity.NewsSummary;
+import com.youthletter.domain.news.repository.ArticleTermHighlightRepository;
 import com.youthletter.domain.news.repository.NewsArticleRepository;
 import com.youthletter.domain.news.repository.NewsSummaryRepository;
+import com.youthletter.domain.term.entity.FinancialTerm;
+import com.youthletter.domain.term.repository.FinancialTermRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +32,11 @@ public class NewsProcessingService {
     private final HankyungCrawlerService crawlerService;
     private final AiServiceClient aiServiceClient;
     private final NewsArticleRepository newsArticleRepository;
-    private final NewsSummaryRepository newsSummaryRepository;
+    private final NewsAiWriter writer;
+    private final java.util.concurrent.atomic.AtomicBoolean running = new java.util.concurrent.atomic.AtomicBoolean();
+
+    @Value("${ai-service.model-version:qwen3:8b}")
+    private String modelVersion;
 
     public record CrawlStatus(
             LocalDateTime lastRunAt,
@@ -46,7 +55,7 @@ public class NewsProcessingService {
     /**
      * 6시간마다 자동 실행: 크롤링 -> AI 처리 -> DB 저장
      */
-    @Scheduled(cron = "0 0 */6 * * *")
+    @Scheduled(cron = "${crawler.cron:0 0 */6 * * *}")
     public void scheduledProcess() {
         log.info("[Pipeline] 뉴스 크롤링 스케줄 시작");
         processAll();
@@ -56,8 +65,9 @@ public class NewsProcessingService {
      * 크롤링 -> AI 처리 -> DB 저장 파이프라인.
      * 수동 트리거(AdminCrawlController)에서도 호출.
      */
-    @Transactional
     public int processAll() {
+        if (!running.compareAndSet(false, true)) throw new com.youthletter.global.exception.BusinessException(com.youthletter.global.exception.ErrorCode.CRAWLING_ERROR);
+        try {
         lastStatus.set(new CrawlStatus(LocalDateTime.now(), 0, 0, "RUNNING"));
 
         List<CrawledArticleDto> articles = crawlerService.crawl();
@@ -75,29 +85,8 @@ public class NewsProcessingService {
                         new AiProcessRequest(article.url(), article.title(),
                                 article.content(), article.category()));
 
-                NewsArticle saved = newsArticleRepository.save(
-                        NewsArticle.builder()
-                                .sourceUrl(article.url())
-                                .sourceName("한국경제")
-                                .title(article.title())
-                                .content(article.content())
-                                .category(article.category())
-                                .publishedAt(article.publishedAt())
-                                .build()
-                );
-
-                if (aiResponse.summary() != null && !aiResponse.summary().isBlank()) {
-                    newsSummaryRepository.save(
-                            NewsSummary.builder()
-                                    .article(saved)
-                                    .summaryText(aiResponse.summary())
-                                    .summaryVersion(1)
-                                    .modelVersion("stub")
-                                    .build()
-                    );
-                }
-
-                log.info("[Pipeline] 저장 완료: {}", saved.getTitle());
+                writer.create(article, aiResponse, aiServiceClient.isStubMode() ? "stub" : modelVersion);
+                log.info("[Pipeline] 저장 완료: {}", article.title());
                 savedCount++;
             } catch (Exception e) {
                 log.error("[Pipeline] 기사 처리 실패: {} - {}", article.url(), e.getMessage());
@@ -109,5 +98,13 @@ public class NewsProcessingService {
         lastStatus.set(new CrawlStatus(LocalDateTime.now(), savedCount, failedCount,
                 failedCount == 0 ? "SUCCESS" : "PARTIAL"));
         return savedCount;
+        } catch (RuntimeException e) {
+            var previous = lastStatus.get();
+            lastStatus.set(new CrawlStatus(LocalDateTime.now(), previous.savedCount(), previous.failedCount(), "FAILED"));
+            throw e;
+        } finally {
+            running.set(false);
+        }
     }
+
 }

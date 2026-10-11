@@ -2,6 +2,7 @@ package com.youthletter.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.youthletter.global.auth.jwt.JwtAuthenticationFilter;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import com.youthletter.global.auth.oauth.CustomOAuth2UserService;
 import com.youthletter.global.auth.oauth.OAuth2AuthenticationFailureHandler;
 import com.youthletter.global.auth.oauth.OAuth2AuthenticationSuccessHandler;
@@ -22,6 +23,7 @@ import java.util.Map;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
@@ -39,11 +41,15 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
 
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/auth/logout", "/api/auth/withdraw").authenticated()
+                .requestMatchers("/api/news/recommend", "/api/policies/recommend", "/api/stocks/watchlist").authenticated()
+                .requestMatchers("/api/health").permitAll()
                 .requestMatchers(
                     "/api/auth/**",
                     "/api/news",
                     "/api/news/today",
                     "/api/news/{id}",
+                    "/api/news/{id}/body",
                     "/api/terms",
                     "/api/terms/search",
                     "/api/terms/autocomplete",
@@ -53,7 +59,15 @@ public class SecurityConfig {
                     "/api/policies",
                     "/api/policies/{policyId}",
                     "/api/stocks/{ticker}",
+                    "/api/card-news",
+                    "/api/card-news/{id}",
+                    "/api/card-news/article/{articleId}",
                     "/api/guides/**",
+                    "/api/categories",
+                    "/api/keywords",
+                    "/api/search/**",
+                    "/api/news/search",
+                    "/api/profile-images/*",
                     "/oauth2/**",
                     "/login/oauth2/**",
                     "/swagger-ui/**",

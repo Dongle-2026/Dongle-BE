@@ -5,6 +5,12 @@ spring:
   profiles:
     active: local  # 기본 프로필 (IntelliJ 실행 시)
 
+  # ── 업로드 (프로필 사진: 서버에서 512px JPEG로 축소 후 DB 저장) ──
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+
   # ── JPA 공통 설정 ──
   jpa:
     open-in-view: false  # OSIV 비활성화 (성능 + 명시적 트랜잭션 관리)
@@ -19,11 +25,36 @@ spring:
       pool:
         size: 3
 
+  data:
+    web:
+      pageable:
+        max-page-size: 100
+
   # ── Jackson 직렬화 ──
   jackson:
     serialization:
       write-dates-as-timestamps: false  # ISO-8601 형식
     default-property-inclusion: non_null
+
+ai-service:
+  base-url: ${AI_SERVICE_BASE_URL:http://127.0.0.1:3000}
+  use-stub: ${AI_USE_STUB:false}
+  model-version: ${AI_MODEL_VERSION:qwen3:8b}
+  token: ${AI_SERVICE_TOKEN:}
+  timeout-seconds: ${AI_TIMEOUT_SECONDS:370}
+
+# ── 모바일 소셜 로그인 (앱이 보낸 idToken 검증) ──
+# audiences가 비어 있는 제공자는 503(설정 안 됨)으로 거부한다.
+mobile-oauth:
+  providers:
+    google:
+      jwk-set-uri: https://www.googleapis.com/oauth2/v3/certs
+      issuers: https://accounts.google.com,accounts.google.com
+      audiences: ${GOOGLE_MOBILE_CLIENT_IDS:}   # iOS/Android/웹 OAuth 클라이언트 ID, 쉼표 구분
+    kakao:
+      jwk-set-uri: https://kauth.kakao.com/.well-known/jwks.json
+      issuers: https://kauth.kakao.com
+      audiences: ${KAKAO_APP_KEYS:}             # 카카오 앱 키(네이티브 앱 키 등), 쉼표 구분. OIDC 활성화 필요
 
 # ── Swagger ──
 springdoc:
@@ -54,7 +85,7 @@ spring:
 
   # ── PostgreSQL ──
   datasource:
-    url: jdbc:postgresql://localhost:5432/youthletter
+    url: jdbc:postgresql://localhost:15432/youthletter
     username: ${DB_USERNAME:youthletter}
     password: ${DB_PASSWORD:youthletter1234}
     driver-class-name: org.postgresql.Driver
@@ -106,17 +137,14 @@ jwt:
   refresh-token-expiration: 604800000  # 7일 (ms)
 
 # ── OAuth2 프론트엔드 리다이렉트 ──
-# FE Next.js 개발 서버: http://localhost:3000
-# /auth/callback 페이지에서 accessToken + refreshToken 쿼리 파라미터를 파싱해 localStorage에 저장
+# FE(Next.js) 실행 중: OAUTH2_REDIRECT_URI=http://localhost:3001/auth/callback
+# FE 없이 백엔드만 테스트: 기본값 localhost:8080/auth/callback.html 사용
 oauth2:
-  # test.html(localhost:8080)로 테스트 시 기본값 사용
-  # 프론트엔드(localhost:3000)와 연동 시: OAUTH2_REDIRECT_URI=http://localhost:3000/auth/callback
   redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:8080/auth/callback.html}
 
 # ── AI Service (Node.js) 내부 호출 ──
 ai-service:
-  base-url: http://localhost:3000
-  use-stub: true   # 혜린이 API 완성 후 false로 변경
+  base-url: ${AI_SERVICE_BASE_URL:http://127.0.0.1:3000}
 
 # ── 로깅 ──
 logging:
@@ -162,7 +190,7 @@ oauth2:
   redirect-uri: ${OAUTH2_REDIRECT_URI:https://youthletter.com/auth/callback}
 
 ai-service:
-  base-url: http://ai-service:3000  # Docker 네트워크 내 서비스명
+  base-url: ${AI_SERVICE_BASE_URL:http://ai-service:3000}
 
 logging:
   level:

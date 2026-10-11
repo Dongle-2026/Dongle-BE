@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>카드뉴스 — 돈글돈글</title>
+  <style>
+    :root {
+      --yellow: #FFD600;
+      --yellow-dark: #F5C400;
+      --black: #111;
+      --dark: #1a1a2e;
+      --gray: #f5f5f5;
+      --gray2: #e8e8e8;
+      --text: #222;
+      --sub: #888;
+      --radius: 16px;
+
+      /* 템플릿별 색상 */
+      --t01: #1a1a2e; --t01-fg: #FFD600;
+      --t02: #0057B7; --t02-fg: #fff;
+      --t03: #7c3aed; --t03-fg: #fff;
+      --t04: #d97706; --t04-fg: #fff;
+      --t05: #0891b2; --t05-fg: #fff;
+      --t06: #dc2626; --t06-fg: #fff;
+      --t07: #16a34a; --t07-fg: #fff;
+      --t08: #475569; --t08-fg: #fff;
+      --t09: #9333ea; --t09-fg: #fff;
+      --t10: #1a1a2e; --t10-fg: #FFD600;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--gray); color: var(--text); min-height: 100vh;
+    }
+
+    /* ── 헤더 ── */
+    header {
+      position: sticky; top: 0; z-index: 100;
+      background: var(--dark); color: #fff;
+      padding: 0 24px; height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .logo { font-size: 18px; font-weight: 900; letter-spacing: -0.5px; display: flex; align-items: center; gap: 8px; }
+    .logo-box { width: 30px; height: 30px; background: var(--yellow); border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 16px; }
+    .header-right { display: flex; align-items: center; gap: 10px; }
+    .back-btn {
+      background: rgba(255,255,255,.1); color: #fff;
+      border: none; border-radius: 8px; padding: 6px 14px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .back-btn:hover { background: rgba(255,255,255,.2); }
+
+    /* ── 메인 레이아웃 ── */
+    .page {
+      max-width: 680px; margin: 0 auto;
+      padding: 32px 20px 80px;
+    }
+
+    /* ── 초기 입력창 ── */
+    .entry-box {
+      background: #fff; border-radius: var(--radius);
+      padding: 32px 28px; text-align: center;
+      box-shadow: 0 2px 12px rgba(0,0,0,.08);
+    }
+    .entry-box h2 { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+    .entry-box p { font-size: 14px; color: var(--sub); margin-bottom: 24px; }
+    .entry-row { display: flex; gap: 10px; max-width: 340px; margin: 0 auto; }
+    .entry-row input {
+      flex: 1; padding: 10px 14px; border: 2px solid var(--gray2); border-radius: 10px;
+      font-size: 15px; outline: none; transition: border-color .15s;
+    }
+    .entry-row input:focus { border-color: var(--yellow-dark); }
+    .entry-row button {
+      background: var(--yellow); color: var(--black);
+      border: none; border-radius: 10px; padding: 10px 20px;
+      font-size: 14px; font-weight: 700; cursor: pointer;
+      white-space: nowrap;
+    }
+    .entry-row button:hover { background: var(--yellow-dark); }
+
+    /* ── 로딩 / 에러 ── */
+    .state-box {
+      text-align: center; padding: 60px 20px;
+      color: var(--sub); font-size: 15px;
+    }
+    .spinner {
+      width: 36px; height: 36px; margin: 0 auto 16px;
+      border: 3px solid var(--gray2); border-top-color: var(--dark);
+      border-radius: 50%; animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── 기사 정보 헤더 ── */
+    .article-meta {
+      margin-bottom: 24px;
+    }
+    .article-meta .cat-badge {
+      display: inline-block; font-size: 11px; font-weight: 700;
+      padding: 3px 10px; border-radius: 20px;
+      background: var(--yellow); color: var(--black);
+      margin-bottom: 10px;
+    }
+    .article-meta h1 {
+      font-size: 20px; font-weight: 800; line-height: 1.4; color: var(--dark);
+      margin-bottom: 6px;
+    }
+    .article-meta .progress-info {
+      font-size: 13px; color: var(--sub);
+    }
+
+    /* ── 진행 바 ── */
+    .progress-bar-wrap {
+      height: 4px; background: var(--gray2); border-radius: 2px;
+      margin-bottom: 24px; overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%; background: var(--yellow-dark); border-radius: 2px;
+      transition: width .3s ease;
+    }
+
+    /* ── 카드 ── */
+    .card-wrap {
+      position: relative; min-height: 360px;
+    }
+    .card-slide {
+      background: #fff; border-radius: var(--radius);
+      box-shadow: 0 4px 24px rgba(0,0,0,.1);
+      overflow: hidden;
+      animation: fadeIn .25s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+    .card-top {
+      padding: 20px 24px 16px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .template-badge {
+      font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px;
+      border: 1.5px solid currentColor;
+    }
+    .card-num { font-size: 13px; font-weight: 600; color: var(--sub); }
+
+    .card-body {
+      padding: 0 24px 28px;
+    }
+    .card-highlight {
+      display: inline-block; font-size: 13px; font-weight: 700;
+      background: var(--yellow); color: var(--black);
+      padding: 4px 12px; border-radius: 20px;
+      margin-bottom: 14px;
+    }
+    .card-title-text {
+      font-size: 22px; font-weight: 800; line-height: 1.35;
+      color: var(--dark); margin-bottom: 12px;
+    }
+    .card-body-text {
+      font-size: 16px; line-height: 1.65; color: var(--text); margin-bottom: 8px;
+    }
+    .card-sub-text {
+      font-size: 14px; line-height: 1.6; color: var(--sub);
+    }
+
+    /* 표지형 / 마무리형 특별 스타일 */
+    .card-slide.cover .card-body,
+    .card-slide.outro .card-body {
+      background: var(--dark); padding: 28px 24px 36px;
+    }
+    .card-slide.cover .card-title-text,
+    .card-slide.outro .card-title-text { color: var(--yellow); }
+    .card-slide.cover .card-body-text,
+    .card-slide.outro .card-body-text { color: rgba(255,255,255,.85); }
+
+    /* ── 네비게이션 버튼 ── */
+    .nav-row {
+      display: flex; gap: 12px; margin-top: 20px;
+    }
+    .nav-btn {
+      flex: 1; padding: 14px; border: none; border-radius: 12px;
+      font-size: 15px; font-weight: 700; cursor: pointer;
+      transition: filter .15s, transform .05s;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+    }
+    .nav-btn:hover { filter: brightness(1.06); }
+    .nav-btn:active { transform: scale(.97); }
+    .nav-btn:disabled { opacity: .35; cursor: not-allowed; filter: none; }
+    .btn-prev { background: var(--gray2); color: var(--dark); }
+    .btn-next { background: var(--dark); color: #fff; }
+    .btn-finish { background: var(--yellow); color: var(--black); flex: 2; }
+
+    /* ── 미니 카드 목차 ── */
+    .toc-wrap {
+      margin-top: 24px;
+    }
+    .toc-title { font-size: 12px; font-weight: 600; color: var(--sub); margin-bottom: 10px; }
+    .toc-list {
+      display: flex; gap: 6px; flex-wrap: wrap;
+    }
+    .toc-item {
+      width: 32px; height: 32px; border-radius: 8px;
+      border: 2px solid var(--gray2); background: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; color: var(--sub);
+      cursor: pointer; transition: all .15s;
+    }
+    .toc-item:hover { border-color: var(--dark); color: var(--dark); }
+    .toc-item.active { background: var(--dark); border-color: var(--dark); color: #fff; }
+    .toc-item.visited { border-color: var(--yellow-dark); color: var(--dark); }
+
+    /* ── 원문 보기 버튼 ── */
+    .original-link {
+      display: block; text-align: center;
+      margin-top: 28px; padding: 14px;
+      background: #fff; border-radius: 12px;
+      border: 2px solid var(--gray2);
+      font-size: 14px; font-weight: 600; color: var(--dark);
+      text-decoration: none; transition: border-color .15s;
+    }
+    .original-link:hover { border-color: var(--dark); }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-box">💰</div>
+    돈글돈글
+  </div>
+  <div class="header-right">
+    <a href="/test.html" class="back-btn">← 테스트 콘솔</a>
+  </div>
+</header>
+
+<div class="page" id="page">
+
+  <!-- 초기 입력 상태 -->
+  <div id="view-entry" class="entry-box">
+    <h2>📰 카드뉴스 뷰어</h2>
+    <p>기사 ID를 입력하면 해당 기사의 카드뉴스를 카드 형태로 볼 수 있어요.</p>
+    <div class="entry-row">
+      <input type="number" id="entry-id" placeholder="기사 ID" min="1">
+      <button onclick="loadCardNews()">불러오기</button>
+    </div>
+    <p id="entry-error" style="color:#dc2626;font-size:13px;margin-top:12px;display:none;"></p>
+  </div>
+
+  <!-- 로딩 -->
+  <div id="view-loading" class="state-box" style="display:none;">
+    <div class="spinner"></div>
+    카드뉴스를 불러오는 중...
+  </div>
+
+  <!-- 에러 -->
+  <div id="view-error" class="state-box" style="display:none;">
+    <div style="font-size:36px;margin-bottom:12px;">😢</div>
+    <div id="error-msg"></div>
+    <button onclick="resetView()" style="margin-top:20px;padding:10px 24px;background:var(--dark);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;">다시 시도</button>
+  </div>
+
+  <!-- 카드뉴스 뷰어 -->
+  <div id="view-content" style="display:none;">
+
+    <div class="article-meta">
+      <div class="cat-badge" id="meta-category">-</div>
+      <h1 id="meta-title">-</h1>
+      <div class="progress-info" id="meta-progress">0 / 0</div>
+    </div>
+
+    <div class="progress-bar-wrap">
+      <div class="progress-bar" id="progress-bar" style="width:0%"></div>
+    </div>
+
+    <div class="card-wrap">
+      <div class="card-slide" id="card-slide">
+        <div class="card-top">
+          <span class="template-badge" id="card-template-badge">T01</span>
+          <span class="card-num" id="card-num">1 / 7</span>
+        </div>
+        <div class="card-body" id="card-body">
+          <div class="card-highlight" id="card-highlight" style="display:none;"></div>
+          <div class="card-title-text" id="card-title"></div>
+          <div class="card-body-text" id="card-body-text"></div>
+          <div class="card-sub-text" id="card-sub-text"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="nav-row">
+      <button class="nav-btn btn-prev" id="btn-prev" onclick="prevCard()" disabled>← 이전</button>
+      <button class="nav-btn btn-next" id="btn-next" onclick="nextCard()">다음 →</button>
+    </div>
+
+    <div class="toc-wrap">
+      <div class="toc-title">카드 목차</div>
+      <div class="toc-list" id="toc-list"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+const BASE = 'http://localhost:8080';
+
+// ── 상태 ──────────────────────────────────────────────
+let cards = [];
+let current = 0;
+let visited = new Set();
+let articleId = null;
+
+const TEMPLATE_COLORS = {
+  T01: '#1a1a2e', T02: '#0057B7', T03: '#7c3aed',
+  T04: '#d97706', T05: '#0891b2', T06: '#dc2626',
+  T07: '#16a34a', T08: '#475569', T09: '#9333ea', T10: '#1a1a2e',
+};
+
+// ── 초기 로드 (URL 파라미터) ───────────────────────────
+(function init() {
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('articleId');
+  if (id) {
+    document.getElementById('entry-id').value = id;
+    loadCardNews(id);
+  }
+})();
+
+// ── 뷰 전환 ───────────────────────────────────────────
+function show(id) {
+  ['view-entry','view-loading','view-error','view-content'].forEach(v => {
+    document.getElementById(v).style.display = v === id ? 'block' : 'none';
+  });
+}
+
+function resetView() {
+  show('view-entry');
+  document.getElementById('entry-id').value = '';
+}
+
+// ── 데이터 로드 ────────────────────────────────────────
+async function loadCardNews(id) {
+  const inputId = id || document.getElementById('entry-id').value.trim();
+  if (!inputId) {
+    document.getElementById('entry-error').textContent = '기사 ID를 입력해주세요.';
+    document.getElementById('entry-error').style.display = 'block';
+    return;
+  }
+  document.getElementById('entry-error').style.display = 'none';
+  articleId = inputId;
+
+  show('view-loading');
+
+  try {
+    const at = localStorage.getItem('accessToken');
+    const headers = { 'Content-Type': 'application/json' };
+    if (at) headers['Authorization'] = 'Bearer ' + at;
+
+    const res = await fetch(`${BASE}/api/card-news/article/${inputId}`, { headers });
+    const json = await res.json();
+
+    if (!res.ok || !json.data) {
+      throw new Error(json.message || '카드뉴스를 불러올 수 없습니다.');
+    }
+
+    const data = json.data;
+    cards = data.cards || [];
+
+    if (cards.length === 0) {
+      throw new Error('카드가 없습니다. 먼저 카드뉴스를 생성해주세요.');
+    }
+
+    // 메타 세팅
+    document.getElementById('meta-category').textContent = data.articleCategory || '뉴스';
+    document.getElementById('meta-title').textContent = data.articleTitle || '';
+
+    // 목차 생성
+    buildToc();
+
+    // 첫 번째 카드 표시
+    current = 0;
+    visited.clear();
+    visited.add(0);
+    renderCard();
+    show('view-content');
+
+  } catch (e) {
+    document.getElementById('error-msg').textContent = e.message;
+    show('view-error');
+  }
+}
+
+// ── 카드 렌더 ──────────────────────────────────────────
+function renderCard() {
+  const card = cards[current];
+  if (!card) return;
+
+  const total = cards.length;
+  const tpl   = card.templateType || 'T01';
+  const color = TEMPLATE_COLORS[tpl] || '#1a1a2e';
+  const isCover = tpl === 'T01';
+  const isOutro = tpl === 'T10';
+
+  // 진행률
+  const pct = Math.round((current + 1) / total * 100);
+  document.getElementById('progress-bar').style.width = pct + '%';
+  document.getElementById('meta-progress').textContent = `${current + 1} / ${total}`;
+  document.getElementById('card-num').textContent = `${current + 1} / ${total}`;
+
+  // 템플릿 배지
+  const badge = document.getElementById('card-template-badge');
+  badge.textContent = (card.templateLabel || tpl);
+  badge.style.color = color;
+  badge.style.borderColor = color;
+
+  // 카드 슬라이드 클래스
+  const slide = document.getElementById('card-slide');
+  slide.className = 'card-slide';
+  if (isCover) slide.classList.add('cover');
+  if (isOutro) slide.classList.add('outro');
+
+  // 내용
+  const hl = document.getElementById('card-highlight');
+  if (card.highlight) {
+    hl.textContent = card.highlight;
+    hl.style.display = 'inline-block';
+  } else {
+    hl.style.display = 'none';
+  }
+  document.getElementById('card-title').textContent    = card.title   || '';
+  document.getElementById('card-body-text').textContent = card.body    || '';
+  document.getElementById('card-sub-text').textContent  = card.subBody || '';
+
+  // 버튼 상태
+  document.getElementById('btn-prev').disabled = current === 0;
+  const nextBtn = document.getElementById('btn-next');
+  if (current === total - 1) {
+    nextBtn.textContent = '처음으로';
+    nextBtn.className = 'nav-btn btn-finish';
+  } else {
+    nextBtn.textContent = '다음 →';
+    nextBtn.className = 'nav-btn btn-next';
+  }
+
+  // 목차 하이라이트
+  updateToc();
+}
+
+function prevCard() {
+  if (current > 0) { current--; visited.add(current); renderCard(); }
+}
+
+function nextCard() {
+  if (current < cards.length - 1) {
+    current++;
+    visited.add(current);
+    renderCard();
+  } else {
+    // 마지막에서 처음으로
+    current = 0;
+    renderCard();
+  }
+}
+
+function goToCard(idx) {
+  current = idx;
+  visited.add(idx);
+  renderCard();
+}
+
+// ── 목차 ──────────────────────────────────────────────
+function buildToc() {
+  const list = document.getElementById('toc-list');
+  list.innerHTML = '';
+  cards.forEach((_, i) => {
+    const item = document.createElement('div');
+    item.className = 'toc-item';
+    item.id = `toc-${i}`;
+    item.textContent = i + 1;
+    item.onclick = () => goToCard(i);
+    list.appendChild(item);
+  });
+}
+
+function updateToc() {
+  cards.forEach((_, i) => {
+    const item = document.getElementById(`toc-${i}`);
+    if (!item) return;
+    item.className = 'toc-item' +
+      (i === current ? ' active' : visited.has(i) ? ' visited' : '');
+  });
+}
+
+// ── 키보드 네비게이션 ─────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (document.getElementById('view-content').style.display === 'none') return;
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') nextCard();
+  if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   prevCard();
+});
+
+// ── Enter 키 입력 ────────────────────────────────────
+document.getElementById('entry-id').addEventListener('keydown', e => {
+  if (e.key === 'Enter') loadCardNews();
+});
+</script>
+</body>
+</html>

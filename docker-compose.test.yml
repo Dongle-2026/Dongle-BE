@@ -18,6 +18,15 @@ services:
       - "5433:5432"  # 개발용 5432와 충돌 방지
     volumes:
       - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql
+      - ./docker/postgres/upgrade-capstone.sql:/docker-entrypoint-initdb.d/02-capstone.sql
+      - ./src/main/resources/db/migration/V16__ai_jobs.sql:/docker-entrypoint-initdb.d/03-ai-jobs.sql
+      - ./src/main/resources/db/migration/V17__spending_record_sequence.sql:/docker-entrypoint-initdb.d/04-spending-sequence.sql
+      - ./src/main/resources/db/migration/V18__notification_read_state.sql:/docker-entrypoint-initdb.d/05-notification-read.sql
+      - ./src/main/resources/db/migration/V19__term_bookmarks.sql:/docker-entrypoint-initdb.d/06-term-bookmarks.sql
+      - ./src/main/resources/db/migration/V20__notification_settings.sql:/docker-entrypoint-initdb.d/07-notification-settings.sql
+      - ./src/main/resources/db/migration/V21__profile_image.sql:/docker-entrypoint-initdb.d/08-profile-image.sql
+      - ./src/main/resources/db/migration/V22__search_logs.sql:/docker-entrypoint-initdb.d/09-search-logs.sql
+      - ./src/main/resources/db/migration/V23__quiz_honey.sql:/docker-entrypoint-initdb.d/10-quiz-honey.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U test -d youthletter_test"]
       interval: 5s

@@ -105,7 +105,7 @@ public class HankyungCrawlerService {
                 url,
                 title,
                 content,
-                "금융",
+                com.youthletter.domain.news.category.NewsCategoryClassifier.classify(title, content).displayName(),
                 LocalDateTime.now()
         );
     }

@@ -20,7 +20,7 @@ public class NotificationController {
 
     private final NotificationService notificationService;
 
-    @Operation(summary = "내 알림 목록", description = "미발송(안 읽은) 알림 우선, 최신순")
+    @Operation(summary = "내 알림 목록", description = "안 읽은 알림 우선, 최신순. isRead와 isSent는 서로 독립적입니다.")
     @GetMapping
     public GlobalResponse<List<NotificationResponse>> getMyNotifications(
             @AuthenticationPrincipal CustomUserPrincipal principal) {

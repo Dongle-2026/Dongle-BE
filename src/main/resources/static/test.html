@@ -197,6 +197,7 @@
     <a onclick="scrollTo('sec-spending')">6. Spending</a>
     <a onclick="scrollTo('sec-guide')">7. Guide</a>
     <a onclick="scrollTo('sec-admin')">8. Admin</a>
+    <a onclick="scrollTo('sec-cardnews')">9. 카드뉴스</a>
   </nav>
 
   <!-- ── Main Content ── -->
@@ -588,6 +589,65 @@
           <button class="btn btn-purple" onclick="api('POST','/api/admin/crawl/ai-stub')">Stub 토글</button>
         </div>
 
+        <div class="card">
+          <div class="card-title">유저 역할 조회 <span class="tag tag-get">GET</span></div>
+          <label>이메일</label>
+          <input id="admin-email" placeholder="user@example.com">
+          <button class="btn btn-primary" onclick="adminFindUser()">유저 조회</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">유저 역할 변경 <span class="tag tag-patch">PATCH</span></div>
+          <label>유저 ID</label>
+          <input id="admin-role-uid" placeholder="숫자">
+          <label>역할 (USER / ADMIN)</label>
+          <select id="admin-role-val">
+            <option value="ADMIN">ADMIN</option>
+            <option value="USER">USER</option>
+          </select>
+          <button class="btn btn-warning" onclick="adminUpdateRole()">역할 변경</button>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── 9. CardNews ── -->
+    <div class="section" id="sec-cardnews">
+      <div class="section-title"><span class="section-icon">🗞️</span> 9. CardNews (카드뉴스)</div>
+      <div class="grid">
+
+        <div class="card">
+          <div class="card-title">CN-01 카드뉴스 생성 <span class="tag tag-post">POST</span> <span style="font-size:10px;color:#888;">(ADMIN)</span></div>
+          <label>기사 ID</label>
+          <input id="cn-gen-id" value="1">
+          <button class="btn btn-success" onclick="generateCardNews()">카드뉴스 생성</button>
+          <p style="font-size:10px;color:#888;margin-top:6px;">이미 생성된 경우 재생성됩니다. ADMIN 토큰 필요.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-title">CN-04 카드뉴스 목록 <span class="tag tag-get">GET</span></div>
+          <label>페이지 (0부터)</label>
+          <input id="cn-list-page" value="0">
+          <button class="btn btn-primary" onclick="getCardNewsList()">목록 조회</button>
+        </div>
+
+        <div class="card">
+          <div class="card-title">CN-02 기사 ID로 조회 <span class="tag tag-get">GET</span></div>
+          <label>기사 ID</label>
+          <input id="cn-article-id" value="1">
+          <div class="btn-row">
+            <button class="btn btn-primary" onclick="getCardNewsByArticle()">JSON 조회</button>
+            <button class="btn btn-outline" onclick="openCardNewsViewer()">뷰어로 보기</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">CN-03 카드뉴스 ID로 조회 <span class="tag tag-get">GET</span></div>
+          <label>카드뉴스 ID</label>
+          <input id="cn-id" value="1">
+          <button class="btn btn-primary" onclick="api('GET','/api/card-news/'+v('cn-id'))">상세 조회</button>
+        </div>
+
       </div>
     </div>
 
@@ -850,6 +910,44 @@ function getSpendingDashboard() {
   const month = v('sp-dash-month');
   const qs    = month ? `?userId=${uid}&month=${month}` : `?userId=${uid}`;
   api('GET', '/api/spending/dashboard' + qs);
+}
+
+// ── Admin ─────────────────────────────────────────────────
+function adminFindUser() {
+  const email = v('admin-email');
+  if (!email) { showResponse({ error: '이메일을 입력하세요' }, false); return; }
+  api('GET', '/api/admin/users?email=' + encodeURIComponent(email));
+}
+
+function adminUpdateRole() {
+  const uid  = v('admin-role-uid');
+  const role = v('admin-role-val');
+  if (!uid) { showResponse({ error: '유저 ID를 입력하세요' }, false); return; }
+  api('PATCH', `/api/admin/users/${uid}/role`, { role });
+}
+
+// ── CardNews ──────────────────────────────────────────────
+function generateCardNews() {
+  const id = v('cn-gen-id');
+  if (!id) { showResponse({ error: '기사 ID를 입력하세요' }, false); return; }
+  api('POST', `/api/card-news/${id}/generate`);
+}
+
+function getCardNewsList() {
+  const page = v('cn-list-page') || '0';
+  api('GET', `/api/card-news?page=${page}&size=10`);
+}
+
+function getCardNewsByArticle() {
+  const id = v('cn-article-id');
+  if (!id) { showResponse({ error: '기사 ID를 입력하세요' }, false); return; }
+  api('GET', `/api/card-news/article/${id}`);
+}
+
+function openCardNewsViewer() {
+  const id = v('cn-article-id');
+  if (!id) { showResponse({ error: '기사 ID를 입력하세요' }, false); return; }
+  window.open(`/card-news.html?articleId=${id}`, '_blank');
 }
 </script>
 </body>

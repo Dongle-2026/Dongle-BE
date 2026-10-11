@@ -22,31 +22,32 @@ public class HealthCheckController {
     private final RedisTemplate<String, Object> redisTemplate;
 
     @Operation(summary = "전체 헬스 체크", description = "서버, DB, Redis 연결 상태를 확인합니다")
-    @GetMapping("/actuator/health")
-    public GlobalResponse<Map<String, Object>> healthCheck() {
+    @GetMapping({"/actuator/health", "/api/health"})
+    public org.springframework.http.ResponseEntity<GlobalResponse<Map<String, Object>>> healthCheck() {
         Map<String, Object> health = new LinkedHashMap<>();
-        health.put("status", "UP");
-        health.put("server", "Spring Boot running on port 8080");
-        health.put("database", checkDatabase());
-        health.put("redis", checkRedis());
-        return GlobalResponse.ok(health);
+        String database = checkDatabase();
+        String redis = checkRedis();
+        boolean ready = "connected".equals(database) && "connected".equals(redis);
+        health.put("status", ready ? "UP" : "DOWN");
+        health.put("database", database);
+        health.put("redis", redis);
+        return ready ? org.springframework.http.ResponseEntity.ok(GlobalResponse.ok(health))
+                : org.springframework.http.ResponseEntity.status(503).body(GlobalResponse.error(503, "dependencies unavailable", health));
     }
 
     private String checkDatabase() {
         try (Connection conn = dataSource.getConnection()) {
             return conn.isValid(3) ? "connected" : "unreachable";
         } catch (Exception e) {
-            return "error: " + e.getMessage();
+            return "unreachable";
         }
     }
 
     private String checkRedis() {
-        try {
-            String pong = redisTemplate.getConnectionFactory()
-                    .getConnection().ping();
-            return pong != null ? "connected" : "unreachable";
+        try (var connection = redisTemplate.getConnectionFactory().getConnection()) {
+            return "PONG".equals(connection.ping()) ? "connected" : "unreachable";
         } catch (Exception e) {
-            return "error: " + e.getMessage();
+            return "unreachable";
         }
     }
 }

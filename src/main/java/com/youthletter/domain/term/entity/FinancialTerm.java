@@ -24,7 +24,9 @@ public class FinancialTerm extends BaseTimeEntity {
      * ltree 타입은 JPA 기본 타입이 아니므로 String으로 매핑.
      * 네이티브 쿼리에서 ltree 연산자(<@, @>, ~)를 직접 사용.
      * 예: "finance.stock.etf"
+     * INSERT/UPDATE 시 varchar → ltree 캐스팅이 필요하다 (AI가 신규 용어를 저장하는 경로).
      */
+    @org.hibernate.annotations.ColumnTransformer(write = "?::ltree")
     @Column(nullable = false, columnDefinition = "ltree")
     private String path;
 

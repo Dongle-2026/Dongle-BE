@@ -133,14 +133,14 @@ User(email={kakao_account.email}) 조회
 
 성공 시 아래 URL로 302 redirect:
 ```
-http://localhost:3000/auth/callback
+http://localhost:3000/login
   ?accessToken={accessToken}   // 유효기간 15분
   &refreshToken={refreshToken} // 유효기간 7일
 ```
 
 실패 시:
 ```
-http://localhost:3000/auth/callback
+http://localhost:3000/login
   ?error={에러 메시지}
 ```
 

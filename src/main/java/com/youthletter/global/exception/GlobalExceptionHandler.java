@@ -17,6 +17,28 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler({java.time.DateTimeException.class,
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
+            org.springframework.http.converter.HttpMessageNotReadableException.class,
+            org.springframework.web.bind.MissingServletRequestParameterException.class})
+    protected ResponseEntity<GlobalResponse<Void>> handleInvalidInput(Exception e) {
+        return ResponseEntity.badRequest().body(GlobalResponse.error(4105, "입력 형식 또는 날짜를 확인해 주세요"));
+    }
+
+    /** 업로드 용량 초과(spring.servlet.multipart.max-file-size) */
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    protected ResponseEntity<GlobalResponse<Void>> handleUploadTooLarge(Exception e) {
+        ErrorCode code = ErrorCode.PROFILE_IMAGE_TOO_LARGE;
+        return ResponseEntity.status(code.getHttpStatus()).body(GlobalResponse.error(code.getCode(), "사진은 5MB 이하만 올릴 수 있습니다"));
+    }
+
+    /** multipart가 아닌 요청 등 */
+    @ExceptionHandler({org.springframework.web.multipart.MultipartException.class,
+            org.springframework.web.HttpMediaTypeNotSupportedException.class})
+    protected ResponseEntity<GlobalResponse<Void>> handleBadMultipart(Exception e) {
+        return ResponseEntity.badRequest().body(GlobalResponse.error(4105, "multipart/form-data 형식으로 보내 주세요"));
+    }
+
     /**
      * 비즈니스 예외 처리
      */

@@ -7,6 +7,8 @@ import com.youthletter.domain.activity.repository.TermLookupLogRepository;
 import com.youthletter.domain.user.dto.*;
 import com.youthletter.domain.user.entity.User;
 import com.youthletter.domain.user.entity.UserProfile;
+import com.youthletter.domain.user.repository.OAuthAccountRepository;
+import com.youthletter.domain.user.repository.ProfileImageRepository;
 import com.youthletter.domain.user.repository.UserProfileRepository;
 import com.youthletter.domain.user.repository.UserRepository;
 import com.youthletter.global.exception.BusinessException;
@@ -29,6 +31,10 @@ public class UserService {
     private final ReadingHistoryRepository readingHistoryRepository;
     private final TermLookupLogRepository termLookupLogRepository;
     private final ObjectMapper objectMapper;
+    private final com.youthletter.domain.quiz.service.HoneyService honeyService;
+    private final com.youthletter.domain.quiz.service.LearningService learningService;
+    private final ProfileImageRepository profileImageRepository;
+    private final OAuthAccountRepository oAuthAccountRepository;
 
     @Transactional(readOnly = true)
     public UserProfileResponse getMyProfile(Long userId) {
@@ -74,7 +80,9 @@ public class UserService {
         long readNewsCount = readingHistoryRepository.countByUserId(userId);
         long learnedTermCount = termLookupLogRepository.countDistinctTermByUserId(userId);
         int consecutiveDays = computeConsecutiveLearningDays(userId);
-        return new LearningStatsResponse(readNewsCount, learnedTermCount, consecutiveDays);
+        return new LearningStatsResponse(readNewsCount, learnedTermCount, consecutiveDays,
+                learningService.completedToday(userId), honeyService.total(userId), learningService.quizCount(userId),
+                honeyService.today(userId), learningService.correctCount(userId));
     }
 
     private int computeConsecutiveLearningDays(Long userId) {
@@ -84,7 +92,7 @@ public class UserService {
                 .toList();
         if (dates.isEmpty()) return 0;
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
         LocalDate expected = today;
         int count = 0;
 
@@ -104,7 +112,12 @@ public class UserService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
     }
 
-    private UserProfileResponse toProfileResponse(User user) {
+    UserProfileResponse toProfileResponse(User user) {
+        String imageUrl = profileImageRepository.findKeyByUserId(user.getId())
+                .map(ProfileImageUrls::of)
+                .orElse(null);
+        String provider = oAuthAccountRepository.findProvidersByUserId(user.getId()).stream()
+                .findFirst().map(p -> p.toLowerCase(java.util.Locale.ROOT)).orElse(null);
         return new UserProfileResponse(
                 user.getId(),
                 user.getEmail(),
@@ -115,7 +128,12 @@ public class UserService {
                 user.getRegionCode(),
                 user.getOccupation(),
                 user.getIncomeLevel(),
-                parseInterests(user.getInterests())
+                parseInterests(user.getInterests()),
+                user.getBio(),
+                user.getAvatarId(),
+                imageUrl,
+                provider,
+                user.getCreatedAt()
         );
     }
 

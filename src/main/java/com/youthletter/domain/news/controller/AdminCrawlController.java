@@ -23,6 +23,7 @@ public class AdminCrawlController {
 
     private final NewsProcessingService newsProcessingService;
     private final AiServiceClient aiServiceClient;
+    private final org.springframework.core.env.Environment environment;
 
     @Operation(summary = "수동 크롤링 트리거", description = "한경 금융 뉴스 즉시 크롤링 → AI 처리 → DB 저장")
     @PostMapping("/trigger")
@@ -43,6 +44,9 @@ public class AdminCrawlController {
     @Operation(summary = "AI Stub 모드 토글", description = "true면 stub 응답, false면 실제 AI 서비스 호출. 개발 환경 전용.")
     @PostMapping("/ai-stub")
     public ResponseEntity<GlobalResponse<Map<String, Object>>> toggleAiStub() {
+        if (!environment.acceptsProfiles(org.springframework.core.env.Profiles.of("local", "test"))) {
+            throw new com.youthletter.global.exception.BusinessException(com.youthletter.global.exception.ErrorCode.ACCESS_DENIED);
+        }
         boolean newMode = !aiServiceClient.isStubMode();
         aiServiceClient.setStubMode(newMode);
         String message = newMode ? "Stub 모드 활성화 — AI 서비스 없이 동작합니다"

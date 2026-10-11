@@ -61,7 +61,7 @@ public class SpendingController {
         return GlobalResponse.ok(spendingService.getMonthlyList(principal.getUserId(), year, month));
     }
 
-    @Operation(summary = "월별 소비 대시보드", description = "카테고리별 지출 합계 (스냅샷 우선, 없으면 이벤트 집계)")
+    @Operation(summary = "월별 소비 대시보드", description = "최신 유효 이벤트의 카테고리별 지출 합계")
     @GetMapping("/dashboard")
     public GlobalResponse<SpendingDashboardResponse> getDashboard(
             @AuthenticationPrincipal CustomUserPrincipal principal,
@@ -94,7 +94,7 @@ public class SpendingController {
         return GlobalResponse.ok(spendingService.getBudgetStatus(principal.getUserId()));
     }
 
-    @Operation(summary = "AI 소비 인사이트 (stub)", description = "최근 30일 소비 패턴 AI 분석 결과")
+    @Operation(summary = "AI 소비 인사이트", description = "UTC 당월/전월 실집계와 AI 행동 제안. AI 실패 시 rule-based-v1 반환")
     @PostMapping("/ai-insight")
     public GlobalResponse<SpendingAiInsightResponse> getAiInsight(
             @AuthenticationPrincipal CustomUserPrincipal principal) {

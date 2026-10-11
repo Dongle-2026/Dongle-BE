@@ -3,6 +3,7 @@ package com.youthletter.domain.news.controller;
 import com.youthletter.domain.news.dto.NewsDetailResponse;
 import com.youthletter.domain.news.dto.NewsListResponse;
 import com.youthletter.domain.news.service.NewsService;
+import com.youthletter.domain.search.service.SearchService;
 import com.youthletter.global.auth.jwt.CustomUserPrincipal;
 import com.youthletter.global.response.GlobalResponse;
 import io.swagger.v3.oas.annotations.Operation;
@@ -27,15 +28,46 @@ import java.util.Map;
 public class NewsController {
 
     private final NewsService newsService;
+    private final SearchService searchService;
+
+    /** 트렌드 집계용: 로그인 사용자의 첫 페이지 검색만 기록(다음 페이지 로딩은 같은 검색). */
+    private void recordSearch(CustomUserPrincipal principal, String keyword, Pageable pageable) {
+        if (principal != null && pageable.getPageNumber() == 0) searchService.record(principal.getUserId(), keyword);
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<GlobalResponse<Page<NewsListResponse>>> searchNews(
+            @AuthenticationPrincipal CustomUserPrincipal principal,
+            @RequestParam String q,
+            @PageableDefault(size = 20, sort = "publishedAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        recordSearch(principal, q, pageable);
+        return ResponseEntity.ok(GlobalResponse.ok(newsService.getNewsList(null, q, null, pageable)));
+    }
+
+    @PostMapping("/{articleId}/save")
+    public GlobalResponse<Map<String, Boolean>> saveNews(@AuthenticationPrincipal CustomUserPrincipal principal,
+                                                        @PathVariable Long articleId) {
+        return saveBookmark(principal, articleId);
+    }
+
+    @PostMapping("/{articleId}/unsave")
+    public GlobalResponse<Map<String, Boolean>> unsaveNews(@AuthenticationPrincipal CustomUserPrincipal principal,
+                                                          @PathVariable Long articleId) {
+        return removeBookmark(principal, articleId);
+    }
 
     @Operation(summary = "뉴스 목록 조회", description = "카테고리/페이지네이션")
     @GetMapping
     public ResponseEntity<GlobalResponse<Page<NewsListResponse>>> getNewsList(
-            @Parameter(description = "카테고리 (ECONOMY, STOCK, INSURANCE, LOAN, POLICY, YOUTH)")
+            @AuthenticationPrincipal CustomUserPrincipal principal,
+            @Parameter(description = "카테고리 id(youth, policy, finance, investment, real-estate, economy, job, saving) 또는 표시명")
             @RequestParam(required = false) String category,
-            @PageableDefault(size = 10, sort = "publishedAt", direction = Sort.Direction.DESC)
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate date,
+            @PageableDefault(size = 20, sort = "publishedAt", direction = Sort.Direction.DESC)
             Pageable pageable) {
-        return ResponseEntity.ok(GlobalResponse.ok(newsService.getNewsList(category, pageable)));
+        recordSearch(principal, keyword, pageable);
+        return ResponseEntity.ok(GlobalResponse.ok(newsService.getNewsList(category, keyword, date, pageable)));
     }
 
     @Operation(summary = "오늘의 뉴스 홈 브리핑", description = "오늘 수집된 최신 12건. 로그인 시 관심 카테고리 우선 정렬.")
@@ -70,5 +102,18 @@ public class NewsController {
             @PathVariable Long articleId) {
         boolean bookmarked = newsService.toggleBookmark(principal.getUserId(), articleId);
         return ResponseEntity.ok(GlobalResponse.ok(Map.of("bookmarked", bookmarked)));
+    }
+
+    @GetMapping("/{articleId}/bookmark")
+    public GlobalResponse<Map<String, Boolean>> bookmarkStatus(@AuthenticationPrincipal CustomUserPrincipal principal, @PathVariable Long articleId) {
+        return GlobalResponse.ok(Map.of("bookmarked", newsService.isBookmarked(principal.getUserId(), articleId)));
+    }
+    @PutMapping("/{articleId}/bookmark")
+    public GlobalResponse<Map<String, Boolean>> saveBookmark(@AuthenticationPrincipal CustomUserPrincipal principal, @PathVariable Long articleId) {
+        return GlobalResponse.ok(Map.of("bookmarked", newsService.setBookmark(principal.getUserId(), articleId, true)));
+    }
+    @DeleteMapping("/{articleId}/bookmark")
+    public GlobalResponse<Map<String, Boolean>> removeBookmark(@AuthenticationPrincipal CustomUserPrincipal principal, @PathVariable Long articleId) {
+        return GlobalResponse.ok(Map.of("bookmarked", newsService.setBookmark(principal.getUserId(), articleId, false)));
     }
 }

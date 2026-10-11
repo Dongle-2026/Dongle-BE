@@ -42,7 +42,7 @@ public class AuthController {
     }
 
     @Operation(summary = "토큰 재발급", description = "Refresh Token → 새 Access/Refresh Token 발급")
-    @PostMapping("/reissue")
+    @PostMapping({"/reissue", "/refresh"})
     public ResponseEntity<GlobalResponse<TokenResponse>> reissue(
             @Valid @RequestBody TokenReissueRequest request) {
         return ResponseEntity.ok(GlobalResponse.ok(authService.reissue(request.refreshToken())));
