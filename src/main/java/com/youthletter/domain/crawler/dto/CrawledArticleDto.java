@@ -7,6 +7,7 @@ public record CrawledArticleDto(
         String title,
         String content,
         String category,
-        LocalDateTime publishedAt
+        LocalDateTime publishedAt,
+        String thumbnailUrl
 ) {
 }

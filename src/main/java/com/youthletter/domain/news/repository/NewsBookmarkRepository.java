@@ -15,6 +15,9 @@ public interface NewsBookmarkRepository extends JpaRepository<NewsBookmark, Long
 
     boolean existsByUserIdAndArticleId(Long userId, Long articleId);
 
+    @Query("SELECT b.article.id FROM NewsBookmark b WHERE b.user.id = :userId AND b.article.id IN :articleIds")
+    java.util.List<Long> findSavedArticleIds(@Param("userId") Long userId, @Param("articleIds") java.util.Collection<Long> articleIds);
+
     @Query("SELECT b FROM NewsBookmark b JOIN FETCH b.article WHERE b.user.id = :userId ORDER BY b.createdAt DESC")
     Page<NewsBookmark> findByUserIdWithArticle(@Param("userId") Long userId, Pageable pageable);
 }

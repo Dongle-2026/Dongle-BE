@@ -14,8 +14,14 @@ public record NewsListResponse(
         @Schema(description = "출처") String sourceName,
         @Schema(description = "카테고리") String category,
         @Schema(description = "AI 요약 (3줄)") String summary,
-        @Schema(description = "발행일") LocalDateTime publishedAt
+        @Schema(description = "발행일") LocalDateTime publishedAt,
+        @Schema(description = "대표 이미지 URL(없으면 생략)") String image,
+        @Schema(description = "내가 저장한 기사인지. 비로그인이면 생략") Boolean isSaved
 ) {
+    public NewsListResponse withSaved(Boolean saved) {
+        return new NewsListResponse(id, title, sourceName, category, summary, publishedAt, image, saved);
+    }
+
     public static NewsListResponse from(NewsArticle article, String summary) {
         return NewsListResponse.builder()
                 .id(article.getId())
@@ -24,6 +30,7 @@ public record NewsListResponse(
                 .category(article.getCategory())
                 .summary(summary)
                 .publishedAt(article.getPublishedAt())
+                .image(article.getThumbnailUrl())
                 .build();
     }
 }
