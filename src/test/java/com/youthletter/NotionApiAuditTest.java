@@ -100,8 +100,8 @@ class NotionApiAuditTest {
         "A23,GET,/api/search/trending,false",
         "A24,GET,/api/search/suggestions,false",
         "A25,PATCH,/api/me/profile,false",
-        "A26,GET,/api/me/notification-settings,false",
-        "A27,PATCH,/api/me/notification-settings,false",
+        "A26,GET,/api/me/notification-settings,true",
+        "A27,PATCH,/api/me/notification-settings,true",
         "A28,DELETE,/api/me,true",
         "A29,POST,/api/me/devices,true"
     })
