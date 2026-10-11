@@ -21,6 +21,7 @@ public class AiJobWorker {
     private final AiServiceClient client;
     private final NewsArticleRepository articles;
     private final CardNewsValidator validator;
+    private final com.youthletter.domain.quiz.service.QuizValidator quizValidator;
     @Value("${ai-service.model-version:qwen3:8b}") private String model;
 
     @Scheduled(fixedDelayString="${ai-jobs.poll-ms:3000}")
@@ -36,6 +37,10 @@ public class AiJobWorker {
             var request = new AiProcessRequest(article.getSourceUrl(), article.getTitle(), article.getContent(), article.getCategory());
             if (claim.job().kind() == AiJobService.Kind.ARTICLE) {
                 jobs.complete(claim, client.process(request), null, model);
+            } else if (claim.job().kind() == AiJobService.Kind.QUIZ) {
+                var quiz = client.generateQuiz(request);
+                quizValidator.validate(quiz, article.getContent());
+                jobs.completeQuiz(claim, quiz);
             } else {
                 var result = client.generateCards(request);
                 validator.validate(result, article.getContent());

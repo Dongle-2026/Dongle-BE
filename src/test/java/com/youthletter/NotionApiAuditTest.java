@@ -68,6 +68,11 @@ class NotionApiAuditTest {
             && mapping.getPatternValues().stream().anyMatch(p -> canonical(p).equals(canonical(path))));
     }
 
+    Long quizId() {
+        return jdbc.queryForObject("INSERT INTO quizzes(article_id,quiz_order,question,choices,answer_index,explanation,source_sentence_ids) VALUES (?,1,'q','[\"a\",\"b\",\"c\",\"d\"]'::jsonb,0,'e','[1]'::jsonb) RETURNING id",
+            Long.class, articleId);
+    }
+
     Long termId() {
         return jdbc.queryForObject("INSERT INTO financial_terms(name,path,definition,simple_definition) VALUES (?,'audit','시험 정의','쉬운 정의') RETURNING id",
             Long.class, marker + "-term");
@@ -84,8 +89,8 @@ class NotionApiAuditTest {
         "A7,POST,/api/news/{id}/unsave,true",
         "A8,GET,/api/me,true",
         "A9,GET,/api/me/stats,true",
-        "A10,GET,/api/news/{id}/body,false",
-        "A11,POST,/api/quizzes/{quizId}/answer,false",
+        "A10,GET,/api/news/{id}/body,true",
+        "A11,POST,/api/quizzes/{quizId}/answer,true",
         "A12,POST,/api/terms/{id}/save,true",
         "A13,POST,/api/terms/{id}/unsave,true",
         "A14,POST,/api/news/{id}/read,true",
@@ -93,10 +98,10 @@ class NotionApiAuditTest {
         "A16,GET,/api/me/saved-terms,true",
         "A17,GET,/api/me/saved-news,true",
         "A18,GET,/api/me/read-history,true",
-        "A19,GET,/api/me/activity,false",
+        "A19,GET,/api/me/activity,true",
         "A20,GET,/api/categories,true",
         "A21,GET,/api/keywords,true",
-        "A22,GET,/api/me/insights,false",
+        "A22,GET,/api/me/insights,true",
         "A23,GET,/api/search/trending,true",
         "A24,GET,/api/search/suggestions,true",
         "A25,PATCH,/api/me/profile,true",
@@ -108,13 +113,14 @@ class NotionApiAuditTest {
     void inventoryAndAuthenticatedResponse(String id, String method, String path, boolean exists) throws Exception {
         assertThat(registered(method,path)).as(id+" exact controller registration").isEqualTo(exists);
         String resourceId = path.startsWith("/api/terms/") ? termId().toString() : articleId.toString();
-        String concrete = path.replace("{provider}","google").replace("{id}",resourceId).replace("{quizId}","1");
+        String concrete = path.replace("{provider}","google").replace("{id}",resourceId).replace("{quizId}", id.equals("A11") ? quizId().toString() : "1");
         var call = id.equals("A25")
             ? multipart(HttpMethod.PATCH, concrete).param("bio", "audit").header("Authorization","Bearer "+access)
             : request(HttpMethod.valueOf(method),concrete).header("Authorization","Bearer "+access);
         if (!method.equals("GET") && !id.equals("A25")) call.contentType("application/json").content("{}");
         if (id.equals("A2")) call.content(json.writeValueAsString(java.util.Map.of("refreshToken", tokens.createRefreshToken(userId))));
         if (id.equals("A15") || id.equals("A24")) call.param("q", marker);
+        if (id.equals("A11")) call.content("{\"selectedIndex\":0}");
         if (id.equals("A29")) call.content("{\"deviceId\":\"audit\",\"token\":\""+marker+"\",\"platform\":\"IOS\"}");
         var result = mvc.perform(call).andReturn();
         int status = result.getResponse().getStatus();
@@ -148,7 +154,7 @@ class NotionApiAuditTest {
             Integer.class,userId,articleId)).isEqualTo(1);
         mvc.perform(get("/api/users/me/learning-stats").header("Authorization","Bearer "+access))
             .andExpect(status().isOk()).andExpect(jsonPath("$.data.readNewsCount").value(1))
-            .andExpect(jsonPath("$.data.todayCompleted").doesNotExist());
+            .andExpect(jsonPath("$.data.todayCompleted").value(true)); // A9 확장: 오늘 읽음 → 학습 완료
     }
 
     @Test void existingAlternativesWorkButAreNotAliases() throws Exception {

@@ -15,13 +15,14 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 public class AiJobService {
-    public enum Kind { ARTICLE, CARD }
+    public enum Kind { ARTICLE, CARD, QUIZ }
     public record Job(Long id, Long articleId, Kind kind, String status, int attempts,
                       String errorCode, LocalDateTime createdAt, LocalDateTime updatedAt) {}
     public record Claim(Job job, String token) {}
     private final JdbcTemplate jdbc;
     private final NewsAiWriter newsWriter;
     private final CardNewsWriter cardWriter;
+    private final com.youthletter.domain.quiz.service.QuizWriter quizWriter;
     private static final RowMapper<Job> MAPPER = (rs, row) -> new Job(rs.getLong("id"), rs.getLong("article_id"),
             Kind.valueOf(rs.getString("kind")), rs.getString("status"), rs.getInt("attempts"),
             rs.getString("error_code"), rs.getObject("created_at", java.time.OffsetDateTime.class).withOffsetSameInstant(java.time.ZoneOffset.UTC).toLocalDateTime(),
@@ -76,6 +77,14 @@ public class AiJobService {
         else cardWriter.save(claim.job.articleId(), cards);
         jdbc.update("UPDATE ai_jobs SET status='SUCCEEDED', error_code=NULL, lease_token=NULL, lease_until=NULL, updated_at=now() WHERE id=?", claim.job.id());
         return true; // 결과 저장과 상태 변경은 같은 트랜잭션이다.
+    }
+
+    @Transactional
+    public boolean completeQuiz(Claim claim, com.youthletter.domain.news.client.dto.AiQuizResponse quiz) {
+        if (!owns(claim)) return false;
+        quizWriter.saveIfAbsent(claim.job.articleId(), quiz);
+        jdbc.update("UPDATE ai_jobs SET status='SUCCEEDED', error_code=NULL, lease_token=NULL, lease_until=NULL, updated_at=now() WHERE id=?", claim.job.id());
+        return true;
     }
 
     @Transactional
