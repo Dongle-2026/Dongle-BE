@@ -28,6 +28,7 @@ Flyway 자동 실행은 없다. **서비스를 중지하고 백업한 후** 기�
 1. `src/main/resources/db/migration/V16__ai_jobs.sql`
 2. `src/main/resources/db/migration/V17__spending_record_sequence.sql`
 3. `src/main/resources/db/migration/V18__notification_read_state.sql`
+4. `src/main/resources/db/migration/V19__term_bookmarks.sql` (용어 저장 테이블, 재실행 안전)
 
 이번 작업에서는 테스트 DB(5433)에만 적용했다. 개발 DB(15432)·운영 DB는 미적용이다. V17은 기존 소비 ID보다 큰 값에서 시작하고 번호는 건너뛸 수 있다. V18의 기존 알림은 미읽음으로 시작한다. 기존 is_sent에는 가짜 발송과 사용자 읽음이 혼재하여 읽음 상태를 복원할 근거가 없다. 기존 발송 이력은 삭제하지 않는다.
 

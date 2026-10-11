@@ -1,5 +1,6 @@
 package com.youthletter.domain.activity.service;
 
+import com.youthletter.domain.activity.dto.ReadHistoryResponse;
 import com.youthletter.domain.activity.entity.TermLookupLog;
 import com.youthletter.domain.activity.repository.ReadingHistoryRepository;
 import com.youthletter.domain.activity.repository.TermLookupLogRepository;
@@ -12,6 +13,9 @@ import com.youthletter.domain.user.repository.UserRepository;
 import com.youthletter.global.exception.BusinessException;
 import com.youthletter.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -58,5 +62,15 @@ public class ActivityService {
                 .term(term)
                 .article(article)
                 .build());
+    }
+
+    /**
+     * 최근 읽은 기사 (기사별 1건, 마지막 읽은 시각 내림차순).
+     * 정렬은 쿼리에 고정하므로 클라이언트 sort 파라미터는 무시한다.
+     */
+    @Transactional(readOnly = true)
+    public Page<ReadHistoryResponse> getReadHistory(Long userId, Pageable pageable) {
+        return readingHistoryRepository.findReadHistory(userId,
+                PageRequest.of(pageable.getPageNumber(), pageable.getPageSize()));
     }
 }

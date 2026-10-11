@@ -5,16 +5,20 @@ import com.youthletter.domain.activity.repository.TermLookupLogRepository;
 import com.youthletter.domain.news.entity.NewsArticle;
 import com.youthletter.domain.news.repository.ArticleTermHighlightRepository;
 import com.youthletter.domain.term.dto.LearnedTermResponse;
+import com.youthletter.domain.term.dto.SavedTermResponse;
 import com.youthletter.domain.term.dto.TermDetailResponse;
 import com.youthletter.domain.term.dto.TermListResponse;
 import com.youthletter.domain.term.entity.FinancialTerm;
+import com.youthletter.domain.term.entity.TermBookmark;
 import com.youthletter.domain.term.repository.FinancialTermRepository;
+import com.youthletter.domain.term.repository.TermBookmarkRepository;
 import com.youthletter.domain.user.entity.User;
 import com.youthletter.domain.user.repository.UserRepository;
 import com.youthletter.global.exception.BusinessException;
 import com.youthletter.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +36,7 @@ public class TermService {
     private final TermLookupLogRepository termLookupLogRepository;
     private final UserRepository userRepository;
     private final ArticleTermHighlightRepository highlightRepository;
+    private final TermBookmarkRepository termBookmarkRepository;
 
     @Transactional(readOnly = true)
     public Page<TermListResponse> getTermList(String path, Pageable pageable) {
@@ -109,5 +114,30 @@ public class TermService {
                         log.getLookedUpAt()
                 ))
                 .toList();
+    }
+
+    /**
+     * 용어 저장/해제. 같은 요청을 반복해도 결과가 같다(멱등).
+     * 사용자 행을 잠가 같은 사용자의 동시 저장 요청을 직렬화한다.
+     */
+    @Transactional
+    public boolean setTermBookmark(Long userId, Long termId, boolean saved) {
+        User user = userRepository.findLockedById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        FinancialTerm term = termRepository.findById(termId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.TERM_NOT_FOUND));
+        var existing = termBookmarkRepository.findByUserIdAndTermId(userId, termId);
+        if (saved && existing.isEmpty()) {
+            termBookmarkRepository.save(TermBookmark.builder().user(user).term(term).build());
+        }
+        if (!saved) existing.ifPresent(termBookmarkRepository::delete);
+        return saved;
+    }
+
+    /** 내가 저장한 용어 목록 (최근 저장 순 고정, 클라이언트 sort 무시) */
+    @Transactional(readOnly = true)
+    public Page<SavedTermResponse> getSavedTerms(Long userId, Pageable pageable) {
+        return termBookmarkRepository.findByUserIdWithTerm(userId,
+                        PageRequest.of(pageable.getPageNumber(), pageable.getPageSize())).map(SavedTermResponse::from);
     }
 }

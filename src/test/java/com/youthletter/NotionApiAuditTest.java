@@ -68,6 +68,11 @@ class NotionApiAuditTest {
             && mapping.getPatternValues().stream().anyMatch(p -> canonical(p).equals(canonical(path))));
     }
 
+    Long termId() {
+        return jdbc.queryForObject("INSERT INTO financial_terms(name,path,definition,simple_definition) VALUES (?,'audit','시험 정의','쉬운 정의') RETURNING id",
+            Long.class, marker + "-term");
+    }
+
     @ParameterizedTest(name="{0} {1} {2} declared={3}")
     @CsvSource({
         "A1,POST,/api/auth/oauth/{provider},false",
@@ -81,13 +86,13 @@ class NotionApiAuditTest {
         "A9,GET,/api/me/stats,true",
         "A10,GET,/api/news/{id}/body,false",
         "A11,POST,/api/quizzes/{quizId}/answer,false",
-        "A12,POST,/api/terms/{id}/save,false",
-        "A13,POST,/api/terms/{id}/unsave,false",
+        "A12,POST,/api/terms/{id}/save,true",
+        "A13,POST,/api/terms/{id}/unsave,true",
         "A14,POST,/api/news/{id}/read,true",
         "A15,GET,/api/news/search,true",
-        "A16,GET,/api/me/saved-terms,false",
+        "A16,GET,/api/me/saved-terms,true",
         "A17,GET,/api/me/saved-news,true",
-        "A18,GET,/api/me/read-history,false",
+        "A18,GET,/api/me/read-history,true",
         "A19,GET,/api/me/activity,false",
         "A20,GET,/api/categories,false",
         "A21,GET,/api/keywords,false",
@@ -97,16 +102,18 @@ class NotionApiAuditTest {
         "A25,PATCH,/api/me/profile,false",
         "A26,GET,/api/me/notification-settings,false",
         "A27,PATCH,/api/me/notification-settings,false",
-        "A28,DELETE,/api/me,false",
-        "A29,POST,/api/me/devices,false"
+        "A28,DELETE,/api/me,true",
+        "A29,POST,/api/me/devices,true"
     })
     void inventoryAndAuthenticatedResponse(String id, String method, String path, boolean exists) throws Exception {
         assertThat(registered(method,path)).as(id+" exact controller registration").isEqualTo(exists);
-        String concrete = path.replace("{provider}","google").replace("{id}",articleId.toString()).replace("{quizId}","1");
+        String resourceId = path.startsWith("/api/terms/") ? termId().toString() : articleId.toString();
+        String concrete = path.replace("{provider}","google").replace("{id}",resourceId).replace("{quizId}","1");
         var call = request(HttpMethod.valueOf(method),concrete).header("Authorization","Bearer "+access);
         if (!method.equals("GET")) call.contentType("application/json").content("{}");
         if (id.equals("A2")) call.content(json.writeValueAsString(java.util.Map.of("refreshToken", tokens.createRefreshToken(userId))));
         if (id.equals("A15")) call.param("q", marker);
+        if (id.equals("A29")) call.content("{\"deviceId\":\"audit\",\"token\":\""+marker+"\",\"platform\":\"IOS\"}");
         var result = mvc.perform(call).andReturn();
         int status = result.getResponse().getStatus();
         System.out.println("NOTION_AUDIT "+id+" "+method+" "+path+" registered="+exists+" HTTP="+status);
