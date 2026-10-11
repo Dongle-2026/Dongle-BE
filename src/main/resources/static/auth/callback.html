@@ -25,7 +25,8 @@
     const error        = params.get('error');
 
     if (error) {
-      document.getElementById('msg').textContent = '로그인 실패: ' + error;
+      // message: 같은 이메일로 이미 가입된 경우의 안내 등(서버가 보냄). 없으면 오류 코드 표시
+      document.getElementById('msg').textContent = '로그인 실패: ' + (params.get('message') || error);
 
     } else if (accessToken && refreshToken) {
       // 1. localhost:8080 localStorage에 저장 → test.html에서 바로 사용 가능

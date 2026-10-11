@@ -38,4 +38,12 @@ public class KakaoUserInfo implements OAuth2UserInfo {
         }
         return (String) properties.get("nickname");
     }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public boolean isEmailVerified() {
+        Map<String, Object> kakaoAccount = (Map<String, Object>) attributes.get("kakao_account");
+        return kakaoAccount != null && Boolean.TRUE.equals(kakaoAccount.get("is_email_verified"))
+                && Boolean.TRUE.equals(kakaoAccount.get("is_email_valid"));
+    }
 }
