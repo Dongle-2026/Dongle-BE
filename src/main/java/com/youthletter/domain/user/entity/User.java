@@ -60,6 +60,14 @@ public class User extends BaseTimeEntity {
     @Column(columnDefinition = "jsonb")
     private String interests;  // JSON 문자열 ["주식", "보험"]
 
+    /** 앱 프로필 소개글 (최대 100자) */
+    @Column(length = 100)
+    private String bio;
+
+    /** 앱 기본 아바타 식별자 (사진이 없을 때 표시) */
+    @Column(name = "avatar_id", length = 30)
+    private String avatarId;
+
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
@@ -97,6 +105,15 @@ public class User extends BaseTimeEntity {
         if (occupation != null) this.occupation = occupation;
         if (incomeLevel != null) this.incomeLevel = incomeLevel;
         if (interests != null) this.interests = interests;
+    }
+
+    /**
+     * 앱 프로필 수정. null은 변경 없음, 빈 문자열 bio는 소개글 삭제.
+     */
+    public void updateAppProfile(String nickname, String bio, String avatarId) {
+        if (nickname != null) this.nickname = nickname;
+        if (bio != null) this.bio = bio.isEmpty() ? null : bio;
+        if (avatarId != null) this.avatarId = avatarId;
     }
 
     /**

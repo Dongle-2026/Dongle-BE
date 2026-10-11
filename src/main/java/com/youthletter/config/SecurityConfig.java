@@ -62,6 +62,7 @@ public class SecurityConfig {
                     "/api/card-news/{id}",
                     "/api/card-news/article/{articleId}",
                     "/api/guides/**",
+                    "/api/profile-images/*",
                     "/oauth2/**",
                     "/login/oauth2/**",
                     "/swagger-ui/**",

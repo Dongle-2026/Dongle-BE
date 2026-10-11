@@ -99,7 +99,7 @@ class NotionApiAuditTest {
         "A22,GET,/api/me/insights,false",
         "A23,GET,/api/search/trending,false",
         "A24,GET,/api/search/suggestions,false",
-        "A25,PATCH,/api/me/profile,false",
+        "A25,PATCH,/api/me/profile,true",
         "A26,GET,/api/me/notification-settings,true",
         "A27,PATCH,/api/me/notification-settings,true",
         "A28,DELETE,/api/me,true",
@@ -109,8 +109,10 @@ class NotionApiAuditTest {
         assertThat(registered(method,path)).as(id+" exact controller registration").isEqualTo(exists);
         String resourceId = path.startsWith("/api/terms/") ? termId().toString() : articleId.toString();
         String concrete = path.replace("{provider}","google").replace("{id}",resourceId).replace("{quizId}","1");
-        var call = request(HttpMethod.valueOf(method),concrete).header("Authorization","Bearer "+access);
-        if (!method.equals("GET")) call.contentType("application/json").content("{}");
+        var call = id.equals("A25")
+            ? multipart(HttpMethod.PATCH, concrete).param("bio", "audit").header("Authorization","Bearer "+access)
+            : request(HttpMethod.valueOf(method),concrete).header("Authorization","Bearer "+access);
+        if (!method.equals("GET") && !id.equals("A25")) call.contentType("application/json").content("{}");
         if (id.equals("A2")) call.content(json.writeValueAsString(java.util.Map.of("refreshToken", tokens.createRefreshToken(userId))));
         if (id.equals("A15")) call.param("q", marker);
         if (id.equals("A29")) call.content("{\"deviceId\":\"audit\",\"token\":\""+marker+"\",\"platform\":\"IOS\"}");
