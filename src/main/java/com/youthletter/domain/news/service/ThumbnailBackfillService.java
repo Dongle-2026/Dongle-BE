@@ -1,6 +1,6 @@
 package com.youthletter.domain.news.service;
 
-import com.youthletter.domain.crawler.service.ArticleImageExtractor;
+import com.youthletter.domain.crawler.service.ArticlePageExtractor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Jsoup;
@@ -35,7 +35,7 @@ public class ThumbnailBackfillService {
             String url = (String) targets.get(i).get("source_url");
             try {
                 if (i > 0) Thread.sleep(DELAY_MS);
-                String image = ArticleImageExtractor.extract(Jsoup.connect(url).userAgent("Mozilla/5.0").timeout(10_000).get());
+                String image = ArticlePageExtractor.extract(Jsoup.connect(url).userAgent("Mozilla/5.0").timeout(10_000).get());
                 if (image == null) { notFound++; continue; }
                 updated += jdbc.update("UPDATE news_articles SET thumbnail_url=? WHERE id=? AND thumbnail_url IS NULL", image, id);
             } catch (InterruptedException e) {
@@ -48,4 +48,36 @@ public class ThumbnailBackfillService {
         }
         return new Result(targets.size(), updated, notFound, failed);
     }
+
+    /**
+     * 섹션명이 붙어 저장된 기존 제목을 원문에서 다시 읽어 고친다(값이 다를 때만).
+     * afterId보다 큰 기사부터 최대 limit건. 다음 호출에 쓸 lastId를 돌려준다.
+     */
+    public TitleResult refreshTitles(long afterId, int limit) {
+        List<Map<String, Object>> targets = jdbc.queryForList(
+                "SELECT id, source_url, title FROM news_articles WHERE id > ? AND source_url LIKE 'http%' ORDER BY id LIMIT ?",
+                afterId, Math.max(1, Math.min(MAX_BATCH, limit)));
+        int updated = 0, failed = 0;
+        long lastId = afterId;
+        for (int i = 0; i < targets.size(); i++) {
+            Long id = ((Number) targets.get(i).get("id")).longValue();
+            lastId = id;
+            try {
+                if (i > 0) Thread.sleep(DELAY_MS);
+                String title = ArticlePageExtractor.title(Jsoup.connect((String) targets.get(i).get("source_url"))
+                        .userAgent("Mozilla/5.0").timeout(10_000).get());
+                if (!title.isBlank() && title.length() <= 300 && !title.equals(targets.get(i).get("title")))
+                    updated += jdbc.update("UPDATE news_articles SET title=? WHERE id=?", title, id);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                break;
+            } catch (Exception e) {
+                log.warn("[Title] 수집 실패: id={}, reason={}", id, e.getClass().getSimpleName());
+                failed++;
+            }
+        }
+        return new TitleResult(targets.size(), updated, failed, lastId);
+    }
+
+    public record TitleResult(int checked, int updated, int failed, long lastId) {}
 }

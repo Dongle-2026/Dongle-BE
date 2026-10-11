@@ -5,11 +5,11 @@ import org.jsoup.nodes.Element;
 
 import java.net.URI;
 
-/** 기사 페이지의 대표 이미지(og:image → twitter:image) URL. http(s) 절대 주소만 허용한다. */
-public final class ArticleImageExtractor {
+/** 기사 원문 페이지에서 대표 이미지(og:image → twitter:image, http(s)만)와 제목을 뽑는다. */
+public final class ArticlePageExtractor {
     static final int MAX_LENGTH = 1000;
 
-    private ArticleImageExtractor() {}
+    private ArticlePageExtractor() {}
 
     public static String extract(Document doc) {
         for (String selector : new String[]{"meta[property=og:image]", "meta[name=twitter:image]"}) {
@@ -33,5 +33,18 @@ public final class ArticleImageExtractor {
         } catch (IllegalArgumentException e) {
             return null;
         }
+    }
+
+    /**
+     * 기사 제목. 한경 페이지는 섹션 로고(h1.logo-area)와 제목(h1.headline) 두 h1이 있어
+     * "h1" 전체를 합치면 "경제 …"처럼 섹션명이 붙는다. headline → og:title → 첫 h1 순서로 하나만 쓴다.
+     */
+    public static String title(Document doc) {
+        Element headline = doc.selectFirst("h1.headline");
+        if (headline != null && !headline.text().isBlank()) return headline.text().strip();
+        Element og = doc.selectFirst("meta[property=og:title]");
+        if (og != null && !og.attr("content").isBlank()) return og.attr("content").strip();
+        Element h1 = doc.selectFirst("h1");
+        return h1 == null ? "" : h1.text().strip();
     }
 }

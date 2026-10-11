@@ -91,7 +91,7 @@ public class HankyungCrawlerService {
                 .timeout(10_000)
                 .get();
 
-        String title = doc.select("h1.headline, h1").text().trim();
+        String title = ArticlePageExtractor.title(doc);
         if (title.isEmpty()) {
             return null;
         }
@@ -107,7 +107,7 @@ public class HankyungCrawlerService {
                 content,
                 com.youthletter.domain.news.category.NewsCategoryClassifier.classify(title, content).displayName(),
                 LocalDateTime.now(),
-                ArticleImageExtractor.extract(doc)
+                ArticlePageExtractor.extract(doc)
         );
     }
 
