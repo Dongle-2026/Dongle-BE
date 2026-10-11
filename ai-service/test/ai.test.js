@@ -163,3 +163,13 @@ test('재시도 때 거부된 숫자를 구체적으로 알려준다', async () 
   assert.match(prompts[1], /1번 문제의 숫자 2025는 근거 문장에 없다/);
   assert.match(retryHint({ code: 'QUIZ_SELF_CHECK_FAILED' }, '문제'), /정답을 하나로 고를 수 없었다/);
 });
+
+test('해설의 숫자는 기사 안에만 있으면 되고, 질문·정답의 숫자는 근거 문장에 있어야 한다', () => {
+  const three = (q) => ({ quizzes: [q, goodQuiz({ question: 'b' }), goodQuiz({ question: 'c' })] });
+  // 해설이 다른 문장(2번)의 숫자를 인용 → 허용
+  assert.equal(validateQuizzes(three(goodQuiz({ explanation: '5년 만기이며 정부기여금은 최대 월 2.4만원이다.' })), quizSource)[0].answerIndex, 2);
+  // 해설에 기사에 없는 숫자 → 거부
+  assert.throws(() => validateQuizzes(three(goodQuiz({ explanation: '2025년부터 5년 만기다.' })), quizSource), /UNSUPPORTED_NUMBER/);
+  // 정답 보기의 숫자가 근거 문장(1번)에 없고 다른 문장에만 있음 → 거부
+  assert.throws(() => validateQuizzes(three(goodQuiz({ choices: ['1년', '3년', '2.4만원', '10년'] })), quizSource), /UNSUPPORTED_NUMBER/);
+});
