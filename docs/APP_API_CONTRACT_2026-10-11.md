@@ -174,3 +174,101 @@ UI와 로컬 기능을 모두 보존하는 충돌 해결이 필요하다. 단순
 노션 경로 등록 17/29. 테스트 DB(5433) 대상으로 실제 서버(포트 18081)를 띄워 HTTP 스모크도 확인했다:
 용어 저장 동시 20회 → 200 20건·DB 1행, 익명 401, 없는 용어 404, 읽음 2회 → 이력 1건, 기기 등록 2회 → 1행(최신 토큰),
 DELETE /api/me 후 같은 토큰 401·기기 0건. 스모크 데이터는 삭제했다. 실제 iPhone 화면 연결은 아직 미확인.
+
+## 7. 2026-10-11 추가 구현 — 노션 29개 경로 전부 등록
+
+공통 규칙(3장)은 그대로다. 성공 `{status, message, data}`, 목록은 Spring Page(`content`, `last`), page는 0부터,
+ID는 숫자, 날짜는 오프셋 없는 `LocalDateTime`. **null 필드는 JSON에서 생략**되므로 앱은 "없음 = null"로 처리한다.
+
+### 인증 (A1)
+
+| 요청 | 응답 data | 비고 |
+|---|---|---|
+| `POST /api/auth/oauth/{kakao\|google}` `{idToken, nonce?}` | `accessToken, refreshToken, nickname, newUser` | 앱 SDK가 받은 OIDC idToken. nonce를 SDK 로그인에 넣었다면 같은 값을 보낸다 |
+
+- 401 `4006` 토큰 검증 실패, 409 `4007` 같은 이메일이 다른 방식으로 이미 가입됨(자동 연결 안 함, "기존 방식으로 로그인" 안내), 503 `5004` 서버에 제공자 설정 없음.
+- `newUser=true`면 온보딩(관심사 등) 화면으로 보낸다.
+
+### 프로필 (A8 확장, A25)
+
+`GET /api/me` 응답에 `bio, avatarId, profileImageUrl, oauthProvider(kakao|google, 이메일 가입은 없음), joinedAt` 추가.
+
+`PATCH /api/me/profile` — **multipart/form-data**. 필드: `nickname`, `bio`(빈 문자열=삭제), `avatarId`, `image`(파일), `removeImage=true`.
+보내지 않은 필드는 유지. `image`와 `removeImage`를 같이 보내면 400. 응답은 수정 후 프로필 전체.
+
+- 사진은 서버에서 긴 변 512px JPEG로 줄여 DB에 저장(실측: 4000px 1.3MB → 31KB). EXIF(위치정보)는 제거.
+- 허용: JPEG, PNG(그대로 재인코딩), HEIC/HEIF/WebP(변환 없이 저장, 1MB 이하). 업로드 최대 5MB.
+- **권장**: 이미 `allowsEditing: true, quality: 0.8`로 고르면 JPEG가 와서 문제없다. HEIC 원본을 보내지 말 것.
+- 413 `4106` 용량 초과, 415 `4107` 지원하지 않는 형식, 400 `4108` 손상된 파일.
+- `profileImageUrl`은 인증 없이 열리는 URL(추측 불가 키). 사진을 바꾸면 URL이 바뀌므로 캐시 걱정 없음.
+
+### 알림 설정 (A26, A27)
+
+`GET/PATCH /api/me/notification-settings` — `{dailyDigest, quizReminder, streakAlert}`. 저장 전 기본값은 모두 `true`.
+PATCH는 보낸 항목만 바뀌고 전체 설정을 돌려준다. (실제 푸시 발송은 아직 없음. 설정 저장만 된다.)
+
+### 카테고리·검색 (A20, A21, A23, A24)
+
+| 요청 | 응답 data |
+|---|---|
+| `GET /api/categories` | `[{id, name, isNew}]` 8개: youth 청년, policy 정책, finance 금융, investment 투자, real-estate 부동산, economy 경제, job 취업, saving 저축. **'전체'는 앱에서 앞에 붙인다** |
+| `GET /api/news?category=youth` | id·표시명 둘 다 허용 |
+| `GET /api/keywords?limit=8` | `[{id, keyword, category, categoryName, articleCount}]`. `image`는 기사 썸네일이 없어 **항상 없음** → 앱 기본 이미지 사용. 카드 탭 시 `GET /api/news/search?q={keyword}` |
+| `GET /api/search/trending?limit=10` | `[{rank, keyword, change(up\|down\|same), isNew}]` |
+| `GET /api/search/suggestions?q=금리` | `[{keyword, type(term\|trending)}]` 최대 8개 |
+
+- isNew: 최근 24시간 안에 그 카테고리 기사가 들어옴.
+- 키워드 카드: 최근 7일 기사에 하이라이트된 용어를 기사 수 순으로.
+- 트렌드: 최근 24시간 **검색한 사용자 수** 순위(한 사람이 여러 번 검색해도 1), 직전 24시간과 비교. 로그인 사용자의 첫 페이지 검색만 집계, 30일 후 삭제.
+- 최근 검색어(RECENT_SEARCHES)는 서버 API가 없다. 기기에 저장한다.
+
+### 본문·퀴즈·꿀 (A10, A11, A9 확장, A19, A22)
+
+`GET /api/news/{id}/body` (로그인 선택):
+
+```json
+{"newsId":1,"title":"...","intro":"AI 요약(없으면 생략)","source":"한경","publishedAt":"...",
+ "sections":[{"id":"s1","text":"원문 문단"}],
+ "terms":[{"termId":7,"term":"ETF","definition":"쉬운 설명","category":"금융","saved":true}],
+ "quizStatus":"READY","quizzes":[{"id":31,"question":"...","choices":[{"id":"a","text":"..."}],"honey":10,
+   "myResult":{"attempts":1,"solved":true,"earnedHoney":10}}],
+ "tags":[]}
+```
+
+- **정답(answerIndex)·해설은 본문에 없다.** 앱의 클라이언트 채점을 서버 제출로 바꿔야 한다.
+- 소제목은 원문에 없어서 만들지 않는다(`subtitle` 없음). `tags`는 데이터가 없어 빈 배열.
+- `quizStatus`: `READY` / `GENERATING`(AI가 만드는 중, 1~2분 뒤 다시 조회) / `UNAVAILABLE`(지금은 퀴즈 없음, 퀴즈 영역 숨김).
+- `terms[].termId`로 `POST /api/terms/{termId}/save` 호출. 앱 `TermDefinition`에 termId 추가 필요.
+
+`POST /api/quizzes/{quizId}/answer` `{"choiceId":"b"}` 또는 `{"selectedIndex":1}` (로그인 필수):
+
+```json
+{"quizId":31,"selectedIndex":1,"isCorrect":true,"earnedHoney":10,"alreadySolved":false,"correctIndex":1,"explanation":"..."}
+```
+
+- **재도전 가능.** 오답이면 `correctIndex`·`explanation`이 없다(정답을 알려주면 재도전 의미가 없음). 화면에서 "다시 풀기"를 제공한다.
+- 꿀: 문제당 **첫 정답 10꿀**, 다시 맞히면 0꿀 + `alreadySolved=true`. 기사 읽음 **하루 기사당 5꿀**(`POST /api/news/{id}/read` 시 자동).
+
+`GET /api/me/stats` 추가 필드: `todayCompleted`(오늘 한국 날짜 기사 1개 이상 읽음), `totalHoney`, `totalQuizCount`(제출한 문제 수).
+앱 `streak` = `consecutiveLearningDays`.
+
+`GET /api/me/activity?days=126` → `[{date:"2026-10-11", level:0~4, honey}]` 오래된 날부터, 빈 날도 포함(최대 365일).
+level: 0꿀=0, 1~10=1, 11~25=2, 26~40=3, 41+=4.
+
+`GET /api/me/insights` → `{correctRate, totalQuizCount, interestedCategories[], weakCategories[]}`
+
+- correctRate: 문제별 첫 시도 정답률(%). 푼 문제가 없으면 없음 → "아직 퀴즈 기록이 없어요".
+- interestedCategories: 최근 30일 많이 읽은 카테고리 최대 3개.
+- weakCategories: 3문제 이상 푼 카테고리 중 첫 시도 정답률 60% 미만, 최대 2개. 표본 부족이면 빈 배열.
+
+`GET /api/me/read-history` 항목에 `honey`(그 기사에서 받은 꿀 합계) 추가. `thumbnail`은 데이터 없음.
+
+### 검증 (develop 통합 후)
+
+`RUN_NOTION_API_AUDIT=true ./gradlew test --rerun`: 150건 중 149건 성공, 실제 AI 전용 1건 조건부 제외, 실패 0건.
+AI 서비스 `npm test` 16건 성공. 노션 29개 경로 모두 등록·정상 응답(A1은 실제 idToken이 필요해 경로 도달만 감사, 서명 검증은 전용 테스트).
+테스트 DB를 쓰는 실제 서버(18081)에서 기능별 HTTP 확인: 동시 요청 시 꿀·저장·가입·설정이 1회만 반영됨,
+실제 로컬 모델(qwen3:8b)로 퀴즈 생성 161초·저장·채점까지 확인. 실제 iPhone, 실제 카카오/구글 로그인은 미확인.
+
+서버 환경 변수(운영자가 설정): `GOOGLE_MOBILE_CLIENT_IDS`, `KAKAO_APP_KEYS`(카카오 OIDC 활성화 필요).
+DB 적용: `docs/INTEGRATION_STATUS.md`의 V19~V23 순서, 이후 `POST /api/admin/news/reclassify`.
