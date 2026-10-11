@@ -24,8 +24,12 @@ public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationF
                                         AuthenticationException exception) throws IOException {
         log.error("OAuth2 로그인 실패: {}", exception.getMessage());
 
+        // 같은 이메일로 이미 가입된 경우: error=email_already_registered, message=기존 가입 방법 안내
+        String code = exception instanceof org.springframework.security.oauth2.core.OAuth2AuthenticationException oauth
+                ? oauth.getError().getErrorCode() : "oauth_failed";
         String redirectUrl = UriComponentsBuilder.fromUriString(frontendRedirectUri)
-                .queryParam("error", exception.getMessage())
+                .queryParam("error", code)
+                .queryParam("message", exception.getMessage())
                 .build().encode().toUriString();
 
         getRedirectStrategy().sendRedirect(request, response, redirectUrl);

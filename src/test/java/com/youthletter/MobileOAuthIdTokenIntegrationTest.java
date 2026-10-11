@@ -123,7 +123,8 @@ class MobileOAuthIdTokenIntegrationTest {
 
     @Test void existingEmailAccountIsNotLinked() throws Exception {
         jdbc.update("INSERT INTO users(email,name,nickname,password_hash) VALUES (?,'기존','기존" + sub.substring(2, 12) + "','x')", sub + "@gmail.test");
-        login("google", token(c -> {}), null).andExpect(status().isConflict()).andExpect(jsonPath("$.status").value(4007));
+        login("google", token(c -> {}), null).andExpect(status().isConflict()).andExpect(jsonPath("$.status").value(4007))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("이메일 로그인")));
         assertThat(accounts()).isZero();
     }
 
