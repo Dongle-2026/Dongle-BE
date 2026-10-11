@@ -1,6 +1,5 @@
 package com.youthletter.domain.activity.service;
 
-import com.youthletter.domain.activity.entity.ReadingHistory;
 import com.youthletter.domain.activity.entity.TermLookupLog;
 import com.youthletter.domain.activity.repository.ReadingHistoryRepository;
 import com.youthletter.domain.activity.repository.TermLookupLogRepository;
@@ -31,16 +30,13 @@ public class ActivityService {
      */
     @Transactional
     public void trackReading(Long userId, Long articleId, Integer durationSeconds) {
-        User user = userRepository.findById(userId)
+        // Serialize writes for a user so simultaneous retries cannot both insert.
+        User user = userRepository.findLockedById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
         NewsArticle article = articleRepository.findById(articleId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.ARTICLE_NOT_FOUND));
 
-        readingHistoryRepository.save(ReadingHistory.builder()
-                .user(user)
-                .article(article)
-                .readDurationSeconds(durationSeconds)
-                .build());
+        readingHistoryRepository.insertDailyReading(user.getId(), article.getId(), durationSeconds);
     }
 
     /**

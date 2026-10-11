@@ -28,6 +28,25 @@ public class NewsController {
 
     private final NewsService newsService;
 
+    @GetMapping("/search")
+    public ResponseEntity<GlobalResponse<Page<NewsListResponse>>> searchNews(
+            @RequestParam String q,
+            @PageableDefault(size = 20, sort = "publishedAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(GlobalResponse.ok(newsService.getNewsList(null, q, null, pageable)));
+    }
+
+    @PostMapping("/{articleId}/save")
+    public GlobalResponse<Map<String, Boolean>> saveNews(@AuthenticationPrincipal CustomUserPrincipal principal,
+                                                        @PathVariable Long articleId) {
+        return saveBookmark(principal, articleId);
+    }
+
+    @PostMapping("/{articleId}/unsave")
+    public GlobalResponse<Map<String, Boolean>> unsaveNews(@AuthenticationPrincipal CustomUserPrincipal principal,
+                                                          @PathVariable Long articleId) {
+        return removeBookmark(principal, articleId);
+    }
+
     @Operation(summary = "뉴스 목록 조회", description = "카테고리/페이지네이션")
     @GetMapping
     public ResponseEntity<GlobalResponse<Page<NewsListResponse>>> getNewsList(

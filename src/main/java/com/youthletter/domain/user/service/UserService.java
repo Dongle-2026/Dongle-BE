@@ -84,7 +84,7 @@ public class UserService {
                 .toList();
         if (dates.isEmpty()) return 0;
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(java.time.ZoneId.of("Asia/Seoul"));
         LocalDate expected = today;
         int count = 0;
 

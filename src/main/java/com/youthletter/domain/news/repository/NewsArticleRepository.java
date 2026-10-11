@@ -4,6 +4,7 @@ import com.youthletter.domain.news.entity.NewsArticle;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -12,17 +13,24 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-public interface NewsArticleRepository extends JpaRepository<NewsArticle, Long> {
+public interface NewsArticleRepository extends JpaRepository<NewsArticle, Long>, JpaSpecificationExecutor<NewsArticle> {
 
-    @Query("""
-        SELECT a FROM NewsArticle a WHERE (:category IS NULL OR a.category = :category)
-          AND (:keyword IS NULL OR lower(a.title) LIKE lower(concat('%', :keyword, '%'))
-               OR lower(a.content) LIKE lower(concat('%', :keyword, '%')))
-          AND (cast(:start as timestamp) IS NULL OR a.publishedAt >= :start)
-          AND (cast(:end as timestamp) IS NULL OR a.publishedAt < :end)
-        """)
-    Page<NewsArticle> search(@Param("category") String category, @Param("keyword") String keyword,
-                            @Param("start") LocalDateTime start, @Param("end") LocalDateTime end, Pageable pageable);
+    default Page<NewsArticle> search(String category, String keyword,
+                                    LocalDateTime start, LocalDateTime end, Pageable pageable) {
+        // Omit absent filters: nullable LIKE parameters can be bound as bytea by PostgreSQL.
+        return findAll((root, query, cb) -> {
+            var predicates = new java.util.ArrayList<jakarta.persistence.criteria.Predicate>();
+            if (category != null) predicates.add(cb.equal(root.get("category"), category));
+            if (keyword != null) {
+                String pattern = "%" + keyword.toLowerCase(java.util.Locale.ROOT) + "%";
+                predicates.add(cb.or(cb.like(cb.lower(root.get("title")), pattern),
+                        cb.like(cb.lower(root.get("content")), pattern)));
+            }
+            if (start != null) predicates.add(cb.greaterThanOrEqualTo(root.get("publishedAt"), start));
+            if (end != null) predicates.add(cb.lessThan(root.get("publishedAt"), end));
+            return cb.and(predicates.toArray(jakarta.persistence.criteria.Predicate[]::new));
+        }, pageable);
+    }
 
     /**
      * 카테고리별 뉴스 목록 (홈 화면)

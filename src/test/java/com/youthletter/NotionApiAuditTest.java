@@ -71,12 +71,12 @@ class NotionApiAuditTest {
     @ParameterizedTest(name="{0} {1} {2} declared={3}")
     @CsvSource({
         "A1,POST,/api/auth/oauth/{provider},false",
-        "A2,POST,/api/auth/refresh,false",
+        "A2,POST,/api/auth/refresh,true",
         "A3,POST,/api/auth/logout,true",
         "A4,GET,/api/news,true",
         "A5,GET,/api/news/{id},true",
-        "A6,POST,/api/news/{id}/save,false",
-        "A7,POST,/api/news/{id}/unsave,false",
+        "A6,POST,/api/news/{id}/save,true",
+        "A7,POST,/api/news/{id}/unsave,true",
         "A8,GET,/api/me,false",
         "A9,GET,/api/me/stats,false",
         "A10,GET,/api/news/{id}/body,false",
@@ -84,7 +84,7 @@ class NotionApiAuditTest {
         "A12,POST,/api/terms/{id}/save,false",
         "A13,POST,/api/terms/{id}/unsave,false",
         "A14,POST,/api/news/{id}/read,true",
-        "A15,GET,/api/news/search,false",
+        "A15,GET,/api/news/search,true",
         "A16,GET,/api/me/saved-terms,false",
         "A17,GET,/api/me/saved-news,false",
         "A18,GET,/api/me/read-history,false",
@@ -105,6 +105,8 @@ class NotionApiAuditTest {
         String concrete = path.replace("{provider}","google").replace("{id}",articleId.toString()).replace("{quizId}","1");
         var call = request(HttpMethod.valueOf(method),concrete).header("Authorization","Bearer "+access);
         if (!method.equals("GET")) call.contentType("application/json").content("{}");
+        if (id.equals("A2")) call.content(json.writeValueAsString(java.util.Map.of("refreshToken", tokens.createRefreshToken(userId))));
+        if (id.equals("A15")) call.param("q", marker);
         var result = mvc.perform(call).andReturn();
         int status = result.getResponse().getStatus();
         System.out.println("NOTION_AUDIT "+id+" "+method+" "+path+" registered="+exists+" HTTP="+status);
@@ -128,13 +130,13 @@ class NotionApiAuditTest {
         assertThat(item.get("publishedAt").asText()).doesNotMatch(".*(Z|[+-]\\d{2}:\\d{2})$");
     }
 
-    @Test void readIsNotIdempotentAndInflatesCount() throws Exception {
+    @Test void readIsIdempotentPerKoreanDay() throws Exception {
         for (int i=0;i<2;i++) mvc.perform(post("/api/news/"+articleId+"/read")
             .header("Authorization","Bearer "+access)).andExpect(status().isOk());
         assertThat(jdbc.queryForObject("SELECT count(*) FROM reading_history WHERE user_id=? AND article_id=?",
-            Integer.class,userId,articleId)).isEqualTo(2);
+            Integer.class,userId,articleId)).isEqualTo(1);
         mvc.perform(get("/api/users/me/learning-stats").header("Authorization","Bearer "+access))
-            .andExpect(status().isOk()).andExpect(jsonPath("$.data.readNewsCount").value(2))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.data.readNewsCount").value(1))
             .andExpect(jsonPath("$.data.todayCompleted").doesNotExist());
     }
 

@@ -22,6 +22,8 @@ import static org.assertj.core.api.Assertions.*;
 class CapstoneIntegrationTest {
     @org.springframework.beans.factory.annotation.Autowired JdbcTemplate jdbc;
     @org.springframework.beans.factory.annotation.Autowired NewsArticleRepository articles;
+    @org.springframework.beans.factory.annotation.Autowired com.youthletter.domain.activity.service.ActivityService activity;
+    @org.springframework.beans.factory.annotation.Autowired com.youthletter.domain.activity.repository.ReadingHistoryRepository readings;
     @org.springframework.beans.factory.annotation.Autowired RecommendationRepository recommendations;
     @org.springframework.beans.factory.annotation.Autowired SpendingEventRepository events;
     @org.springframework.beans.factory.annotation.Autowired com.youthletter.domain.spending.service.SpendingService spending;
@@ -42,6 +44,32 @@ class CapstoneIntegrationTest {
         var result = articles.search("LOAN", "대출금리", LocalDate.now().atStartOfDay(), LocalDate.now().plusDays(1).atStartOfDay(), PageRequest.of(0,20));
         assertThat(result.getContent()).extracting(a -> a.getId()).containsExactly(id);
         assertThat(articles.search(null, null, null, null, PageRequest.of(0,20)).getTotalElements()).isGreaterThanOrEqualTo(2);
+    }
+    @Test void optionalSearchFiltersRemainValidAcrossRepeatedQueries() {
+        Long id = article("Regression MixedCase", "LOAN");
+        var page = PageRequest.of(0, 20);
+        for (int i = 0; i < 3; i++) {
+            assertThat(articles.search(null, null, null, null, page).getTotalElements()).isPositive();
+            assertThat(articles.search(null, "mixedcase", null, null, page).getContent())
+                    .extracting(a -> a.getId()).containsExactly(id);
+            assertThat(articles.search("LOAN", null, null, null, page).getTotalElements()).isPositive();
+            assertThat(articles.search(null, null, LocalDate.now().atStartOfDay(),
+                    LocalDate.now().plusDays(1).atStartOfDay(), page).getTotalElements()).isPositive();
+        }
+    }
+    @Test void dailyReadingPreservesHistoryAndDeduplicatesKoreanCalendarDays() {
+        Long id = article("하루 한 번", "LOAN");
+        // Historical duplicates are retained, but stats count one article per KST day.
+        for (int i = 0; i < 2; i++) jdbc.update("""
+            INSERT INTO reading_history(user_id, article_id, read_at)
+            VALUES (?, ?, ((statement_timestamp() AT TIME ZONE 'Asia/Seoul')::date - 1
+                + time '23:59:59') AT TIME ZONE 'Asia/Seoul')
+            """, user, id);
+        activity.trackReading(user, id, null);
+        activity.trackReading(user, id, 10);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM reading_history WHERE user_id=?", Long.class, user)).isEqualTo(3);
+        assertThat(readings.countByUserId(user)).isEqualTo(2);
+        assertThat(readings.findDistinctReadDatesByUserId(user)).hasSize(2);
     }
     @Test void latestStateFiltersAfterDateChangesAndExcludesDeletion() {
         LocalDate today = LocalDate.now();

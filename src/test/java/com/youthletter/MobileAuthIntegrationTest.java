@@ -56,6 +56,24 @@ class MobileAuthIntegrationTest {
         assertThat(news.isBookmarked(userId,article)).isFalse();
     }
 
+    @Test void notionAliasesPreserveAuthorizationAndIdempotency() throws Exception {
+        String marker = UUID.randomUUID().toString();
+        Long article = jdbc.queryForObject("INSERT INTO news_articles(source_url,source_name,title,content,category) VALUES (?,'test',?,'body','YOUTH') RETURNING id", Long.class, marker, marker);
+        String bearer = "Bearer " + tokens.createAccessToken(userId, "test@test.invalid", "USER");
+        for (String action : java.util.List.of("save", "unsave")) {
+            mvc.perform(post("/api/news/"+article+"/"+action)).andExpect(status().isUnauthorized());
+            for (int i=0; i<2; i++) mvc.perform(post("/api/news/"+article+"/"+action).header("Authorization", bearer))
+                    .andExpect(status().isOk()).andExpect(jsonPath("$.data.bookmarked").value(action.equals("save")));
+        }
+        mvc.perform(get("/api/news/search").param("q",marker)).andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].id").value(article));
+        String refresh = tokens.createRefreshToken(userId);
+        mvc.perform(post("/api/auth/refresh").contentType("application/json")
+                .content(json.writeValueAsString(java.util.Map.of("refreshToken",refresh))))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.accessToken").isNotEmpty());
+        assertThat(tokens.validateRefreshToken(userId,refresh)).isFalse();
+    }
+
     @Test void appJourneySignupReadSaveReissueAndLogout() throws Exception {
         String key = UUID.randomUUID().toString();
         Long registeredId = null;
