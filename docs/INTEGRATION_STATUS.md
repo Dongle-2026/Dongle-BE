@@ -35,6 +35,7 @@ Flyway 자동 실행은 없다. **서비스를 중지하고 백업한 후** 기�
 8. `src/main/resources/db/migration/V23__quiz_honey.sql` (퀴즈·풀이·꿀 원장, ai_jobs kind에 QUIZ 추가, 재실행 안전)
 9. `src/main/resources/db/migration/V24__article_thumbnail.sql` (기사 썸네일 URL). 적용 후 `POST /api/admin/news/thumbnails`로 기존 기사 채우기(1회 최대 100건)
 10. `src/main/resources/db/migration/V25__quiz_reveals.sql` (퀴즈 정답 보기 기록, 재실행 안전)
+11. `src/main/resources/db/migration/V26__push_logs.sql` (푸시 발송 기록·하루 1회 보장, 재실행 안전)
 
 이번 작업에서는 테스트 DB(5433)에만 적용했다. 개발 DB(15432)·운영 DB는 미적용이다. V17은 기존 소비 ID보다 큰 값에서 시작하고 번호는 건너뛸 수 있다. V18의 기존 알림은 미읽음으로 시작한다. 기존 is_sent에는 가짜 발송과 사용자 읽음이 혼재하여 읽음 상태를 복원할 근거가 없다. 기존 발송 이력은 삭제하지 않는다.
 
