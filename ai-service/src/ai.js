@@ -76,7 +76,7 @@ export function validateCards(value, source) {
   });
 }
 
-// 퀴즈는 기사 문장 근거로만 출제한다. 정답·질문·해설의 숫자는 근거 문장에 있어야 한다(오답 보기는 예외).
+// 퀴즈는 기사 문장 근거로만 출제한다. 질문·정답의 숫자는 근거 문장에, 해설의 숫자는 기사 안에 있어야 한다(오답 보기는 예외).
 const solveSchema = object({ answers: { type: 'array', minItems: 3, maxItems: 3, items: { type: 'integer', minimum: 0, maximum: 3 } } });
 
 // 사람 검수 대신: 같은 모델이 기사 문장만 보고 문제를 다시 풀어 출제 정답과 같은지 확인한다.
@@ -99,8 +99,10 @@ export function validateQuizzes(value, source) {
       throw new AiError('INVALID_QUIZ');
     }
     const evidence = q.sourceSentenceIds.map(id => source[id - 1].text).join(' ');
-    const bad = unsupportedNumbers(`${q.question} ${q.choices[q.answerIndex]} ${q.explanation}`, evidence);
-    if (bad.length) throw new AiError('UNSUPPORTED_NUMBER', 502, { item: quizIndex + 1, numbers: bad });
+    // 질문·정답은 근거 문장 기준(핵심 사실), 해설은 보조 설명이므로 기사 전체 기준으로 숫자를 확인한다.
+    const bad = [...unsupportedNumbers(`${q.question} ${q.choices[q.answerIndex]}`, evidence),
+      ...unsupportedNumbers(q.explanation, source.map(s => s.text).join(' '))];
+    if (bad.length) throw new AiError('UNSUPPORTED_NUMBER', 502, { item: quizIndex + 1, numbers: [...new Set(bad)] });
     return { question: q.question.trim(), choices: q.choices.map(c => c.trim()), answerIndex: q.answerIndex,
       explanation: q.explanation.trim(), sourceSentenceIds: [...new Set(q.sourceSentenceIds)] };
   });

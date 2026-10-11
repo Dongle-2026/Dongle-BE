@@ -26,8 +26,9 @@ public class QuizValidator {
                     || !questions.add(q.question().strip())) throw invalid();
             List<String> sentences = QuizText.sentences(articleContent);
             String evidence = String.join(" ", q.sourceSentenceIds().stream().map(id -> sentences.get(id - 1)).toList());
-            if (!com.youthletter.global.util.NumberEvidence.unsupported(
-                    q.question() + " " + q.choices().get(q.answerIndex()) + " " + q.explanation(), evidence).isEmpty()) throw invalid();
+            // 질문·정답은 근거 문장, 해설은 기사 전체 기준(AI 서비스와 같은 규칙)
+            if (!com.youthletter.global.util.NumberEvidence.unsupported(q.question() + " " + q.choices().get(q.answerIndex()), evidence).isEmpty()
+                    || !com.youthletter.global.util.NumberEvidence.unsupported(q.explanation(), articleContent).isEmpty()) throw invalid();
         }
     }
 
