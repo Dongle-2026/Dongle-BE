@@ -94,11 +94,11 @@ class NotionApiAuditTest {
         "A17,GET,/api/me/saved-news,true",
         "A18,GET,/api/me/read-history,true",
         "A19,GET,/api/me/activity,false",
-        "A20,GET,/api/categories,false",
-        "A21,GET,/api/keywords,false",
+        "A20,GET,/api/categories,true",
+        "A21,GET,/api/keywords,true",
         "A22,GET,/api/me/insights,false",
-        "A23,GET,/api/search/trending,false",
-        "A24,GET,/api/search/suggestions,false",
+        "A23,GET,/api/search/trending,true",
+        "A24,GET,/api/search/suggestions,true",
         "A25,PATCH,/api/me/profile,true",
         "A26,GET,/api/me/notification-settings,true",
         "A27,PATCH,/api/me/notification-settings,true",
@@ -114,7 +114,7 @@ class NotionApiAuditTest {
             : request(HttpMethod.valueOf(method),concrete).header("Authorization","Bearer "+access);
         if (!method.equals("GET") && !id.equals("A25")) call.contentType("application/json").content("{}");
         if (id.equals("A2")) call.content(json.writeValueAsString(java.util.Map.of("refreshToken", tokens.createRefreshToken(userId))));
-        if (id.equals("A15")) call.param("q", marker);
+        if (id.equals("A15") || id.equals("A24")) call.param("q", marker);
         if (id.equals("A29")) call.content("{\"deviceId\":\"audit\",\"token\":\""+marker+"\",\"platform\":\"IOS\"}");
         var result = mvc.perform(call).andReturn();
         int status = result.getResponse().getStatus();

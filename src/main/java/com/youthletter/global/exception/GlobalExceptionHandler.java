@@ -19,7 +19,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({java.time.DateTimeException.class,
             org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
-            org.springframework.http.converter.HttpMessageNotReadableException.class})
+            org.springframework.http.converter.HttpMessageNotReadableException.class,
+            org.springframework.web.bind.MissingServletRequestParameterException.class})
     protected ResponseEntity<GlobalResponse<Void>> handleInvalidInput(Exception e) {
         return ResponseEntity.badRequest().body(GlobalResponse.error(4105, "입력 형식 또는 날짜를 확인해 주세요"));
     }

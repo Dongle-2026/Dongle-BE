@@ -51,4 +51,9 @@ public class NewsArticle extends BaseEntity {
         this.publishedAt = publishedAt;
         this.crawledAt = LocalDateTime.now();
     }
+
+    /** 자동 분류 결과 반영 (관리자 재분류) */
+    public void changeCategory(String category) {
+        this.category = category;
+    }
 }
