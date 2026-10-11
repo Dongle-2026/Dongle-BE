@@ -71,7 +71,8 @@ public enum ErrorCode {
     AI_SERVICE_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, 5002, "AI 서비스 응답 시간이 초과되었습니다"),
     CRAWLING_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, 5003, "뉴스 크롤링 중 오류가 발생했습니다"),
     OAUTH_PROVIDER_NOT_CONFIGURED(HttpStatus.SERVICE_UNAVAILABLE, 5004, "소셜 로그인 설정이 아직 완료되지 않았습니다"),
-    OAUTH_PROVIDER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, 5005, "소셜 로그인 서버에 연결할 수 없습니다");
+    OAUTH_PROVIDER_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, 5005, "소셜 로그인 서버에 연결할 수 없습니다"),
+    PUSH_DISABLED(HttpStatus.SERVICE_UNAVAILABLE, 5006, "서버의 푸시 발송이 꺼져 있습니다");
 
     private final HttpStatus httpStatus;
     private final int code;

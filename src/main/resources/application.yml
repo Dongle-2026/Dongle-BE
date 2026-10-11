@@ -56,6 +56,15 @@ mobile-oauth:
       issuers: https://kauth.kakao.com
       audiences: ${KAKAO_APP_KEYS:}             # 카카오 앱 키(네이티브 앱 키 등), 쉼표 구분. OIDC 활성화 필요
 
+# ── 푸시 알림 (Expo Push API) ──
+# 기본은 꺼짐. 켜면 정기 알림(한국 시간)과 정책 마감 알림을 앱 기기(ExponentPushToken)로 보낸다.
+push:
+  enabled: ${PUSH_ENABLED:false}
+  expo-access-token: ${EXPO_ACCESS_TOKEN:}       # Expo 계정에서 Push security를 켠 경우만 필요
+  daily-digest-cron: ${PUSH_DAILY_DIGEST_CRON:0 0 8 * * *}
+  quiz-reminder-cron: ${PUSH_QUIZ_REMINDER_CRON:0 0 19 * * *}
+  streak-alert-cron: ${PUSH_STREAK_ALERT_CRON:0 0 21 * * *}
+
 # ── Swagger ──
 springdoc:
   swagger-ui:
