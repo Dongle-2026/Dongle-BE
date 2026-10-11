@@ -19,7 +19,7 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 public class ThumbnailBackfillService {
-    static final int MAX_BATCH = 100;
+    public static final int MAX_BATCH = 100;
     static final long DELAY_MS = 500;
     private final JdbcTemplate jdbc;
 
