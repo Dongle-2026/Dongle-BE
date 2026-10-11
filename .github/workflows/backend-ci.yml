@@ -84,6 +84,7 @@ jobs:
           psql -h localhost -U test -d youthletter_test -v ON_ERROR_STOP=1 -f src/main/resources/db/migration/V22__search_logs.sql
           psql -h localhost -U test -d youthletter_test -v ON_ERROR_STOP=1 -f src/main/resources/db/migration/V23__quiz_honey.sql
           psql -h localhost -U test -d youthletter_test -v ON_ERROR_STOP=1 -f src/main/resources/db/migration/V24__article_thumbnail.sql
+          psql -h localhost -U test -d youthletter_test -v ON_ERROR_STOP=1 -f src/main/resources/db/migration/V25__quiz_reveals.sql
         env:
           PGPASSWORD: test1234
 

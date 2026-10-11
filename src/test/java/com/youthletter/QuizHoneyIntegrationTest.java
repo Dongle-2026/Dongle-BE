@@ -194,4 +194,35 @@ class QuizHoneyIntegrationTest {
                 .andExpect(jsonPath("$.data.weakCategories.length()").value(1)) // 경제는 3문제 미만
                 .andExpect(jsonPath("$.data.interestedCategories.length()").value(2));
     }
+
+    @Test void revealOnlyAfterAttemptAndForfeitsHoney() throws Exception {
+        Long q = quiz(articleId, 1, 2);
+        mvc.perform(post("/api/quizzes/" + q + "/reveal").header("Authorization", bearer))
+                .andExpect(status().isConflict()).andExpect(jsonPath("$.status").value(4204)); // 풀기 전에는 불가
+        answer(bearer, q, "{\"selectedIndex\":0}").andExpect(status().isOk());
+        for (int i = 0; i < 2; i++)
+            mvc.perform(post("/api/quizzes/" + q + "/reveal").header("Authorization", bearer)).andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data.correctIndex").value(2))
+                    .andExpect(jsonPath("$.data.correctChoiceId").value("c"))
+                    .andExpect(jsonPath("$.data.explanation").value("해설입니다"));
+        JsonNode after = data(answer(bearer, q, "{\"selectedIndex\":2}"));
+        assertThat(after.get("isCorrect").asBoolean()).isTrue();
+        assertThat(after.get("earnedHoney").asInt()).isZero();
+        assertThat(after.get("revealed").asBoolean()).isTrue();
+        assertThat(after.get("alreadySolved").asBoolean()).isFalse();
+        assertThat(ledger(userId)).isZero();
+        mvc.perform(get("/api/news/" + articleId + "/body").header("Authorization", bearer))
+                .andExpect(jsonPath("$.data.quizzes[0].myResult.revealed").value(true))
+                .andExpect(jsonPath("$.data.quizzes[0].myResult.solved").value(true))
+                .andExpect(jsonPath("$.data.quizzes[0].myResult.earnedHoney").value(0));
+
+        // 이미 맞혀 꿀을 받은 뒤 정답 보기를 해도 받은 꿀은 유지
+        Long q2 = quiz(articleId, 2, 1);
+        answer(otherBearer, q2, "{\"selectedIndex\":1}");
+        mvc.perform(post("/api/quizzes/" + q2 + "/reveal").header("Authorization", otherBearer)).andExpect(status().isOk());
+        assertThat(ledger(otherId)).isEqualTo(10);
+        assertThat(data(answer(otherBearer, q2, "{\"selectedIndex\":1}")).get("alreadySolved").asBoolean()).isTrue();
+        mvc.perform(post("/api/quizzes/" + q + "/reveal")).andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/quizzes/999999999/reveal").header("Authorization", bearer)).andExpect(status().isNotFound());
+    }
 }

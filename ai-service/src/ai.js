@@ -62,6 +62,16 @@ export function validateCards(value, source) {
 }
 
 // 퀴즈는 기사 문장 근거로만 출제한다. 정답·질문·해설의 숫자는 근거 문장에 있어야 한다(오답 보기는 예외).
+const solveSchema = object({ answers: { type: 'array', minItems: 3, maxItems: 3, items: { type: 'integer', minimum: 0, maximum: 3 } } });
+
+// 사람 검수 대신: 같은 모델이 기사 문장만 보고 문제를 다시 풀어 출제 정답과 같은지 확인한다.
+export function checkSelfSolved(quizzes, solved) {
+  if (!Array.isArray(solved?.answers) || solved.answers.length !== quizzes.length) throw new AiError('QUIZ_SELF_CHECK_FAILED');
+  const mismatched = quizzes.map((q, i) => solved.answers[i] === q.answerIndex ? -1 : i).filter(i => i >= 0);
+  if (mismatched.length) throw new AiError('QUIZ_SELF_CHECK_FAILED');
+  return quizzes;
+}
+
 export function validateQuizzes(value, source) {
   if (!Array.isArray(value?.quizzes) || value.quizzes.length !== 3) throw new AiError('INVALID_QUIZ');
   const quizzes = value.quizzes.map(q => {
@@ -163,13 +173,15 @@ export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_
       let quizzes;
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
-          quizzes = validateQuizzes(await generate(quizSchema, instruction + (attempt ? ' 이전 출력 검증 실패. 보기 중복·숫자 근거·글자수를 재확인하라.' : ''), { title: input.title, sentences: source }, 1400), source);
+          quizzes = validateQuizzes(await generate(quizSchema, instruction + (attempt ? ' 이전 출력 검증 실패. 정답이 기사 근거와 정확히 일치하는지, 보기 중복·숫자 근거·글자수를 재확인하라.' : ''), { title: input.title, sentences: source }, 1400), source);
+          const exam = quizzes.map(q => ({ question: q.question, choices: q.choices }));
+          checkSelfSolved(quizzes, await generate(solveSchema, '기사 문장만 근거로 각 문제의 정답 보기 번호(0~3)를 answers 배열에 순서대로 고른다. 기사로 판단할 수 없으면 가장 근거가 강한 보기를 고른다.', { sentences: source, quizzes: exam }, 200));
           break;
         } catch (error) {
           if (attempt || error.status === 503) throw error;
         }
       }
-      return { modelVersion: model, promptVersion: 'quiz-v1', quizzes };
+      return { modelVersion: model, promptVersion: 'quiz-v2-selfcheck', quizzes };
     },
     async insight(input) {
       // 숫자는 Spring에서 문장화한다. 모델은 숫자 없는 일반 행동 제안만 작성한다.

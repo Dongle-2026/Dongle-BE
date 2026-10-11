@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAi, validateCards, validateQuizzes, sentences, articleInput } from '../src/ai.js';
+import { createAi, validateCards, validateQuizzes, checkSelfSolved, sentences, articleInput } from '../src/ai.js';
 
 const article = { title: '금리 안내', content: '기준금리는 3%입니다. 청년 지원을 안내합니다.' };
 const source = sentences(article.content);
@@ -94,15 +94,18 @@ const quizSource = sentences(quizArticle.content);
 const goodQuiz = (overrides = {}) => ({ question: '청년도약계좌의 만기는?', choices: ['1년', '3년', '5년', '10년'], answerIndex: 2,
   explanation: '기사에서 5년 만기라고 설명한다.', sourceSentenceIds: [1], ...overrides });
 test('퀴즈 3문제를 근거 문장과 함께 검증해 반환한다', async () => {
-  let requested;
+  let requested, calls = 0;
   const ai = createAi({ fetchImpl: async (url, init) => {
+    calls++;
+    if (calls === 2) return { ok: true, json: async () => ({ message: { content: '{"answers":[2,1,0]}' } }) }; // 자기 풀이 일치
     requested = JSON.parse(init.body);
     return { ok: true, json: async () => ({ message: { content: JSON.stringify({ quizzes: [goodQuiz(),
       goodQuiz({ question: '정부기여금 최대 금액은?', choices: ['월 1만원', '월 2.4만원', '월 5만원', '없음'], answerIndex: 1, explanation: '최대 월 2.4만원이다.', sourceSentenceIds: [2] }),
       goodQuiz({ question: '가입 대상 나이는?', choices: ['만 19~34세', '만 40세 이상', '제한 없음', '만 15세 이하'], answerIndex: 0, explanation: '만 19~34세 청년이 대상이다.', sourceSentenceIds: [3, 3] })] }) } }) };
   } });
   const result = await ai.quiz(quizArticle);
-  assert.equal(result.promptVersion, 'quiz-v1');
+  assert.equal(result.promptVersion, 'quiz-v2-selfcheck');
+  assert.equal(calls, 2);
   assert.equal(result.quizzes.length, 3);
   assert.deepEqual(result.quizzes[2].sourceSentenceIds, [3]);
   assert.equal(requested.format.properties.quizzes.items.properties.choices.minItems, undefined);
@@ -124,4 +127,18 @@ test('퀴즈 첫 출력이 검증 실패하면 한 번만 재시도한다', asyn
   const ai = createAi({ fetchImpl: async () => { calls++; return { ok: true, json: async () => ({ message: { content: '{"quizzes":[]}' } }) }; } });
   await assert.rejects(() => ai.quiz(quizArticle), /INVALID_QUIZ/);
   assert.equal(calls, 2);
+});
+
+test('자기 풀이 정답이 다르면 다시 출제하고, 또 다르면 저장하지 않는다', async () => {
+  const three = JSON.stringify({ quizzes: [goodQuiz(), goodQuiz({ question: 'b', explanation: '기사에서 설명한다.' }), goodQuiz({ question: 'c', explanation: '기사에서 설명한다.' })] });
+  let calls = 0;
+  const ai = createAi({ fetchImpl: async () => {
+    calls++;
+    const content = calls % 2 === 1 ? three : '{"answers":[2,2,0]}'; // 3번째 문제 불일치
+    return { ok: true, json: async () => ({ message: { content } }) };
+  } });
+  await assert.rejects(() => ai.quiz(quizArticle), /QUIZ_SELF_CHECK_FAILED/);
+  assert.equal(calls, 4); // 출제+풀이 2회
+  assert.throws(() => checkSelfSolved([goodQuiz()], { answers: [] }), /QUIZ_SELF_CHECK_FAILED/);
+  assert.equal(checkSelfSolved([goodQuiz()], { answers: [2] }).length, 1);
 });
