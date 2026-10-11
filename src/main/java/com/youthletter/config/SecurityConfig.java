@@ -49,6 +49,7 @@ public class SecurityConfig {
                     "/api/news",
                     "/api/news/today",
                     "/api/news/{id}",
+                    "/api/news/{id}/body",
                     "/api/terms",
                     "/api/terms/search",
                     "/api/terms/autocomplete",

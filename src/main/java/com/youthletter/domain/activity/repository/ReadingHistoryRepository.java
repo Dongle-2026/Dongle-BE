@@ -1,6 +1,6 @@
 package com.youthletter.domain.activity.repository;
 
-import com.youthletter.domain.activity.dto.ReadHistoryResponse;
+import com.youthletter.domain.activity.dto.ReadHistoryRow;
 import com.youthletter.domain.activity.entity.ReadingHistory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -37,7 +37,7 @@ public interface ReadingHistoryRepository extends JpaRepository<ReadingHistory, 
     List<Date> findDistinctReadDatesByUserId(@Param("userId") Long userId);
 
     @Query(value = """
-        SELECT new com.youthletter.domain.activity.dto.ReadHistoryResponse(
+        SELECT new com.youthletter.domain.activity.dto.ReadHistoryRow(
             a.id, a.title, a.sourceName, a.category, a.publishedAt, max(r.readAt))
         FROM ReadingHistory r JOIN r.article a
         WHERE r.user.id = :userId
@@ -45,5 +45,5 @@ public interface ReadingHistoryRepository extends JpaRepository<ReadingHistory, 
         ORDER BY max(r.readAt) DESC, a.id DESC
         """,
         countQuery = "SELECT count(DISTINCT r.article.id) FROM ReadingHistory r WHERE r.user.id = :userId")
-    Page<ReadHistoryResponse> findReadHistory(@Param("userId") Long userId, Pageable pageable);
+    Page<ReadHistoryRow> findReadHistory(@Param("userId") Long userId, Pageable pageable);
 }

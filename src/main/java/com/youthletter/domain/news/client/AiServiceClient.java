@@ -35,6 +35,10 @@ public class AiServiceClient {
         return post("/api/ai/card-news", request, AiCardResponse.class);
     }
 
+    public com.youthletter.domain.news.client.dto.AiQuizResponse generateQuiz(AiProcessRequest request) {
+        return post("/api/ai/quiz", request, com.youthletter.domain.news.client.dto.AiQuizResponse.class);
+    }
+
     public AiInsightResponse insight(AiInsightRequest request) {
         return post("/api/ai/spending-insight", request, AiInsightResponse.class);
     }
@@ -83,7 +87,7 @@ public class AiServiceClient {
             String code = new com.fasterxml.jackson.databind.ObjectMapper().readTree(body).path("error").asText();
             return java.util.Set.of("OLLAMA_TIMEOUT", "OLLAMA_UNAVAILABLE", "OLLAMA_ERROR", "AI_BUSY",
                     "INVALID_MODEL_JSON", "MODEL_OUTPUT_TRUNCATED", "INVALID_ANALYSIS", "INVALID_TERM", "INVALID_EMBEDDING",
-                    "INVALID_CARDS", "UNSUPPORTED_NUMBER", "INVALID_ADVICE", "INVALID_ARTICLE",
+                    "INVALID_CARDS", "INVALID_QUIZ", "UNSUPPORTED_NUMBER", "INVALID_ADVICE", "INVALID_ARTICLE",
                     "INVALID_FACTS", "UNAUTHORIZED").contains(code) ? code : "AI_UNKNOWN_ERROR";
         } catch (Exception ignored) { return "AI_UNKNOWN_ERROR"; }
     }

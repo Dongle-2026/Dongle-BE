@@ -1,6 +1,7 @@
 package com.youthletter.domain.activity.service;
 
 import com.youthletter.domain.activity.dto.ReadHistoryResponse;
+import com.youthletter.domain.activity.dto.ReadHistoryRow;
 import com.youthletter.domain.activity.entity.TermLookupLog;
 import com.youthletter.domain.activity.repository.ReadingHistoryRepository;
 import com.youthletter.domain.activity.repository.TermLookupLogRepository;
@@ -28,6 +29,8 @@ public class ActivityService {
     private final UserRepository userRepository;
     private final NewsArticleRepository articleRepository;
     private final FinancialTermRepository termRepository;
+    private final com.youthletter.domain.quiz.service.HoneyService honeyService;
+    private final org.springframework.jdbc.core.JdbcTemplate jdbc;
 
     /**
      * 뉴스 읽기 기록 저장 (프론트에서 뉴스 상세 진입/이탈 시 호출)
@@ -41,6 +44,7 @@ public class ActivityService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.ARTICLE_NOT_FOUND));
 
         readingHistoryRepository.insertDailyReading(user.getId(), article.getId(), durationSeconds);
+        honeyService.awardRead(user.getId(), article.getId()); // 기사당 하루 1회 5꿀
     }
 
     /**
@@ -70,7 +74,14 @@ public class ActivityService {
      */
     @Transactional(readOnly = true)
     public Page<ReadHistoryResponse> getReadHistory(Long userId, Pageable pageable) {
-        return readingHistoryRepository.findReadHistory(userId,
+        Page<ReadHistoryRow> rows = readingHistoryRepository.findReadHistory(userId,
                 PageRequest.of(pageable.getPageNumber(), pageable.getPageSize()));
+        java.util.Map<Long, Long> honey = new java.util.HashMap<>();
+        if (rows.hasContent()) {
+            Long[] ids = rows.getContent().stream().map(ReadHistoryRow::articleId).toArray(Long[]::new);
+            jdbc.query("SELECT article_id, sum(amount) AS honey FROM honey_ledger WHERE user_id=? AND article_id = ANY(?) GROUP BY article_id",
+                    rs -> { honey.put(rs.getLong("article_id"), rs.getLong("honey")); }, userId, ids);
+        }
+        return rows.map(row -> ReadHistoryResponse.of(row, honey.getOrDefault(row.articleId(), 0L)));
     }
 }

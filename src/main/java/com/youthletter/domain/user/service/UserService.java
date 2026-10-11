@@ -31,6 +31,8 @@ public class UserService {
     private final ReadingHistoryRepository readingHistoryRepository;
     private final TermLookupLogRepository termLookupLogRepository;
     private final ObjectMapper objectMapper;
+    private final com.youthletter.domain.quiz.service.HoneyService honeyService;
+    private final com.youthletter.domain.quiz.service.LearningService learningService;
     private final ProfileImageRepository profileImageRepository;
     private final OAuthAccountRepository oAuthAccountRepository;
 
@@ -78,7 +80,8 @@ public class UserService {
         long readNewsCount = readingHistoryRepository.countByUserId(userId);
         long learnedTermCount = termLookupLogRepository.countDistinctTermByUserId(userId);
         int consecutiveDays = computeConsecutiveLearningDays(userId);
-        return new LearningStatsResponse(readNewsCount, learnedTermCount, consecutiveDays);
+        return new LearningStatsResponse(readNewsCount, learnedTermCount, consecutiveDays,
+                learningService.completedToday(userId), honeyService.total(userId), learningService.quizCount(userId));
     }
 
     private int computeConsecutiveLearningDays(Long userId) {
