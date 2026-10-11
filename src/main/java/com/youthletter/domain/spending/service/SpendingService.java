@@ -157,8 +157,8 @@ public class SpendingService {
         YearMonth month = YearMonth.now(java.time.ZoneOffset.UTC);
         var current = getDashboard(userId, month.toString());
         var previous = getDashboard(userId, month.minusMonths(1).toString());
-        String facts = "이번 달 기록된 소비는 " + current.totalAmount().toPlainString()
-                + "원이며, 지난달 기록된 소비는 " + previous.totalAmount().toPlainString() + "원입니다. ";
+        String facts = "이번 달 기록된 소비는 " + won(current.totalAmount())
+                + "원이며, 지난달 기록된 소비는 " + won(previous.totalAmount()) + "원입니다. ";
         String advice = "등록한 내역이 빠짐없는지 확인하고 카테고리별 지출을 점검해 보세요.";
         String model = "rule-based-v1";
         if (current.totalAmount().signum() > 0 && !aiClient.isStubMode()) {
@@ -183,5 +183,11 @@ public class SpendingService {
     private User findUser(Long userId) {
         return userRepository.findLockedById(userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+    }
+
+    /** 58250.00 → "58,250" (원 단위 반올림, 천 단위 쉼표) */
+    static String won(java.math.BigDecimal amount) {
+        return java.text.NumberFormat.getIntegerInstance(java.util.Locale.KOREA)
+                .format(amount.setScale(0, java.math.RoundingMode.HALF_UP));
     }
 }
