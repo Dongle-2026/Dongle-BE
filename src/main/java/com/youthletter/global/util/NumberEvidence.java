@@ -22,7 +22,17 @@ public final class NumberEvidence {
         Set<String> tokens = new LinkedHashSet<>();
         Matcher m = TOKEN.matcher(text);
         while (m.find()) tokens.add(m.group().replace(",", ""));
-        return tokens.stream().filter(token -> !supported(token, ev)).toList();
+        Set<String> unsupported = new LinkedHashSet<>(tokens.stream().filter(token -> !supported(token, ev)).toList());
+        // 행사명·금액 등에서 찾은 숫자만으로 달력 연도를 추측하는 것을 차단한다.
+        String years = ev.replaceAll("(\\d{4})\\s+년", "$1년");
+        Matcher calendarYear = Pattern.compile("(?<!\\d)(\\d{4})\\s*년").matcher(text);
+        while (calendarYear.find()) {
+            String year = calendarYear.group(1);
+            if (!unsupported.contains(year) && !Pattern.compile("(?<![\\d.])" + year + "년").matcher(years).find()) {
+                unsupported.add(year + "년");
+            }
+        }
+        return List.copyOf(unsupported);
     }
 
     private static boolean supported(String token, String ev) {

@@ -39,13 +39,20 @@ const normalizeNumber = (t) => t.replace(/,/g, '');
 const withPercent = (t) => t.replace(/100분의\s?(\d+(?:\.\d+)?)/g, (m, n) => `${m} ${n}%`);
 export function unsupportedNumbers(text, evidence) {
   const ev = withPercent(evidence.replace(/,/g, ''));
-  return [...new Set((text.match(NUMBER_TOKEN) ?? []).map(normalizeNumber))].filter(token => {
+  const unsupported = [...new Set((text.match(NUMBER_TOKEN) ?? []).map(normalizeNumber))].filter(token => {
     for (let i = ev.indexOf(token); i >= 0; i = ev.indexOf(token, i + 1)) {
       const before = ev[i - 1] ?? '', after = ev[i + token.length] ?? '';
       if (!/[\d.]/.test(before) && !/[\d만억조천]/.test(after)) return false; // 경계가 맞는 일치가 있음
     }
     return true;
   });
+  // 행사명·금액 등의 4자리 숫자를 달력 연도로 바꾸지 않는다.
+  const years = ev.replace(/(\d{4})\s+년/g, '$1년');
+  for (const match of text.matchAll(/(?<!\d)(\d{4})\s*년/g)) {
+    const year = match[1];
+    if (!unsupported.includes(year) && !new RegExp(`(?<![\\d.])${year}년`).test(years)) unsupported.push(`${year}년`);
+  }
+  return [...new Set(unsupported)];
 }
 
 export function articleInput(input) {
@@ -79,9 +86,9 @@ export function validateCards(value, source) {
 }
 
 // 퀴즈는 기사 문장 근거로만 출제한다. 질문·정답의 숫자는 근거 문장에, 해설의 숫자는 기사 안에 있어야 한다(오답 보기는 예외).
-const solveSchema = object({ answers: { type: 'array', minItems: 3, maxItems: 3, items: { type: 'integer', minimum: 0, maximum: 3 } } });
+const solveSchema = object({ answers: { type: 'array', minItems: 3, maxItems: 3, items: { type: 'integer', minimum: -1, maximum: 3 } } });
 
-// 사람 검수 대신: 같은 모델이 기사 문장만 보고 문제를 다시 풀어 출제 정답과 같은지 확인한다.
+// 보조 검사일 뿐 사람 검수를 대체하지 않는다. -1은 근거 부족/복수 정답으로 거부한다.
 export function checkSelfSolved(quizzes, solved) {
   if (!Array.isArray(solved?.answers) || solved.answers.length !== quizzes.length) throw new AiError('QUIZ_SELF_CHECK_FAILED');
   const mismatched = quizzes.map((q, i) => solved.answers[i] === q.answerIndex ? -1 : i).filter(i => i >= 0);
@@ -205,14 +212,14 @@ export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_
         try {
           quizzes = validateQuizzes(await generate(quizSchema, instruction + hint, { title: input.title, sentences: source }, 1100), source);
           const exam = quizzes.map(q => ({ question: q.question, choices: q.choices }));
-          checkSelfSolved(quizzes, await generate(solveSchema, '기사 문장만 근거로 각 문제의 정답 보기 번호(0~3)를 answers 배열에 순서대로 고른다. 기사로 판단할 수 없으면 가장 근거가 강한 보기를 고른다.', { sentences: source, quizzes: exam }, 200));
+          checkSelfSolved(quizzes, await generate(solveSchema, '기사 문장만 근거로 보기 4개를 각각 검토한다. 유일하게 맞는 보기가 있을 때만 그 번호(0~3)를 answers 배열에 순서대로 쓴다. 맞는 보기가 2개 이상이거나 근거가 부족하면 반드시 -1을 쓴다. 더 강한 근거의 보기를 임의로 고르지 않는다. 공동 참여자 일부를 묻는 보기처럼 둘 다 맞는 경우도 -1이다.', { sentences: source, quizzes: exam }, 200));
           break;
         } catch (error) {
           if (attempt || error.status === 503) throw error;
           hint = retryHint(error, '문제');
         }
       }
-      return { modelVersion: model, promptVersion: 'quiz-v4-concept', quizzes };
+      return { modelVersion: model, promptVersion: 'quiz-v5-unique', quizzes };
     },
     async insight(input) {
       // 숫자는 Spring에서 문장화한다. 모델은 숫자 없는 일반 행동 제안만 작성한다.

@@ -8,7 +8,7 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -64,8 +64,13 @@ public class HankyungCrawlerService {
                     log.warn("[Crawler] 기사 파싱 실패: {} - {}", url, e.getMessage());
                 }
             }
+            if (!articleUrls.isEmpty() && articles.isEmpty()) {
+                throw new IllegalStateException("No articles could be fetched or parsed");
+            }
         } catch (Exception e) {
             log.error("[Crawler] 목록 페이지 크롤링 실패", e);
+            throw new com.youthletter.global.exception.BusinessException(
+                    com.youthletter.global.exception.ErrorCode.CRAWLING_ERROR);
         }
 
         return articles;
@@ -74,7 +79,7 @@ public class HankyungCrawlerService {
     /**
      * 목록 페이지에서 기사 URL 수집
      */
-    private List<String> collectArticleUrls() throws Exception {
+    List<String> collectArticleUrls() throws Exception {
         Document doc = Jsoup.connect(FINANCE_URL)
                 .userAgent("Mozilla/5.0")
                 .timeout(10_000)
@@ -102,7 +107,7 @@ public class HankyungCrawlerService {
     /**
      * 개별 기사 페이지에서 제목 + 본문 추출
      */
-    private CrawledArticleDto parseArticle(String url) throws Exception {
+    CrawledArticleDto parseArticle(String url) throws Exception {
         Document doc = Jsoup.connect(url)
                 .userAgent("Mozilla/5.0")
                 .timeout(10_000)
@@ -123,7 +128,7 @@ public class HankyungCrawlerService {
                 title,
                 content,
                 com.youthletter.domain.news.category.NewsCategoryClassifier.classify(title, content).displayName(),
-                LocalDateTime.now(),
+                ArticlePageExtractor.publishedAt(doc, ZoneId.systemDefault()),
                 ArticlePageExtractor.extract(doc)
         );
     }

@@ -29,6 +29,16 @@ public class NewsController {
 
     private final NewsService newsService;
     private final SearchService searchService;
+    private final com.youthletter.domain.news.service.NewsFeedService newsFeedService;
+
+    @Operation(summary = "앱 카드뉴스 목록", description = "limit 지정 시 page=1부터, data 배열과 meta 및 slides 반환. 생성 전 기사는 slides=[]")
+    @GetMapping(params = "limit")
+    public com.youthletter.domain.news.dto.NewsFeedResponse feed(
+            @AuthenticationPrincipal CustomUserPrincipal principal,
+            @RequestParam(defaultValue = "1") int page, @RequestParam int limit,
+            @RequestParam(required = false) String category, @RequestParam(required = false) String keyword) {
+        return newsFeedService.feed(category, keyword, page, limit, principal == null ? null : principal.getUserId());
+    }
 
     /** 트렌드 집계용: 로그인 사용자의 첫 페이지 검색만 기록(다음 페이지 로딩은 같은 검색). */
     private void recordSearch(CustomUserPrincipal principal, String keyword, Pageable pageable) {
