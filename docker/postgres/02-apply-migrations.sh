@@ -8,12 +8,16 @@ DB="${POSTGRES_DB:-youthletter}"
 DB_USER="${POSTGRES_USER:-youthletter}"
 run() { psql -v ON_ERROR_STOP=1 -q -U "$DB_USER" -d "$DB" "$@"; }
 
-run -f /migrations/upgrade-capstone.sql
-for f in $(ls /migrations/db/V*.sql | sort -V); do
+CAPSTONE_SQL="${CAPSTONE_SQL:-/migrations/upgrade-capstone.sql}"
+DB_MIGRATIONS_DIR="${DB_MIGRATIONS_DIR:-/migrations/db}"
+test -f "$CAPSTONE_SQL"
+test -d "$DB_MIGRATIONS_DIR"
+run -f "$CAPSTONE_SQL"
+find "$DB_MIGRATIONS_DIR" -maxdepth 1 -type f -name 'V*.sql' | sort -V | while IFS= read -r f; do
   version=$(basename "$f" | sed -E 's/^V([0-9]+)__.*/\1/')
   if [ "$version" -ge 16 ]; then
     echo "apply $(basename "$f")"
     # 파일 자체에 BEGIN이 있으면 그대로, 없으면 파일 하나를 한 트랜잭션으로 실행
-    if grep -qi '^BEGIN' "$f"; then run -f "$f" > /dev/null; else run -1 -f "$f" > /dev/null; fi
+    if grep -Eqi '^[[:space:]]*BEGIN[[:space:]]*;' "$f"; then run -f "$f" > /dev/null; else run -1 -f "$f" > /dev/null; fi
   fi
 done

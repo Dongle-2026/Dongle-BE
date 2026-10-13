@@ -31,3 +31,8 @@ node_modules/
 
 ### Docker volumes (로컬) ###
 docker/postgres/data/
+
+# Deployment secrets and database archives
+.env.deploy
+backups/
+*.dump

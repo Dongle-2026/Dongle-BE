@@ -14,6 +14,11 @@ spring:
     username: ${DB_USERNAME:test}
     password: ${DB_PASSWORD:test1234}
     driver-class-name: org.postgresql.Driver
+    # 테스트 클래스마다 설정이 달라 Spring 컨텍스트가 여러 개 캐시된다.
+    # 컨텍스트당 기본 10개 연결이면 테스트 DB 한도(100)를 넘어 'too many clients'가 난다.
+    hikari:
+      maximum-pool-size: 4
+      minimum-idle: 1
 
   jpa:
     hibernate:

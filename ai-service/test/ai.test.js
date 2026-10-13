@@ -104,7 +104,7 @@ test('퀴즈 3문제를 근거 문장과 함께 검증해 반환한다', async (
       goodQuiz({ question: '가입 대상 나이는?', choices: ['만 19~34세', '만 40세 이상', '제한 없음', '만 15세 이하'], answerIndex: 0, explanation: '만 19~34세 청년이 대상이다.', sourceSentenceIds: [3, 3] })] }) } }) };
   } });
   const result = await ai.quiz(quizArticle);
-  assert.equal(result.promptVersion, 'quiz-v4-concept');
+  assert.equal(result.promptVersion, 'quiz-v5-unique');
   assert.equal(calls, 2);
   assert.equal(result.quizzes.length, 3);
   assert.deepEqual(result.quizzes[2].sourceSentenceIds, [3]);
@@ -140,6 +140,7 @@ test('자기 풀이 정답이 다르면 다시 출제하고, 또 다르면 저�
   await assert.rejects(() => ai.quiz(quizArticle), /QUIZ_SELF_CHECK_FAILED/);
   assert.equal(calls, 4); // 출제+풀이 2회
   assert.throws(() => checkSelfSolved([goodQuiz()], { answers: [] }), /QUIZ_SELF_CHECK_FAILED/);
+  assert.throws(() => checkSelfSolved([goodQuiz()], { answers: [-1] }), /QUIZ_SELF_CHECK_FAILED/);
   assert.equal(checkSelfSolved([goodQuiz()], { answers: [2] }).length, 1);
 });
 
@@ -178,4 +179,11 @@ test('100분의 N과 N%는 같은 값으로 인정한다', () => {
   assert.deepEqual(unsupportedNumbers('당월 보험료의 100% 이상', '당월 보험료의 100분의 100 이상인 경우'), []);
   assert.deepEqual(unsupportedNumbers('30% 이상', '100분의 30 이상'), []);
   assert.deepEqual(unsupportedNumbers('50% 이상', '100분의 30 이상'), ['50%']);
+});
+
+test('행사명 숫자만으로 달력 연도를 만들지 않는다', () => {
+  assert.deepEqual(unsupportedNumbers('2026년 22일 시상', '오는 22일 2026 한국광고주대회를 연다.'), ['2026년']);
+  assert.deepEqual(unsupportedNumbers('2026년 시상', '2026 년에 시상한다.'), []);
+  assert.deepEqual(unsupportedNumbers('2026 광고주대회', '2026 한국광고주대회'), []);
+  assert.deepEqual(unsupportedNumbers('2026년', '12026년'), ['2026']);
 });

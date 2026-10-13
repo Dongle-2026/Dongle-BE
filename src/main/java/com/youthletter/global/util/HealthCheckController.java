@@ -20,19 +20,30 @@ public class HealthCheckController {
 
     private final DataSource dataSource;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final SchemaReadinessService schemaReadinessService;
 
-    @Operation(summary = "전체 헬스 체크", description = "서버, DB, Redis 연결 상태를 확인합니다")
+    @Operation(summary = "전체 헬스 체크", description = "DB·Redis 연결과 학습 API 스키마 준비 상태를 확인합니다")
     @GetMapping({"/actuator/health", "/api/health"})
     public org.springframework.http.ResponseEntity<GlobalResponse<Map<String, Object>>> healthCheck() {
         Map<String, Object> health = new LinkedHashMap<>();
         String database = checkDatabase();
         String redis = checkRedis();
-        boolean ready = "connected".equals(database) && "connected".equals(redis);
+        String schema = "connected".equals(database) ? checkSchema() : "unavailable";
+        boolean ready = "connected".equals(database) && "connected".equals(redis) && "ready".equals(schema);
         health.put("status", ready ? "UP" : "DOWN");
         health.put("database", database);
         health.put("redis", redis);
+        health.put("schema", schema);
         return ready ? org.springframework.http.ResponseEntity.ok(GlobalResponse.ok(health))
                 : org.springframework.http.ResponseEntity.status(503).body(GlobalResponse.error(503, "dependencies unavailable", health));
+    }
+
+    private String checkSchema() {
+        try {
+            return schemaReadinessService.isReady() ? "ready" : "unavailable";
+        } catch (Exception e) {
+            return "unavailable";
+        }
     }
 
     private String checkDatabase() {
