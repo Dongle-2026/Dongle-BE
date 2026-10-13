@@ -71,7 +71,7 @@ public class NewsService {
         return articles.map(article -> {
             String summary = summaryRepository
                     .findByArticleIdAndValidToIsNull(article.getId())
-                    .map(NewsSummary::getSummaryText)
+                    .map(NewsSummary::getSummaryText).map(NewsSummaryText::display)
                     .orElse(null);
             return NewsListResponse.from(article, summary);
         }).map(markSaved(userId, articles.getContent()));
@@ -120,8 +120,8 @@ public class NewsService {
                 .sourceUrl(article.getSourceUrl())
                 .category(article.getCategory())
                 .publishedAt(article.getPublishedAt())
-                .summary(summary != null ? summary.getSummaryText() : null)
-                .modelVersion(summary != null ? summary.getModelVersion() : null)
+                .summary(summary != null ? NewsSummaryText.display(summary.getSummaryText()) : null)
+                .modelVersion(summary != null && NewsSummaryText.display(summary.getSummaryText()) != null ? summary.getModelVersion() : null)
                 .termHighlights(highlights)
                 .image(article.getThumbnailUrl())
                 .build();
@@ -150,7 +150,7 @@ public class NewsService {
                 .map(a -> {
                     String summary = summaryRepository
                             .findByArticleIdAndValidToIsNull(a.getId())
-                            .map(NewsSummary::getSummaryText)
+                            .map(NewsSummary::getSummaryText).map(NewsSummaryText::display)
                             .orElse(null);
                     return NewsListResponse.from(a, summary);
                 })
