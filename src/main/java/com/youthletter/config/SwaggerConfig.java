@@ -67,8 +67,7 @@ public class SwaggerConfig {
                                 .name("정다은")
                                 .email("ekdms8652@pusan.ac.kr")))
                 .servers(List.of(
-                        new Server().url("http://localhost:8080").description("로컬 개발"),
-                        new Server().url("https://api.youthletter.com").description("운영 서버")))
+                        new Server().url("/").description("현재 Swagger를 연 서버")))
                 .components(new Components()
                         .addSecuritySchemes("bearerAuth", bearerScheme)
                         .addResponses("Unauthorized", unauthorizedResponse())

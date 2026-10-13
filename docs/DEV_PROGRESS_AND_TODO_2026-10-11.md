@@ -1,15 +1,19 @@
+> **2026-10-13 후속 상태:** [최신 작업표](FOLLOWUP_WORK_2026-10-13.md)에서 미완료·검수 대기·외부 설정을 추적합니다. 아래 과거 기록의 미구현 표시는 현재 코드와 다를 수 있습니다.
+
 # 돈글돈글 백엔드 — 개발 경과와 남은 일 (2026-10-11)
 
 > 10/3 작성한 「다은이가 직접 해야 할 일」 문서를 **현재 코드·DB·앱 상태와 대조해 검증**한 결과와,
 > 지금까지의 개발 경과, 앞으로 누가 무엇을 해야 하는지 정리한 문서다.
 > 근거: git 기록, 실제 테스트 실행, 실제 DB 조회(읽기 전용), 앱 저장소(Dongle-APP) 최신 main 확인.
 
-## 0. 결론 먼저
+## 0. 결론 먼저 (10/11 저녁 갱신)
 
-1. **백엔드 API는 노션 요청 29개를 포함해 99개 모두 구현·테스트 완료.** 자동 테스트 150건 실패 0, 실제 서버 HTTP 확인, 실제 로컬 AI 퀴즈 생성까지 확인했다.
-2. **10/3 안내 문서만 그대로 따라 하면 안 된다.** 새 코드는 DB 변경(V19~V23)이 필요한데, 아이폰 시험용 복제 DB에는 아직 적용되지 않았다. 안내 4-2단계 명령으로 실행하면 서버가 시작 단계에서 멈춘다. → 3장 참고.
-3. **앱은 아직 목업이다.** 앱 저장소 main(10/11 16:29, PR #26)은 타입·목업 정리까지이고 실제 API 호출은 주석 상태다. 새 기능(퀴즈·꿀·프로필 사진·알림 설정·소셜 로그인)은 프론트 연결 전까지 앱 화면에서 시험할 수 없다(Swagger로는 가능).
-4. 남은 일은 **결정(다은/팀) → DB 반영(백엔드) → 앱 연결(프론트) → 실기기 시험(다은)** 순서다. 5장 표 참고.
+1. **백엔드 API 102개 구현·테스트 완료**(노션 29개 포함). 자동 테스트 171건 실패 0, AI 서비스 20건 통과.
+2. **결정 10개 모두 반영**(6장). 퀴즈 정답 보기, 웹 로그인 같은 이메일 거부, 실제 푸시 발송, 기사 썸네일, 목록 저장 여부.
+3. **아이폰 시험용 복제 DB에 V19~V26 적용 완료**(새 백업·복원 확인·사본 리허설 후). 기사 84건 제목 정정·재분류·썸네일 채움.
+4. **팀원 로컬 Docker 실행 검증 완료.** 새로 clone해서 `docker-compose.local.yml` 한 번으로 DB·테이블·샘플 데이터까지 준비됨(`LOCAL_DOCKER_SETUP.md`).
+5. **실제 AI 기능 검증**: 요약·카드뉴스·퀴즈 모두 동작. 숫자 오류는 검증기가 막고, 의미 왜곡·애매한 보기는 남은 한계(`AI_VERIFICATION_2026-10-11.md`).
+6. 앱은 아직 목업(앱 main 기준으로 연결 예정). 실제 푸시는 개발 빌드(EAS)가 있어야 받을 수 있다.
 
 ## 1. 개발 경과
 
@@ -37,6 +41,17 @@
 | feature/quiz-honey | A10 A11 A19 A22, A9 확장 | AI 퀴즈 생성(근거 문장 검증), 재도전, 꿀 원장, 히트맵, 인사이트 |
 | fix/openapi-schema-names | — | Swagger에서 소셜 로그인·AI 작업 요청 형식이 잘못 보이던 문제 |
 | feat/app-type-alignment | — | 앱 최신 타입에 맞춰 todayHoney·correctCount·totalHoney 추가 |
+| fix/ci-gradle-wrapper | — | Gradle wrapper jar 미커밋으로 GitHub CI가 항상 실패하던 문제 |
+| feature/news-thumbnail-saved | — | 기사 썸네일(og:image) 수집·표시, 목록 isSaved |
+| feature/web-oauth-email-reject | — | 웹 소셜 로그인도 같은 이메일 거부·안내(모바일과 공통 규칙) |
+| feature/quiz-reveal-selfcheck | — | 정답 보기 버튼, AI 자기 검증 |
+| feature/push-notifications | — | Expo 푸시 발송(뉴스·퀴즈·스트릭·정책 마감), 하루 1회 보장 |
+| feature/ops-maintenance-runner | — | 관리자 로그인 없이 DB 정비(재분류·썸네일·제목) 1회 실행 모드 |
+| fix/crawler-title | — | 기사 제목 앞에 섹션명이 붙던 크롤러 버그 |
+| fix/crawl-rate-limit | — | 원문 429 시 중단, 요청 간격, 저장된 기사 재요청 방지 |
+| fix/local-compose-bootstrap | — | 새 로컬 DB에 테이블 7개 누락·데이터 0건 → 자동 적용 + 샘플 데이터 |
+| fix/ai-number-check-retry | — | 거부 숫자를 알려 주는 재시도, 잘린 숫자 차단, 시간 제한 조정 |
+| fix/quiz-explanation-evidence | — | 퀴즈 해설 숫자는 기사 전체 기준 |
 
 확정한 정책: 소셜 로그인 idToken / 같은 이메일 거부 / 사진은 DB 저장·최소 용량 / 알림 기본 켜짐 / 퀴즈는 AI 생성 /
 정답 10꿀 + 읽기 5꿀(기사당 하루 1회) / 재도전 가능·꿀은 첫 정답만 / 오늘 학습 완료 = 기사 1개 읽기(한국 자정 기준) / 카테고리는 앱 8개 + 키워드 자동 분류.
@@ -74,9 +89,9 @@
 | 2 | 경로·포트 표 | ✅ | 확인. 단 Redis는 테스트용 6380 재사용이 계속 전제 |
 | 3-1 | 백업 파일 `youthletter-iphone-pg16-20260929.dump` | ✅ | 파일 존재 확인(9/29, 214KB). **10/3 이후 데이터는 포함 안 됨** |
 | 3-2 | `docker start youthletter-postgres youthletter-redis-test` | ✅ | 현재 youthletter-postgres는 정지, redis-test는 실행 중 |
-| 3-3 | 복제 DB `youthletter_iphone_20260929` 존재, 기사 수 | ✅ | 존재, 기사 84건(10/11 읽기 전용 확인) |
+| 3-3 | 복제 DB `youthletter_iphone_20260929` 존재, 기사 수 | ✅ | 존재, 기사 84건. **10/11 V19~V26 적용·제목 정정·재분류·썸네일 완료** |
 | 3 | "SQL 파일이 있어도 자동 마이그레이션 안 됨" | ✅ → 🆕 | 맞다. 그래서 **V19~V23을 복제 DB에 적용해야 새 코드가 켜진다**(아래 🆕-1) |
-| 4-2 | `SPRING_JPA_HIBERNATE_DDL_AUTO=validate`로 복제 DB 실행 | ⚠️ | **새 코드에서는 실패.** 복제 DB에 term_bookmarks, notification_settings, profile_images, search_logs, quizzes, quiz_attempts, honey_ledger 테이블과 users.bio 컬럼이 없음(V16~V18은 이미 있음). 🆕-1 이후에 실행 |
+| 4-2 | `SPRING_JPA_HIBERNATE_DDL_AUTO=validate`로 복제 DB 실행 | ✅(10/11 해결) | 복제 DB에 V19~V26 적용 후 validate 기동 확인. 이전 기록: 복제 DB에 term_bookmarks, notification_settings, profile_images, search_logs, quizzes, quiz_attempts, honey_ledger 테이블과 users.bio 컬럼이 없음(V16~V18은 이미 있음). 🆕-1 이후에 실행 |
 | 4-2 | 환경변수 AI_JOBS_ENABLED / CRAWLER_CRON / POLICY_NOTIFICATION_CRON | ✅ | Spring이 각각 ai-jobs.enabled, crawler.cron, policy.notification-cron으로 인식 |
 | 4-3 | health → news 순서 확인 | ✅ | 응답 `{status, database, redis}` |
 | 4-4 | `.env.local`에 `EXPO_PUBLIC_API_URL=http://맥북IP:8080` | ✅ | 앱 기본값이 localhost:3000이라 반드시 필요 |
@@ -121,16 +136,17 @@
 
 ### 다은이가 할 일
 1. 1장 일정·필수 기능 확인(보고서 2회·완성본·발표 날짜, Expo Go 시연 허용 여부).
-2. 6장 결정 항목 답변.
-3. 🆕-1 DB 적용 승인(새 백업 포함).
-4. 🆕-2 카카오·구글 콘솔 설정(소셜 로그인을 넣는다면).
+2. 6장 '새로 결정이 필요한 것' A~C 답변.
+3. ~~🆕-1 DB 적용 승인~~ → 10/11 적용 완료.
+4. 🆕-2 카카오·구글 콘솔 설정(GOOGLE_MOBILE_CLIENT_IDS, KAKAO_APP_KEYS).
+5. 푸시를 실기기로 받으려면 EAS 개발 빌드·Apple Developer 계정 준비, 서버 `PUSH_ENABLED=true`.
 5. 앱 연결 후 5장 1~17 + 🆕-4 18~26 실기기 시험, 오류 양식(10/3 문서 6장)으로 전달.
 6. AI 결과 20건 평가(요약·카드·**퀴즈** 포함).
 7. 노션 DB로 프론트에 API 명세 전달(`API_SPEC_2026-10-11_notion.csv`).
 
 ### 백엔드(개발 담당)가 할 일
-1. 🆕-1 복제 DB 백업·V19~V23 적용·재분류·검증.
-2. 6장 결정에 따른 추가 개발(퀴즈 검수, 썸네일, 목록 isSaved, 네이버 등).
+1. ~~복제 DB 적용~~ 완료. ~~결정 사항 개발~~ 완료(6장).
+2. 6장 A·B 결정에 따른 추가 개발(문제 신고, 모델 교체).
 3. 프론트 연동 중 나오는 오류 수정.
 4. 배포 결정 시 운영 비밀키·HTTPS·접근 제어 점검.
 
@@ -140,6 +156,9 @@
 3. 퀴즈 클라이언트 채점 제거 → 제출 API, `quizStatus` 처리.
 4. 용어 저장에 `termId` 사용, 프로필 multipart 업로드.
 5. 카카오·구글 SDK로 idToken 받아 `POST /api/auth/oauth/{provider}`.
+6. 오답 후 '정답 보기' 버튼(`/reveal`), 목록 `image`·`isSaved` 사용, 앱 타입 naver → google.
+7. expo-notifications로 받은 토큰을 `POST /api/me/devices`, 로그아웃 때 해제.
+8. 로컬 실행은 `LOCAL_DOCKER_SETUP.md`.
 
 ## 5. 진행 순서
 
@@ -152,17 +171,25 @@
 | ⑤ 보완 | 백엔드·프론트 | 시험에서 나온 오류 수정 |
 | ⑥ 평가·보고서·발표 | 다은·팀 | AI 20건 평가, 보고서 2회, 시연 영상 |
 
-## 6. 결정이 필요한 항목
+## 6. 결정 사항 (10/11 확정)
+
+| # | 질문 | 결정 | 반영 |
+|---|---|---|---|
+| 1 | 퀴즈 공개 전 관리자 검수 | 하지 않음 | 대신 AI 자기 검증(자기 문제를 다시 풀어 정답 일치 확인) + 숫자 근거 검증 |
+| 2 | 오답 시 정답 공개 | 정답 보기 버튼 | `POST /api/quizzes/{id}/reveal`, 본 문제는 꿀 없음 |
+| 3 | 웹 소셜 로그인 같은 이메일 | 거부 + 다른 방법 안내 | 웹·모바일 공통 규칙, 기존 가입 방법을 안내 |
+| 4 | 읽기 꿀 | 기사당 하루 1회 | 유지 |
+| 5 | 실제 푸시 | 필요 | Expo Push 발송 구현(기본 꺼짐, `PUSH_ENABLED=true`로 켬) |
+| 6 | 기사 썸네일 | 수집 | og:image 수집 + 기존 기사 채움 |
+| 7 | 복제 DB 적용 | 적용 | 완료(새 백업 `youthletter-iphone-pg16-20261011-before-v19.dump`) |
+| 8 | 소셜 로그인 제공자 | 카카오·구글 | 유지. 앱 타입의 naver → google 변경 필요 |
+| 9 | 목록 저장 여부 | 넣음 | `isSaved` |
+| 10 | 앱 연결 기준 | 앱 main | 문서 반영 |
+
+### 새로 결정이 필요한 것
 
 | # | 질문 | 선택지 |
 |---|---|---|
-| 1 | 퀴즈 내용 검수 | (a) 관리자 승인 후 공개 (b) 자동 공개 + 신고 버튼 (c) 현재대로 자동 공개 |
-| 2 | 오답 시 정답 공개 | 현재 비공개(재도전) / "정답 보기" 버튼(누르면 그 문제 꿀 없음) |
-| 3 | 웹 소셜 로그인의 같은 이메일 자동 연결 | 모바일처럼 거부로 통일 / 웹은 유지 |
-| 4 | 읽기 꿀 | 기사당 하루 1회(현재) / 기사당 평생 1회 |
-| 5 | 실제 푸시 | 필요(Firebase 프로젝트 준비) / 알림 설정 저장만 |
-| 6 | 기사 썸네일 | 크롤러에서 og:image 수집 추가 / 앱 기본 이미지 |
-| 7 | 복제 DB에 V19~V23 적용 | 승인(새 백업 후) / 보류 |
-| 8 | 소셜 로그인 제공자 | **앱 타입은 kakao·naver, 서버는 kakao·google.** 구글 유지 / 네이버로 변경 / 셋 다 |
-| 9 | 뉴스 목록의 저장 여부(isSaved) | 목록에 포함(추가 개발) / 상세에서만 확인 |
-| 10 | 앱 연결 기준 브랜치 | 최신 main 기준 / 10/3 로컬 연동 브랜치 기준 |
+| A | 퀴즈·카드 품질 보완(검수 없이 공개하므로) | 앱에 '문제 신고' 버튼 + 신고 누적 시 숨김 / 현재대로 |
+| B | AI 모델 | 현재 qwen3:8b 유지 / 32GB 이상 장비에서 큰 모델 / 외부 AI API(유료) |
+| C | 실제 푸시 수신 준비 | EAS 개발 빌드 + Apple Developer 계정(iOS) 진행 여부·담당자 |

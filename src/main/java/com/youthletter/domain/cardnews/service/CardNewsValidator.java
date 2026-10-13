@@ -4,7 +4,6 @@ import com.youthletter.domain.news.client.dto.AiCardResponse;
 import com.youthletter.global.exception.*;
 import org.springframework.stereotype.Component;
 import java.util.Arrays;
-import java.util.regex.Pattern;
 
 @Component
 public class CardNewsValidator {
@@ -22,8 +21,8 @@ public class CardNewsValidator {
                     || c.sourceSentenceIds() == null || c.sourceSentenceIds().isEmpty()
                     || c.sourceSentenceIds().stream().anyMatch(id -> id == null || id < 1 || id > sentences.size())) fail();
             String evidence = c.sourceSentenceIds().stream().map(id -> sentences.get(id - 1)).collect(java.util.stream.Collectors.joining(" "));
-            var numbers = Pattern.compile("\\d[\\d,.]*(?:%|퍼센트)?").matcher(c.title() + " " + c.body() + " " + (c.subBody() == null ? "" : c.subBody()));
-            while (numbers.find()) if (!evidence.contains(numbers.group())) fail();
+            if (!com.youthletter.global.util.NumberEvidence.unsupported(
+                    c.title() + " " + c.body() + " " + (c.subBody() == null ? "" : c.subBody()), evidence).isEmpty()) fail();
         }
     }
     private boolean text(String value, int max) { return value != null && !value.isBlank() && value.length() <= max; }

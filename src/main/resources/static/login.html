@@ -204,7 +204,8 @@
     // 에러 처리
     if (error) {
       window.history.replaceState({}, '', '/login.html');
-      setTimeout(() => showToast('로그인에 실패했어요. 다시 시도해주세요.'), 100);
+      const message = params.get('message');
+      setTimeout(() => showToast(error === 'email_already_registered' && message ? message : '로그인에 실패했어요. 다시 시도해주세요.'), 100);
       return;
     }
 

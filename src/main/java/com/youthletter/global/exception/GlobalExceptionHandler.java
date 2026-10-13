@@ -4,6 +4,7 @@ import com.youthletter.global.response.GlobalResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.catalina.connector.ClientAbortException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -16,6 +17,18 @@ import java.util.stream.Collectors;
 @Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+    protected ResponseEntity<GlobalResponse<Void>> handleUnsupportedMethod(org.springframework.web.HttpRequestMethodNotSupportedException e) {
+        var response = ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED);
+        if (e.getSupportedHttpMethods() != null) response.allow(e.getSupportedHttpMethods().toArray(HttpMethod[]::new));
+        return response.body(GlobalResponse.error(405, "지원하지 않는 HTTP 메서드입니다"));
+    }
+
+    @ExceptionHandler(org.springframework.data.mapping.PropertyReferenceException.class)
+    protected ResponseEntity<GlobalResponse<Void>> handleInvalidSort(Exception e) {
+        return ResponseEntity.badRequest().body(GlobalResponse.error(4105, "정렬 필드를 확인해 주세요"));
+    }
 
     @ExceptionHandler({java.time.DateTimeException.class,
             org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,

@@ -23,5 +23,6 @@ public record NewsBodyResponse(
 
     public record Choice(String id, String text) {}
 
-    public record MyResult(int attempts, boolean solved, int earnedHoney) {}
+    /** revealed: "정답 보기"를 눌러 이 문제 꿀을 포기했는지 */
+    public record MyResult(int attempts, boolean solved, int earnedHoney, boolean revealed) {}
 }

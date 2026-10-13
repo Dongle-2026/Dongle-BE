@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAi, validateCards, validateQuizzes, sentences, articleInput } from '../src/ai.js';
+import { createAi, validateCards, validateQuizzes, checkSelfSolved, unsupportedNumbers, retryHint, sentences, articleInput } from '../src/ai.js';
 
 const article = { title: '금리 안내', content: '기준금리는 3%입니다. 청년 지원을 안내합니다.' };
 const source = sentences(article.content);
@@ -94,19 +94,22 @@ const quizSource = sentences(quizArticle.content);
 const goodQuiz = (overrides = {}) => ({ question: '청년도약계좌의 만기는?', choices: ['1년', '3년', '5년', '10년'], answerIndex: 2,
   explanation: '기사에서 5년 만기라고 설명한다.', sourceSentenceIds: [1], ...overrides });
 test('퀴즈 3문제를 근거 문장과 함께 검증해 반환한다', async () => {
-  let requested;
+  let requested, calls = 0;
   const ai = createAi({ fetchImpl: async (url, init) => {
+    calls++;
+    if (calls === 2) return { ok: true, json: async () => ({ message: { content: '{"answers":[2,1,0]}' } }) }; // 자기 풀이 일치
     requested = JSON.parse(init.body);
     return { ok: true, json: async () => ({ message: { content: JSON.stringify({ quizzes: [goodQuiz(),
       goodQuiz({ question: '정부기여금 최대 금액은?', choices: ['월 1만원', '월 2.4만원', '월 5만원', '없음'], answerIndex: 1, explanation: '최대 월 2.4만원이다.', sourceSentenceIds: [2] }),
       goodQuiz({ question: '가입 대상 나이는?', choices: ['만 19~34세', '만 40세 이상', '제한 없음', '만 15세 이하'], answerIndex: 0, explanation: '만 19~34세 청년이 대상이다.', sourceSentenceIds: [3, 3] })] }) } }) };
   } });
   const result = await ai.quiz(quizArticle);
-  assert.equal(result.promptVersion, 'quiz-v1');
+  assert.equal(result.promptVersion, 'quiz-v5-unique');
+  assert.equal(calls, 2);
   assert.equal(result.quizzes.length, 3);
   assert.deepEqual(result.quizzes[2].sourceSentenceIds, [3]);
   assert.equal(requested.format.properties.quizzes.items.properties.choices.minItems, undefined);
-  assert.equal(requested.options.num_predict, 1400);
+  assert.equal(requested.options.num_predict, 1100);
 });
 test('퀴즈 검증: 개수·중복 보기·정답 범위·근거 없는 숫자를 거부한다', () => {
   const three = (q) => ({ quizzes: [q, goodQuiz({ question: 'b' }), goodQuiz({ question: 'c' })] });
@@ -124,4 +127,63 @@ test('퀴즈 첫 출력이 검증 실패하면 한 번만 재시도한다', asyn
   const ai = createAi({ fetchImpl: async () => { calls++; return { ok: true, json: async () => ({ message: { content: '{"quizzes":[]}' } }) }; } });
   await assert.rejects(() => ai.quiz(quizArticle), /INVALID_QUIZ/);
   assert.equal(calls, 2);
+});
+
+test('자기 풀이 정답이 다르면 다시 출제하고, 또 다르면 저장하지 않는다', async () => {
+  const three = JSON.stringify({ quizzes: [goodQuiz(), goodQuiz({ question: 'b', explanation: '기사에서 설명한다.' }), goodQuiz({ question: 'c', explanation: '기사에서 설명한다.' })] });
+  let calls = 0;
+  const ai = createAi({ fetchImpl: async () => {
+    calls++;
+    const content = calls % 2 === 1 ? three : '{"answers":[2,2,0]}'; // 3번째 문제 불일치
+    return { ok: true, json: async () => ({ message: { content } }) };
+  } });
+  await assert.rejects(() => ai.quiz(quizArticle), /QUIZ_SELF_CHECK_FAILED/);
+  assert.equal(calls, 4); // 출제+풀이 2회
+  assert.throws(() => checkSelfSolved([goodQuiz()], { answers: [] }), /QUIZ_SELF_CHECK_FAILED/);
+  assert.throws(() => checkSelfSolved([goodQuiz()], { answers: [-1] }), /QUIZ_SELF_CHECK_FAILED/);
+  assert.equal(checkSelfSolved([goodQuiz()], { answers: [2] }).length, 1);
+});
+
+test('숫자 근거: 단위까지 같은 덩어리여야 하고 잘린·지어낸 숫자는 거부한다', () => {
+  assert.deepEqual(unsupportedNumbers('새 기준선은 519만원', '약 519만원이 새 기준선이 된다.'), []);
+  assert.deepEqual(unsupportedNumbers('6월 17일 시행', '오는 6월17일부터 시행된다.'), []);
+  assert.deepEqual(unsupportedNumbers('1,490.6원', '1490.6원에 마쳤다'), []);
+  assert.deepEqual(unsupportedNumbers('2025년 6월 17일', '오는 6월17일부터 시행된다.'), ['2025']);
+  assert.deepEqual(unsupportedNumbers('평균 21만 원', '평균 21만9000 원을 추가'), ['21만']);
+  assert.deepEqual(unsupportedNumbers('17년 만에', '2017년 이후'), ['17']);
+});
+test('재시도 때 거부된 숫자를 구체적으로 알려준다', async () => {
+  const bad = JSON.stringify({ quizzes: [goodQuiz({ explanation: '2025년 5년 만기다.' }), goodQuiz({ question: 'b' }), goodQuiz({ question: 'c' })] });
+  const prompts = [];
+  const ai = createAi({ fetchImpl: async (url, init) => {
+    prompts.push(JSON.parse(init.body).messages[1].content);
+    return { ok: true, json: async () => ({ message: { content: bad } }) };
+  } });
+  await assert.rejects(() => ai.quiz(quizArticle), /UNSUPPORTED_NUMBER/);
+  assert.equal(prompts.length, 2);
+  assert.match(prompts[1], /1번 문제의 숫자 2025는 근거 문장에 없다/);
+  assert.match(retryHint({ code: 'QUIZ_SELF_CHECK_FAILED' }, '문제'), /정답을 하나로 고를 수 없었다/);
+});
+
+test('해설의 숫자는 기사 안에만 있으면 되고, 질문·정답의 숫자는 근거 문장에 있어야 한다', () => {
+  const three = (q) => ({ quizzes: [q, goodQuiz({ question: 'b' }), goodQuiz({ question: 'c' })] });
+  // 해설이 다른 문장(2번)의 숫자를 인용 → 허용
+  assert.equal(validateQuizzes(three(goodQuiz({ explanation: '5년 만기이며 정부기여금은 최대 월 2.4만원이다.' })), quizSource)[0].answerIndex, 2);
+  // 해설에 기사에 없는 숫자 → 거부
+  assert.throws(() => validateQuizzes(three(goodQuiz({ explanation: '2025년부터 5년 만기다.' })), quizSource), /UNSUPPORTED_NUMBER/);
+  // 정답 보기의 숫자가 근거 문장(1번)에 없고 다른 문장에만 있음 → 거부
+  assert.throws(() => validateQuizzes(three(goodQuiz({ choices: ['1년', '3년', '2.4만원', '10년'] })), quizSource), /UNSUPPORTED_NUMBER/);
+});
+
+test('100분의 N과 N%는 같은 값으로 인정한다', () => {
+  assert.deepEqual(unsupportedNumbers('당월 보험료의 100% 이상', '당월 보험료의 100분의 100 이상인 경우'), []);
+  assert.deepEqual(unsupportedNumbers('30% 이상', '100분의 30 이상'), []);
+  assert.deepEqual(unsupportedNumbers('50% 이상', '100분의 30 이상'), ['50%']);
+});
+
+test('행사명 숫자만으로 달력 연도를 만들지 않는다', () => {
+  assert.deepEqual(unsupportedNumbers('2026년 22일 시상', '오는 22일 2026 한국광고주대회를 연다.'), ['2026년']);
+  assert.deepEqual(unsupportedNumbers('2026년 시상', '2026 년에 시상한다.'), []);
+  assert.deepEqual(unsupportedNumbers('2026 광고주대회', '2026 한국광고주대회'), []);
+  assert.deepEqual(unsupportedNumbers('2026년', '12026년'), ['2026']);
 });

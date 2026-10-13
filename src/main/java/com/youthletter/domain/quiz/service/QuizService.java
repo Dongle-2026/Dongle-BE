@@ -9,6 +9,7 @@ import com.youthletter.domain.news.service.NewsService;
 import com.youthletter.domain.quiz.dto.NewsBodyResponse;
 import com.youthletter.domain.quiz.dto.QuizAnswerRequest;
 import com.youthletter.domain.quiz.dto.QuizAnswerResponse;
+import com.youthletter.domain.quiz.dto.QuizRevealResponse;
 import com.youthletter.domain.user.repository.UserRepository;
 import com.youthletter.global.exception.BusinessException;
 import com.youthletter.global.exception.ErrorCode;
@@ -50,8 +51,7 @@ public class QuizService {
     @Transactional
     public NewsBodyResponse body(Long articleId, Long userId) {
         NewsDetailResponse detail = newsService.getNewsDetail(articleId);
-        String intro = detail.summary() == null || detail.summary().isBlank() || detail.summary().startsWith("[STUB]")
-                ? null : detail.summary();
+        String intro = com.youthletter.domain.news.service.NewsSummaryText.display(detail.summary());
 
         List<NewsBodyResponse.Term> terms = terms(detail, userId);
         List<StoredQuiz> stored = jdbc.query("SELECT id, question, choices FROM quizzes WHERE article_id=? ORDER BY quiz_order",
@@ -59,7 +59,7 @@ public class QuizService {
         Map<Long, NewsBodyResponse.MyResult> mine = userId == null || stored.isEmpty() ? Map.of() : myResults(userId, articleId);
         List<NewsBodyResponse.Quiz> quizzes = stored.stream().map(q -> new NewsBodyResponse.Quiz(q.id(), q.question(),
                 choices(q.choices()), HoneyService.QUIZ_CORRECT,
-                userId == null ? null : mine.getOrDefault(q.id(), new NewsBodyResponse.MyResult(0, false, 0)))).toList();
+                userId == null ? null : mine.getOrDefault(q.id(), new NewsBodyResponse.MyResult(0, false, 0, false)))).toList();
         String status = stored.isEmpty() ? requestGeneration(articleId) : "READY";
 
         return new NewsBodyResponse(detail.id(), detail.title(), intro, detail.sourceName(), detail.publishedAt(),
@@ -75,11 +75,37 @@ public class QuizService {
                 (rs, i) -> new AnswerKey(rs.getLong("article_id"), rs.getInt("answer_index"), rs.getString("explanation")), quizId)
                 .stream().findFirst().orElseThrow(() -> new BusinessException(ErrorCode.QUIZ_NOT_FOUND));
         boolean correct = selected == key.answerIndex();
+        boolean revealed = revealed(userId, quizId);
+        boolean rewardedBefore = Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT EXISTS(SELECT 1 FROM honey_ledger WHERE user_id=? AND quiz_id=? AND reason='QUIZ_CORRECT')", Boolean.class, userId, quizId));
         jdbc.update("INSERT INTO quiz_attempts(user_id, quiz_id, selected_index, is_correct) VALUES (?, ?, ?, ?)",
                 userId, quizId, selected, correct);
-        int earned = correct ? honeyService.awardQuiz(userId, quizId, key.articleId()) : 0;
-        return new QuizAnswerResponse(quizId, selected, correct, earned, correct && earned == 0,
-                correct ? key.answerIndex() : null, correct ? key.explanation() : null, honeyService.total(userId));
+        // 정답을 본 뒤 맞힌 경우는 지급하지 않는다(정답 보기 = 그 문제 꿀 포기).
+        int earned = correct && !revealed ? honeyService.awardQuiz(userId, quizId, key.articleId()) : 0;
+        return new QuizAnswerResponse(quizId, selected, correct, earned, correct && rewardedBefore,
+                correct ? key.answerIndex() : null, correct ? key.explanation() : null, honeyService.total(userId), revealed);
+    }
+
+    /**
+     * 정답 보기. 한 번 이상 제출한 문제만 가능(오답 후 버튼). 본 뒤에는 그 문제로 꿀을 받을 수 없다.
+     * 이미 맞혀서 꿀을 받은 문제는 그대로 유지된다. 반복 호출해도 같은 결과.
+     */
+    @Transactional
+    public QuizRevealResponse reveal(Long userId, Long quizId) {
+        userRepository.findLockedById(userId).orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        AnswerKey key = jdbc.query("SELECT article_id, answer_index, explanation FROM quizzes WHERE id=?",
+                (rs, i) -> new AnswerKey(rs.getLong("article_id"), rs.getInt("answer_index"), rs.getString("explanation")), quizId)
+                .stream().findFirst().orElseThrow(() -> new BusinessException(ErrorCode.QUIZ_NOT_FOUND));
+        if (Boolean.FALSE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM quiz_attempts WHERE user_id=? AND quiz_id=?)",
+                Boolean.class, userId, quizId)))
+            throw new BusinessException(ErrorCode.QUIZ_REVEAL_NOT_ALLOWED);
+        jdbc.update("INSERT INTO quiz_reveals(user_id, quiz_id) VALUES (?, ?) ON CONFLICT DO NOTHING", userId, quizId);
+        return new QuizRevealResponse(quizId, key.answerIndex(), CHOICE_IDS.get(key.answerIndex()), key.explanation());
+    }
+
+    private boolean revealed(Long userId, Long quizId) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM quiz_reveals WHERE user_id=? AND quiz_id=?)",
+                Boolean.class, userId, quizId));
     }
 
     private static int selectedIndex(QuizAnswerRequest request) {
@@ -108,12 +134,14 @@ public class QuizService {
         Map<Long, NewsBodyResponse.MyResult> out = new HashMap<>();
         jdbc.query("""
                 SELECT q.id, count(a.id) AS attempts, coalesce(bool_or(a.is_correct), false) AS solved,
-                       coalesce((SELECT sum(h.amount) FROM honey_ledger h WHERE h.user_id = ? AND h.quiz_id = q.id), 0) AS earned
+                       coalesce((SELECT sum(h.amount) FROM honey_ledger h WHERE h.user_id = ? AND h.quiz_id = q.id), 0) AS earned,
+                       EXISTS(SELECT 1 FROM quiz_reveals v WHERE v.user_id = ? AND v.quiz_id = q.id) AS revealed
                 FROM quizzes q LEFT JOIN quiz_attempts a ON a.quiz_id = q.id AND a.user_id = ?
                 WHERE q.article_id = ? GROUP BY q.id
                 """, rs -> {
-            out.put(rs.getLong("id"), new NewsBodyResponse.MyResult(rs.getInt("attempts"), rs.getBoolean("solved"), rs.getInt("earned")));
-        }, userId, userId, articleId);
+            out.put(rs.getLong("id"), new NewsBodyResponse.MyResult(rs.getInt("attempts"), rs.getBoolean("solved"),
+                    rs.getInt("earned"), rs.getBoolean("revealed")));
+        }, userId, userId, userId, articleId);
         return out;
     }
 

@@ -38,10 +38,10 @@ public interface ReadingHistoryRepository extends JpaRepository<ReadingHistory, 
 
     @Query(value = """
         SELECT new com.youthletter.domain.activity.dto.ReadHistoryRow(
-            a.id, a.title, a.sourceName, a.category, a.publishedAt, max(r.readAt))
+            a.id, a.title, a.sourceName, a.category, a.publishedAt, max(r.readAt), a.thumbnailUrl)
         FROM ReadingHistory r JOIN r.article a
         WHERE r.user.id = :userId
-        GROUP BY a.id, a.title, a.sourceName, a.category, a.publishedAt
+        GROUP BY a.id, a.title, a.sourceName, a.category, a.publishedAt, a.thumbnailUrl
         ORDER BY max(r.readAt) DESC, a.id DESC
         """,
         countQuery = "SELECT count(DISTINCT r.article.id) FROM ReadingHistory r WHERE r.user.id = :userId")

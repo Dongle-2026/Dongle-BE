@@ -40,16 +40,25 @@ public class NewsArticle extends BaseEntity {
     @Column(name = "crawled_at", nullable = false)
     private LocalDateTime crawledAt;
 
+    /** 원문 대표 이미지 URL(og:image). 없으면 null */
+    @Column(name = "thumbnail_url", length = 1000)
+    private String thumbnailUrl;
+
     @Builder
     public NewsArticle(String sourceUrl, String sourceName, String title,
-                       String content, String category, LocalDateTime publishedAt) {
+                       String content, String category, LocalDateTime publishedAt, String thumbnailUrl) {
         this.sourceUrl = sourceUrl;
         this.sourceName = sourceName;
         this.title = title;
         this.content = content;
         this.category = category;
         this.publishedAt = publishedAt;
+        this.thumbnailUrl = thumbnailUrl;
         this.crawledAt = LocalDateTime.now();
+    }
+
+    public void changeThumbnail(String thumbnailUrl) {
+        this.thumbnailUrl = thumbnailUrl;
     }
 
     /** 자동 분류 결과 반영 (관리자 재분류) */

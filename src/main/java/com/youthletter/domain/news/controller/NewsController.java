@@ -29,6 +29,16 @@ public class NewsController {
 
     private final NewsService newsService;
     private final SearchService searchService;
+    private final com.youthletter.domain.news.service.NewsFeedService newsFeedService;
+
+    @Operation(summary = "앱 카드뉴스 목록", description = "limit 지정 시 page=1부터, data 배열과 meta 및 slides 반환. 생성 전 기사는 slides=[]")
+    @GetMapping(params = "limit")
+    public com.youthletter.domain.news.dto.NewsFeedResponse feed(
+            @AuthenticationPrincipal CustomUserPrincipal principal,
+            @RequestParam(defaultValue = "1") int page, @RequestParam int limit,
+            @RequestParam(required = false) String category, @RequestParam(required = false) String keyword) {
+        return newsFeedService.feed(category, keyword, page, limit, principal == null ? null : principal.getUserId());
+    }
 
     /** 트렌드 집계용: 로그인 사용자의 첫 페이지 검색만 기록(다음 페이지 로딩은 같은 검색). */
     private void recordSearch(CustomUserPrincipal principal, String keyword, Pageable pageable) {
@@ -41,7 +51,7 @@ public class NewsController {
             @RequestParam String q,
             @PageableDefault(size = 20, sort = "publishedAt", direction = Sort.Direction.DESC) Pageable pageable) {
         recordSearch(principal, q, pageable);
-        return ResponseEntity.ok(GlobalResponse.ok(newsService.getNewsList(null, q, null, pageable)));
+        return ResponseEntity.ok(GlobalResponse.ok(newsService.getNewsList(null, q, null, pageable, principal == null ? null : principal.getUserId())));
     }
 
     @PostMapping("/{articleId}/save")
@@ -67,7 +77,7 @@ public class NewsController {
             @PageableDefault(size = 20, sort = "publishedAt", direction = Sort.Direction.DESC)
             Pageable pageable) {
         recordSearch(principal, keyword, pageable);
-        return ResponseEntity.ok(GlobalResponse.ok(newsService.getNewsList(category, keyword, date, pageable)));
+        return ResponseEntity.ok(GlobalResponse.ok(newsService.getNewsList(category, keyword, date, pageable, principal == null ? null : principal.getUserId())));
     }
 
     @Operation(summary = "오늘의 뉴스 홈 브리핑", description = "오늘 수집된 최신 12건. 로그인 시 관심 카테고리 우선 정렬.")

@@ -41,7 +41,7 @@ ai-service:
   use-stub: ${AI_USE_STUB:false}
   model-version: ${AI_MODEL_VERSION:qwen3:8b}
   token: ${AI_SERVICE_TOKEN:}
-  timeout-seconds: ${AI_TIMEOUT_SECONDS:370}
+  timeout-seconds: ${AI_TIMEOUT_SECONDS:540}  # 퀴즈는 생성+자기검증 최대 4회 호출. 작업 리스(10분)보다 짧게
 
 # ── 모바일 소셜 로그인 (앱이 보낸 idToken 검증) ──
 # audiences가 비어 있는 제공자는 503(설정 안 됨)으로 거부한다.
@@ -55,6 +55,15 @@ mobile-oauth:
       jwk-set-uri: https://kauth.kakao.com/.well-known/jwks.json
       issuers: https://kauth.kakao.com
       audiences: ${KAKAO_APP_KEYS:}             # 카카오 앱 키(네이티브 앱 키 등), 쉼표 구분. OIDC 활성화 필요
+
+# ── 푸시 알림 (Expo Push API) ──
+# 기본은 꺼짐. 켜면 정기 알림(한국 시간)과 정책 마감 알림을 앱 기기(ExponentPushToken)로 보낸다.
+push:
+  enabled: ${PUSH_ENABLED:false}
+  expo-access-token: ${EXPO_ACCESS_TOKEN:}       # Expo 계정에서 Push security를 켠 경우만 필요
+  daily-digest-cron: ${PUSH_DAILY_DIGEST_CRON:0 0 8 * * *}
+  quiz-reminder-cron: ${PUSH_QUIZ_REMINDER_CRON:0 0 19 * * *}
+  streak-alert-cron: ${PUSH_STREAK_ALERT_CRON:0 0 21 * * *}
 
 # ── Swagger ──
 springdoc:
