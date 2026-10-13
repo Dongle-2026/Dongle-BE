@@ -1,0 +1,32 @@
+# 회귀 테스트 전용. 샘플/실제 기사 생성용 quick-test DB와 분리한다.
+# docker compose -p youthletter-regression -f docker-compose.regression.yml up -d --wait
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: youthletter_test
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test1234
+      TZ: Asia/Seoul
+    ports: ["127.0.0.1:15435:5432"]
+    volumes:
+      - regression_db:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./docker/postgres/02-apply-migrations.sh:/docker-entrypoint-initdb.d/02-apply-migrations.sh:ro
+      - ./docker/postgres/upgrade-capstone.sql:/migrations/upgrade-capstone.sql:ro
+      - ./src/main/resources/db/migration:/migrations/db:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d youthletter_test && psql -U test -d youthletter_test -Atc \"SELECT to_regclass('content_reports') IS NOT NULL\" | grep -qx t"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  redis:
+    image: redis:7-alpine
+    ports: ["127.0.0.1:16382:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+volumes:
+  regression_db:

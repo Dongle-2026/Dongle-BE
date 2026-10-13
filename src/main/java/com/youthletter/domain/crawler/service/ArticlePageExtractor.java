@@ -4,12 +4,34 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 
 import java.net.URI;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeParseException;
 
 /** 기사 원문 페이지에서 대표 이미지(og:image → twitter:image, http(s)만)와 제목을 뽑는다. */
 public final class ArticlePageExtractor {
     static final int MAX_LENGTH = 1000;
 
     private ArticlePageExtractor() {}
+
+    /** 발행 시각만 사용한다. 수정일이나 수집일로 대체하지 않는다.
+     * 기존 JDBC LocalDateTime 저장 규칙에 맞춰 명시한 서버 시간대로 변환한다.
+     */
+    public static LocalDateTime publishedAt(Document doc, ZoneId storageZone) {
+        for (String selector : new String[]{"meta[property=article:published_time]",
+                "meta[itemprop=datePublished]", "time[itemprop=datePublished][datetime]"}) {
+            for (Element element : doc.select(selector)) {
+                String value = element.attr(element.tagName().equals("time") ? "datetime" : "content").strip();
+                try {
+                    return OffsetDateTime.parse(value).atZoneSameInstant(storageZone).toLocalDateTime();
+                } catch (DateTimeParseException ignored) {
+                    // 날짜만 있거나 시간대가 없는 값은 시각을 추측하지 않고 다음 후보를 검사한다.
+                }
+            }
+        }
+        return null;
+    }
 
     public static String extract(Document doc) {
         for (String selector : new String[]{"meta[property=og:image]", "meta[name=twitter:image]"}) {
