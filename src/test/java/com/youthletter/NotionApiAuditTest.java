@@ -131,15 +131,17 @@ class NotionApiAuditTest {
         else assertThat(status).isGreaterThanOrEqualTo(400);
     }
 
-    @Test void listContractDiffersFromNotion() throws Exception {
+    @Test void limitSelectsAppFeedWhileSizePreservesLegacyPage() throws Exception {
         var result = mvc.perform(get("/api/news").param("keyword",marker).param("page","1").param("limit","10"))
             .andExpect(status().isOk()).andReturn();
         JsonNode body = json.readTree(result.getResponse().getContentAsString());
-        assertThat(body.has("meta")).isFalse();
-        assertThat(body.path("data").isObject()).isTrue();
-        assertThat(body.at("/data/number").asInt()).isEqualTo(1);
-        assertThat(body.at("/data/size").asInt()).isEqualTo(20);
-        assertThat(body.at("/data/content").size()).isZero(); // page=1 is the second page
+        assertThat(body.has("meta")).isTrue();
+        assertThat(body.path("data").isArray()).isTrue();
+        assertThat(body.at("/meta/page").asInt()).isEqualTo(1);
+        assertThat(body.at("/meta/limit").asInt()).isEqualTo(10);
+        assertThat(body.path("data").size()).isEqualTo(1);
+        assertThat(body.at("/data/0/id").isTextual()).isTrue();
+        assertThat(body.at("/data/0/slides").isArray()).isTrue();
         var first = mvc.perform(get("/api/news").param("keyword",marker).param("page","0").param("size","10"))
             .andExpect(status().isOk()).andReturn();
         JsonNode item = json.readTree(first.getResponse().getContentAsString()).at("/data/content/0");

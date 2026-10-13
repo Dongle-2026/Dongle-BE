@@ -27,6 +27,8 @@ FROM eclipse-temurin:17-jre
 
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+
 # 보안: root가 아닌 전용 유저로 실행 (Ubuntu/Debian 문법)
 RUN groupadd -r appgroup && useradd -r -g appgroup appuser
 USER appuser
@@ -36,7 +38,7 @@ COPY --from=build /app/build/libs/*.jar app.jar
 
 # 헬스체크
 HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
-    CMD wget -qO- http://localhost:8080/actuator/health || exit 1
+    CMD curl --fail --silent http://localhost:8080/api/health || exit 1
 
 EXPOSE 8080
 

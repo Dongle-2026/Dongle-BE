@@ -92,4 +92,6 @@ clean {
 
 tasks.named('test') {
     useJUnitPlatform()
+    // 명시적으로 켜는 프로세스 재시작 시험에서 하위 JVM의 클래스패스를 사용한다.
+    systemProperty 'test.runtime.classpath', sourceSets.test.runtimeClasspath.asPath
 }

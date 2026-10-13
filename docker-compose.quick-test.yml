@@ -1,0 +1,33 @@
+# 격리 회귀/재시작 검증. 기존 개발·시험용 볼륨과 이름을 공유하지 않는다.
+# docker compose -p youthletter-quick -f docker-compose.quick-test.yml up -d --wait
+# DB_PORT=15434 REDIS_PORT=16381 ./gradlew test --no-daemon
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: youthletter_test
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test1234
+      TZ: Asia/Seoul
+    ports: ["127.0.0.1:15434:5432"]
+    volumes:
+      - quick_db:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./docker/postgres/02-apply-migrations.sh:/docker-entrypoint-initdb.d/02-apply-migrations.sh:ro
+      - ./docker/postgres/upgrade-capstone.sql:/migrations/upgrade-capstone.sql:ro
+      - ./src/main/resources/db/migration:/migrations/db:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U test -d youthletter_test && psql -U test -d youthletter_test -Atc \"SELECT to_regclass('content_reports') IS NOT NULL\" | grep -qx t"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  redis:
+    image: redis:7-alpine
+    ports: ["127.0.0.1:16381:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+volumes:
+  quick_db:
