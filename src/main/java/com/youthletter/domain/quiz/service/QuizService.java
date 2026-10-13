@@ -51,8 +51,7 @@ public class QuizService {
     @Transactional
     public NewsBodyResponse body(Long articleId, Long userId) {
         NewsDetailResponse detail = newsService.getNewsDetail(articleId);
-        String intro = detail.summary() == null || detail.summary().isBlank() || detail.summary().startsWith("[STUB]")
-                ? null : detail.summary();
+        String intro = com.youthletter.domain.news.service.NewsSummaryText.display(detail.summary());
 
         List<NewsBodyResponse.Term> terms = terms(detail, userId);
         List<StoredQuiz> stored = jdbc.query("SELECT id, question, choices FROM quizzes WHERE article_id=? ORDER BY quiz_order",

@@ -28,4 +28,12 @@ class MaintenanceRunnerTest {
         em.flush(); // 테스트 트랜잭션은 커밋되지 않으므로 SQL 확인 전 반영
         assertThat(jdbc.queryForObject("SELECT category FROM news_articles WHERE id=?", String.class, id)).isEqualTo("부동산");
     }
+
+    @Test void keepsCuratedSampleCategories() throws Exception {
+        Long sample = jdbc.queryForObject("INSERT INTO news_articles(source_url,source_name,title,content,category,published_at) VALUES (?,'샘플 데이터','[샘플] 첫 월급 돈 관리','적금 저축 적금','취업',now()) RETURNING id",
+                Long.class, "ops-sample-" + UUID.randomUUID());
+        runner.run(new DefaultApplicationArguments());
+        em.flush();
+        assertThat(jdbc.queryForObject("SELECT category FROM news_articles WHERE id=?", String.class, sample)).isEqualTo("취업");
+    }
 }

@@ -40,8 +40,10 @@ public class NewsAiWriter {
         int version = history.stream().mapToInt(NewsSummary::getSummaryVersion).max().orElse(0) + 1;
         history.stream().filter(s -> s.getValidTo() == null).forEach(NewsSummary::expire);
         summaries.flush();
-        summaries.save(NewsSummary.builder().article(article).summaryText(result.summary())
-                .summaryVersion(version).modelVersion(model).build());
+        // stub 모드의 가짜 요약("[STUB] …")은 저장하지 않는다. 화면에 실제 요약처럼 보이는 문제 방지.
+        if (!"stub".equals(model) && !NewsSummaryText.isStub(result.summary()))
+            summaries.save(NewsSummary.builder().article(article).summaryText(result.summary())
+                    .summaryVersion(version).modelVersion(model).build());
         entityManager.createQuery("DELETE FROM ArticleTermHighlight h WHERE h.article.id = :id")
                 .setParameter("id", article.getId()).executeUpdate();
         if (result.terms() != null) for (var dto : result.terms()) {
