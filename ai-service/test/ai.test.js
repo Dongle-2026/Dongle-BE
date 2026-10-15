@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAi, validateCards, validateQuizzes, screenQuizzes, checkSelfSolved, unsupportedNumbers, numberValue, retryHint, sentences, articleInput } from '../src/ai.js';
+import { createAi, validateCards, validateQuizzes, screenQuizzes, checkSelfSolved, unsupportedNumbers, numberValue, supportSentenceIds, retryHint, sentences, articleInput } from '../src/ai.js';
 
 const article = { title: '금리 안내', content: '기준금리는 3%입니다. 청년 지원을 안내합니다.' };
 const source = sentences(article.content);
@@ -104,7 +104,7 @@ test('퀴즈 3문제를 근거 문장과 함께 검증해 반환한다', async (
       goodQuiz({ question: '가입 대상 나이는?', choices: ['만 19~34세', '만 40세 이상', '제한 없음', '만 15세 이하'], answerIndex: 0, explanation: '만 19~34세 청년이 대상이다.', sourceSentenceIds: [3, 3] })] }) } }) };
   } });
   const result = await ai.quiz(quizArticle);
-  assert.equal(result.promptVersion, 'quiz-v6-pool');
+  assert.equal(result.promptVersion, 'quiz-v6-pool-evidence');
   assert.equal(calls, 2);
   assert.equal(result.quizzes.length, 3);
   assert.deepEqual(result.quizzes[2].sourceSentenceIds, [3]);
@@ -223,6 +223,18 @@ test('숫자는 표기가 달라도 같은 값이면 인정한다', () => {
   assert.deepEqual(unsupportedNumbers('50만원', '50% 늘었다.'), ['50만']);
 });
 
+test('근거 문장 자동 추가: 기사 속 같은 값의 문장 중 인용 문장에서 가장 가까운 것', () => {
+  const src = sentences('A는 1만3700건이다. B는 늘었다. C도 늘었다. D는 1만3700건이 아니다. 2023년부터 시행했다.');
+  assert.deepEqual(supportSentenceIds('1만3700건', [3], src), [3, 4]); // 1번(거리 2)보다 4번(거리 1)
+  assert.deepEqual(supportSentenceIds('1만3700건, 2023년부터', [2], src), [2, 1, 5]);
+  assert.deepEqual(supportSentenceIds('9999건', [2], src), [2]); // 기사에 없음 → 추가 없음
+  assert.deepEqual(supportSentenceIds('1만3700건', [1, 1], src), [1]); // 이미 근거 있음
+  const many = sentences('1이다. 2이다. 3이다. 4이다. 5이다. 없다.');
+  assert.equal(supportSentenceIds('1 2 3 4 5', [6], many).length, 4); // 최대 3개 추가
+  const card = cards(); card.cards[0].body = '청년 지원'; card.cards[1].body = '기준금리 3%'; card.cards[1].sourceSentenceIds = [2];
+  assert.deepEqual(validateCards(card, source)[1].sourceSentenceIds, [2, 1]);
+});
+
 test('"N가지"처럼 문제 구조를 말하는 작은 개수는 검사하지 않는다', () => {
   assert.deepEqual(unsupportedNumbers('기사가 든 2가지 이유는?', '금리와 환율이 원인이다.'), []);
   assert.deepEqual(unsupportedNumbers('2개 은행', '금리와 환율이 원인이다.'), ['2']);
@@ -243,8 +255,10 @@ test('해설의 숫자는 기사 안에만 있으면 되고, 질문·정답의 �
   assert.equal(validateQuizzes(three(goodQuiz({ explanation: '5년 만기이며 정부기여금은 최대 월 2.4만원이다.' })), quizSource)[0].answerIndex, 2);
   // 해설에 기사에 없는 숫자 → 거부
   assert.throws(() => validateQuizzes(three(goodQuiz({ explanation: '2025년부터 5년 만기다.' })), quizSource), /UNSUPPORTED_NUMBER/);
-  // 정답 보기의 숫자가 근거 문장(1번)에 없고 다른 문장에만 있음 → 거부
-  assert.throws(() => validateQuizzes(three(goodQuiz({ choices: ['1년', '3년', '2.4만원', '10년'] })), quizSource), /UNSUPPORTED_NUMBER/);
+  // 정답 보기의 숫자가 인용 문장(1번)에 없고 다른 문장(2번)에만 있음 → 2번 문장을 근거에 추가
+  assert.deepEqual(validateQuizzes(three(goodQuiz({ choices: ['1년', '3년', '2.4만원', '10년'] })), quizSource)[0].sourceSentenceIds, [1, 2]);
+  // 기사 어디에도 없는 숫자 → 거부
+  assert.throws(() => validateQuizzes(three(goodQuiz({ choices: ['1년', '3년', '7만원', '10년'] })), quizSource), /UNSUPPORTED_NUMBER/);
 });
 
 test('100분의 N과 N%는 같은 값으로 인정한다', () => {

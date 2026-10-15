@@ -72,6 +72,25 @@ export function unsupportedNumbers(text, evidence) {
   return [...new Set(unsupported)];
 }
 
+// 모델이 근거 문장 번호를 잘못 붙이는 경우가 많다(숫자는 기사 다른 문장에 그대로 있음).
+// 근거에 없는 숫자가 기사 속 다른 문장에 같은 값으로 있으면, 인용 문장에서 가장 가까운 그 문장을 근거에 추가한다.
+// 기사 어디에도 없는 숫자는 추가할 문장이 없으므로 그대로 거부된다. 추가는 최대 MAX_ADDED_EVIDENCE개.
+const MAX_ADDED_EVIDENCE = 3;
+export function supportSentenceIds(text, ids, source, title = '') {
+  const cited = [...new Set(ids)];
+  const evidence = () => [title, ...cited.map(id => source[id - 1].text)].join(' ');
+  const distance = (s) => Math.min(...cited.map(id => Math.abs(id - s.id)));
+  let added = 0;
+  for (const number of unsupportedNumbers(text, evidence())) {
+    if (added >= MAX_ADDED_EVIDENCE) break;
+    if (!unsupportedNumbers(number, evidence()).length) continue; // 앞서 추가한 문장이 이미 근거가 됨
+    const match = source.filter(s => !cited.includes(s.id) && !unsupportedNumbers(number, s.text).length)
+      .sort((a, b) => distance(a) - distance(b) || a.id - b.id)[0];
+    if (match) { cited.push(match.id); added++; }
+  }
+  return cited;
+}
+
 export function articleInput(input) {
   if (!input || typeof input.title !== 'string' || !input.title.trim() || input.title.length > 300
       || typeof input.content !== 'string' || !input.content.trim() || input.content.length > 16000) {
@@ -94,11 +113,12 @@ export function validateCards(value, source, title = '') {
         || !card.sourceSentenceIds.length || card.sourceSentenceIds.some(id => !Number.isInteger(id) || id < 1 || id > source.length)) {
       throw new AiError('INVALID_CARDS');
     }
-    const evidence = [title, ...card.sourceSentenceIds.map(id => source[id - 1].text)].join(' ');
+    const ids = supportSentenceIds(`${card.title} ${card.body}`, card.sourceSentenceIds, source, title);
+    const evidence = [title, ...ids.map(id => source[id - 1].text)].join(' ');
     const bad = unsupportedNumbers(`${card.title} ${card.body}`, evidence);
     if (bad.length) throw new AiError('UNSUPPORTED_NUMBER', 502, { item: index + 1, numbers: bad });
     return { cardOrder: index + 1, templateType: card.templateType, title: card.title, body: card.body,
-      subBody: null, highlight: null, sourceSentenceIds: [...new Set(card.sourceSentenceIds)] };
+      subBody: null, highlight: null, sourceSentenceIds: ids };
   });
 }
 
@@ -124,13 +144,14 @@ export function validateQuizItem(q, source, quizIndex = 0, title = '') {
       || q.sourceSentenceIds.some(id => !Number.isInteger(id) || id < 1 || id > source.length)) {
     throw new AiError('INVALID_QUIZ', 502, { item: quizIndex + 1 });
   }
-  const evidence = [title, ...q.sourceSentenceIds.map(id => source[id - 1].text)].join(' ');
+  const ids = supportSentenceIds(`${q.question} ${q.choices[q.answerIndex]}`, q.sourceSentenceIds, source, title);
+  const evidence = [title, ...ids.map(id => source[id - 1].text)].join(' ');
   // 질문·정답은 근거 문장 기준(핵심 사실), 해설은 보조 설명이므로 기사 전체 기준으로 숫자를 확인한다.
   const bad = [...unsupportedNumbers(`${q.question} ${q.choices[q.answerIndex]}`, evidence),
     ...unsupportedNumbers(q.explanation, [title, ...source.map(s => s.text)].join(' '))];
   if (bad.length) throw new AiError('UNSUPPORTED_NUMBER', 502, { item: quizIndex + 1, numbers: [...new Set(bad)] });
   return { question: q.question.trim(), choices: q.choices.map(c => c.trim()), answerIndex: q.answerIndex,
-    explanation: q.explanation.trim(), sourceSentenceIds: [...new Set(q.sourceSentenceIds)] };
+    explanation: q.explanation.trim(), sourceSentenceIds: ids };
 }
 
 export function validateQuizzes(value, source, title = '') {
@@ -241,7 +262,7 @@ export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_
           hint = retryHint(error, '카드');
         }
       }
-      return { modelVersion: model, promptVersion: 'card-v4', cards };
+      return { modelVersion: model, promptVersion: 'card-v4-evidence', cards };
     },
     async quiz(input) {
       articleInput(input);
@@ -273,7 +294,7 @@ export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_
         hint = retryHint(lastError, '문제');
       }
       if (accepted.length < 3) throw lastError;
-      return { modelVersion: model, promptVersion: 'quiz-v6-pool', quizzes: accepted.slice(0, 3) };
+      return { modelVersion: model, promptVersion: 'quiz-v6-pool-evidence', quizzes: accepted.slice(0, 3) };
     },
     async insight(input) {
       // 숫자는 Spring에서 문장화한다. 모델은 숫자 없는 일반 행동 제안만 작성한다.
