@@ -235,6 +235,22 @@ test('근거 문장 자동 추가: 기사 속 같은 값의 문장 중 인용 �
   assert.deepEqual(validateCards(card, source)[1].sourceSentenceIds, [2, 1]);
 });
 
+test('요약에 기사에 없는 숫자가 있으면 한 번 다시 요약하고, 또 있으면 저장하지 않는다', async () => {
+  const prompts = [];
+  const summaries = ['인구의 30%가 약자다.', '기준금리는 3%다.'];
+  const ai = createAi({ fetchImpl: async (url, init) => {
+    if (url.endsWith('/embed')) return { ok: true, json: async () => ({ embeddings: [Array(768).fill(0.01)] }) };
+    prompts.push(JSON.parse(init.body).messages[1].content);
+    return { ok: true, json: async () => ({ message: { content: JSON.stringify({ summary: summaries[prompts.length - 1], terms: [] }) } }) };
+  } });
+  assert.equal((await ai.process(article)).summary, '기준금리는 3%다.');
+  assert.match(prompts[1], /이전 요약의 숫자 30%는 기사에 없다/);
+  const always = createAi({ fetchImpl: async (url) => url.endsWith('/embed')
+    ? { ok: true, json: async () => ({ embeddings: [Array(768).fill(0.01)] }) }
+    : { ok: true, json: async () => ({ message: { content: '{"summary":"인구의 30%","terms":[]}' } }) } });
+  await assert.rejects(() => always.process(article), /UNSUPPORTED_NUMBER/);
+});
+
 test('"N가지"처럼 문제 구조를 말하는 작은 개수는 검사하지 않는다', () => {
   assert.deepEqual(unsupportedNumbers('기사가 든 2가지 이유는?', '금리와 환율이 원인이다.'), []);
   assert.deepEqual(unsupportedNumbers('2개 은행', '금리와 환율이 원인이다.'), ['2']);

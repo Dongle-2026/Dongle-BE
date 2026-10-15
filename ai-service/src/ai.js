@@ -231,9 +231,19 @@ export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_
     },
     async process(input) {
       articleInput(input);
-      const result = await generate(analysisSchema, '요약은 총 150자 이내의 짧은 3문장. 본문에 실제 등장하는 핵심 금융 용어는 최대 2개만 선택한다. 각 설명은 40자 이내 한 문장. 불필요한 설명 없이 간결하게 반환한다.', { title: input.title, content: input.content });
-      if (typeof result.summary !== 'string' || !result.summary.trim() || result.summary.length > 2000
-          || !Array.isArray(result.terms) || result.terms.length > 7) throw new AiError('INVALID_ANALYSIS');
+      // 요약의 숫자도 기사(제목·본문)에 있어야 한다. 걸리면 거부된 숫자를 알려 주고 한 번만 다시 요약한다.
+      const instruction = '요약은 총 150자 이내의 짧은 3문장. 숫자는 본문 표기 그대로만 쓰고(계산·반올림·추정 금지) 꼭 필요할 때만 쓴다. 본문에 실제 등장하는 핵심 금융 용어는 최대 2개만 선택한다. 각 설명은 40자 이내 한 문장. 불필요한 설명 없이 간결하게 반환한다.';
+      let result, hint = '';
+      for (let attempt = 0; attempt < 2; attempt++) {
+        result = await generate(analysisSchema, instruction + hint, { title: input.title, content: input.content });
+        if (typeof result.summary !== 'string' || !result.summary.trim() || result.summary.length > 2000
+            || !Array.isArray(result.terms) || result.terms.length > 7) throw new AiError('INVALID_ANALYSIS');
+        const bad = unsupportedNumbers(result.summary, `${input.title} ${input.content}`);
+        if (!bad.length) break;
+        note({ stage: 'summary-rejected', code: 'UNSUPPORTED_NUMBER', numbers: bad });
+        if (attempt) throw new AiError('UNSUPPORTED_NUMBER', 502, { item: 1, numbers: bad });
+        hint = ` 이전 요약의 숫자 ${bad.join(', ')}는 기사에 없다. 기사에 없는 숫자를 만들거나 계산하지 말고 기사 표기 그대로 쓰거나 숫자를 빼라.`;
+      }
       const terms = result.terms.map(t => {
         if (typeof t.term !== 'string' || !t.term || t.term.length > 200 || typeof t.explanation !== 'string'
             || !t.explanation.trim() || t.explanation.length > 500) throw new AiError('INVALID_TERM');
