@@ -193,7 +193,7 @@ export function retryHint(error, kind) {
 
 export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434',
   model = process.env.OLLAMA_CHAT_MODEL ?? 'qwen3:8b', embedModel = process.env.OLLAMA_EMBED_MODEL ?? 'nomic-embed-text',
-  timeoutMs = Number(process.env.OLLAMA_TIMEOUT_MS ?? 240000), observe = () => {},
+  timeoutMs = Number(process.env.OLLAMA_TIMEOUT_MS ?? 300000), observe = () => {},
   // 요청 1건(재시도 포함) 전체 마감. Spring이 AI 응답을 기다리는 시간(AI_TIMEOUT_SECONDS, 기본 540초)보다 짧게 둔다.
   requestBudgetMs = Number(process.env.AI_REQUEST_BUDGET_MS ?? 500000), now = () => performance.now() } = {}) {
   const MIN_CALL_MS = 20000; // 남은 시간이 이보다 짧으면 새 모델 호출을 시작하지 않는다
@@ -289,14 +289,15 @@ export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_
       articleInput(input);
       const source = sentences(input.content);
       // 숫자를 묻는 문제는 모델이 표기를 자주 바꿔 검증에 걸리고 출력도 길어진다 → 개념·원인·결과 중심으로 묻는다.
-      // 필요한 수보다 1개 더 출제해 통과한 문제만 쓴다. 모자라면 한 번 더, 부족한 만큼만 다시 출제한다.
+      // 통과한 문제만 쓴다. 모자라면 한 번 더, 부족한 수보다 1개 더 출제한다.
+      // 첫 출제를 4문제로 하면 출력이 길어져 느린 장비에서 모델 호출 시간 제한에 걸린다(실측) → 첫 출제는 3문제.
       const rules = '각 문제는 제공된 문장 id(sourceSentenceIds)에 근거한다. 주로 기사의 핵심 개념·원인·결과·대상을 묻고, 숫자를 정답으로 묻는 문제는 최대 1개. 숫자·날짜를 쓰면 근거 문장 표기 그대로(연도 추가·반올림·축약 금지). 해설에는 가능하면 숫자를 쓰지 않는다. 보기 4개는 서로 다르고 정답은 1개, answerIndex는 0~3. 오답 보기는 기사 내용과 분명히 다르게(기사 속 다른 사실을 오답으로 쓰지 않는다). 질문 50자, 보기 25자, 해설 60자 이내. 기사에 없는 사실 금지. 투자 권유 금지.';
       const deadline = now() + requestBudgetMs;
       const accepted = [];
       let hint = '', lastError = new AiError('INVALID_QUIZ');
       for (let attempt = 0; attempt < 2 && accepted.length < 3; attempt++) {
         if (attempt && deadline - now() < MIN_CALL_MS) break; // 재시도할 시간이 없으면 마지막 오류로 끝낸다
-        const ask = 3 - accepted.length + 1;
+        const ask = attempt === 0 ? 3 : 3 - accepted.length + 1;
         const avoid = accepted.length ? ` 이미 채택된 질문과 겹치지 않게 한다: ${JSON.stringify(accepted.map(q => q.question))}.` : '';
         const raw = await generate(quizPoolSchema(ask), `기사 이해도 확인용 4지선다 퀴즈 정확히 ${ask}문제. ${rules}${avoid}${hint}`,
           { title: input.title, sentences: source }, 380 * ask, deadline);

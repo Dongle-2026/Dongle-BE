@@ -109,7 +109,7 @@ test('퀴즈 3문제를 근거 문장과 함께 검증해 반환한다', async (
   assert.equal(result.quizzes.length, 3);
   assert.deepEqual(result.quizzes[2].sourceSentenceIds, [3]);
   assert.equal(requested.format.properties.quizzes.items.properties.choices.minItems, undefined);
-  assert.equal(requested.options.num_predict, 1520); // 3문제 + 예비 1문제
+  assert.equal(requested.options.num_predict, 1140); // 첫 출제는 3문제
   assert.equal(requested.format.properties.quizzes.type, 'array');
 });
 test('퀴즈 검증: 개수·중복 보기·정답 범위·근거 없는 숫자를 거부한다', () => {
@@ -194,7 +194,7 @@ test('한 문제가 거부돼도 나머지는 채택하고, 부족한 만큼만 
   } });
   const result = await ai.quiz(quizArticle);
   assert.deepEqual(result.quizzes.map(q => q.question), ['b', 'c', 'e']);
-  assert.deepEqual(asked, [4, 2]);
+  assert.deepEqual(asked, [3, 2]);
   const rejected = events.filter(e => e.stage === 'quiz-item-rejected');
   assert.deepEqual(rejected.find(e => e.code === 'UNSUPPORTED_NUMBER').numbers, ['2025']);
   assert.ok(rejected.some(e => e.code === 'QUIZ_SELF_CHECK_FAILED'));
@@ -267,7 +267,7 @@ test('요청 전체 마감: 첫 시도가 오래 걸리면 재시도하지 않�
     } });
     await assert.rejects(() => ai.quiz(quizArticle), /UNSUPPORTED_NUMBER/);
     assert.equal(timeouts.length, 1); // 재시도 호출 없음
-    assert.equal(timeouts[0], 240000); // 첫 호출은 모델 호출 제한(240초)이 더 짧음
+    assert.equal(timeouts[0], 300000); // 첫 호출은 모델 호출 제한(300초)이 더 짧음
 
     clock = 0; timeouts.length = 0;
     const slow = createAi({ requestBudgetMs: 300000, now: () => clock, fetchImpl: async () => {
@@ -275,7 +275,7 @@ test('요청 전체 마감: 첫 시도가 오래 걸리면 재시도하지 않�
       return { ok: true, json: async () => ({ message: { content: '{"quizzes":[]}' } }) };
     } });
     await assert.rejects(() => slow.quiz(quizArticle), /INVALID_QUIZ/);
-    assert.deepEqual(timeouts, [240000, 100000]); // 두 번째 호출은 남은 100초만 기다림
+    assert.deepEqual(timeouts, [300000, 100000]); // 두 번째 호출은 남은 100초만 기다림
   } finally {
     AbortSignal.timeout = realTimeout;
   }
