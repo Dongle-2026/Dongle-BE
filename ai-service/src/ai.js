@@ -55,7 +55,10 @@ export function numberValue(token) {
 const withPercent = (t) => t.replace(/100분의\s?(\d+(?:\.\d+)?)/g, (m, n) => `${m} ${n}%`);
 // "두 가지 이유"처럼 문제 구조를 설명하는 작은 개수는 기사 사실이 아니므로 검사하지 않는다.
 const isStructuralCount = (text, index, token) => /^\d$|^10$/.test(token) && /^\s?가지/.test(text.slice(index + token.length));
-export function unsupportedNumbers(text, evidence) {
+// "14만 9576명"처럼 단위 뒤를 띄어 써도 한 숫자로 읽는다.
+const joinUnitSpaces = (t) => t.replace(/(\d[만억조천])\s+(?=\d)/g, '$1');
+export function unsupportedNumbers(rawText, rawEvidence) {
+  const text = joinUnitSpaces(rawText), evidence = joinUnitSpaces(rawEvidence);
   const evidenceValues = new Set((withPercent(evidence).match(NUMBER_TOKEN) ?? []).map(numberValue));
   const unsupported = [];
   for (const match of text.matchAll(NUMBER_TOKEN)) {

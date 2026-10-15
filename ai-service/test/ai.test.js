@@ -221,6 +221,9 @@ test('숫자는 표기가 달라도 같은 값이면 인정한다', () => {
   assert.deepEqual(unsupportedNumbers('50% 증가', '50퍼센트 늘었다.'), []);
   assert.deepEqual(unsupportedNumbers('5천만원', '지원금은 1천만원이다.'), ['5천만']);
   assert.deepEqual(unsupportedNumbers('50만원', '50% 늘었다.'), ['50만']);
+  assert.deepEqual(unsupportedNumbers('14만 9576명', '14만9576명이다.'), []);
+  assert.deepEqual(unsupportedNumbers('14만9576명', '14만 9576명이다.'), []);
+  assert.deepEqual(unsupportedNumbers('14만 명', '14만9576명이다.'), ['14만']);
 });
 
 test('근거 문장 자동 추가: 기사 속 같은 값의 문장 중 인용 문장에서 가장 가까운 것', () => {

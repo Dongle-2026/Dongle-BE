@@ -30,6 +30,8 @@ class NumberEvidenceTest {
         assertThat(NumberEvidence.unsupported("50% 증가", "50퍼센트 늘었다.")).isEmpty();
         assertThat(NumberEvidence.unsupported("기사가 든 2가지 이유는?", "금리와 환율이 원인이다.")).isEmpty();
         assertThat(NumberEvidence.value("1천만")).isEqualTo(NumberEvidence.value("10000000"));
+        assertThat(NumberEvidence.unsupported("14만 9576명", "14만9576명이다.")).isEmpty();
+        assertThat(NumberEvidence.unsupported("14만 명", "14만9576명이다.")).containsExactly("14만");
     }
 
     @Test void stillRejectsDifferentValues() {
