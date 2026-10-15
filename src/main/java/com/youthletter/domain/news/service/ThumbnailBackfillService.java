@@ -26,6 +26,18 @@ public class ThumbnailBackfillService {
 
     public record Result(int checked, int updated, int notFound, int failed, boolean rateLimited) {}
 
+    /** 예전에 저장된 로고·기본 이미지 썸네일을 비운다(원문 요청 없음). 비운 건수를 돌려준다. */
+    public int clearPlaceholders() {
+        List<Map<String, Object>> rows = jdbc.queryForList("SELECT id, thumbnail_url FROM news_articles WHERE thumbnail_url IS NOT NULL");
+        int cleared = 0;
+        for (Map<String, Object> row : rows) {
+            String url = (String) row.get("thumbnail_url");
+            if (ArticlePageExtractor.isPlaceholder(url))
+                cleared += jdbc.update("UPDATE news_articles SET thumbnail_url=NULL WHERE id=? AND thumbnail_url=?", row.get("id"), url);
+        }
+        return cleared;
+    }
+
     public Result backfill(int limit) {
         List<Map<String, Object>> targets = jdbc.queryForList(
                 "SELECT id, source_url FROM news_articles WHERE thumbnail_url IS NULL AND source_url LIKE 'http%' ORDER BY id DESC LIMIT ?",

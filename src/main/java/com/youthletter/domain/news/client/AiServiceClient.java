@@ -115,6 +115,10 @@ public class AiServiceClient {
                 || response.embedding().stream().allMatch(v -> v == 0)) {
             throw new BusinessException(ErrorCode.AI_SERVICE_ERROR);
         }
+        // 요약 숫자도 기사(제목·본문)에 있어야 한다(AI 서비스와 같은 규칙). 예: 원문에 없는 "인구의 30%"
+        if (!com.youthletter.global.util.NumberEvidence.unsupported(response.summary(), request.title() + " " + request.content()).isEmpty()) {
+            throw new BusinessException(ErrorCode.AI_SERVICE_ERROR);
+        }
         return response;
     }
 

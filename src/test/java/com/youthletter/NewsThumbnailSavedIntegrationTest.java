@@ -122,4 +122,12 @@ class NewsThumbnailSavedIntegrationTest {
             server.stop(0);
         }
     }
+
+    @Test void clearsSiteLogoThumbnailsOnly() {
+        Long logo = article("https://static.hankyung.com/img/logo/logo-news-sns.png?v=" + m, "u3-" + m);
+        assertThat(backfill.clearPlaceholders()).isGreaterThanOrEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT thumbnail_url FROM news_articles WHERE id=?", String.class, logo)).isNull();
+        assertThat(jdbc.queryForObject("SELECT thumbnail_url FROM news_articles WHERE id=?", String.class, withImage))
+                .isEqualTo("http://img.test/" + m + ".jpg");
+    }
 }
