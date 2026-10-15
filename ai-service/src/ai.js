@@ -190,15 +190,18 @@ export function retryHint(error, kind) {
 
 export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_URL ?? 'http://127.0.0.1:11434',
   model = process.env.OLLAMA_CHAT_MODEL ?? 'qwen3:8b', embedModel = process.env.OLLAMA_EMBED_MODEL ?? 'nomic-embed-text',
-  timeoutMs = Number(process.env.OLLAMA_TIMEOUT_MS ?? 240000), observe = () => {} } = {}) {
-  async function call(path, body) {
+  timeoutMs = Number(process.env.OLLAMA_TIMEOUT_MS ?? 240000), observe = () => {},
+  // 요청 1건(재시도 포함) 전체 마감. Spring이 AI 응답을 기다리는 시간(AI_TIMEOUT_SECONDS, 기본 540초)보다 짧게 둔다.
+  requestBudgetMs = Number(process.env.AI_REQUEST_BUDGET_MS ?? 500000), now = () => performance.now() } = {}) {
+  const MIN_CALL_MS = 20000; // 남은 시간이 이보다 짧으면 새 모델 호출을 시작하지 않는다
+  async function call(path, body, limitMs = timeoutMs) {
     const started = performance.now();
     let status = 0;
     let code = 'OK';
     try {
       const response = await fetchImpl(`${baseUrl}${path}`, { method: body ? 'POST' : 'GET',
         headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined,
-        signal: AbortSignal.timeout(timeoutMs) });
+        signal: AbortSignal.timeout(Math.max(1, Math.min(timeoutMs, limitMs))) });
       status = response.status ?? 200;
       if (!response.ok) throw new AiError('OLLAMA_ERROR', 503);
       return await response.json();
@@ -211,10 +214,13 @@ export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_
     }
   }
   const note = (event) => { try { observe(event); } catch { /* 관측 실패가 생성을 실패시키지 않는다. */ } };
-  async function generate(schema, instruction, data, maxTokens = 1000) {
+  // deadline이 있으면 남은 시간만큼만 기다린다. 남은 시간이 너무 짧으면 호출하지 않고 시간 초과로 끝낸다.
+  async function generate(schema, instruction, data, maxTokens = 1000, deadline = Infinity) {
+    const remaining = deadline - now();
+    if (remaining < MIN_CALL_MS) throw new AiError('OLLAMA_TIMEOUT', 503);
     const result = await call('/api/chat', { model, stream: false, think: false, format: generationSchema(schema),
       options: { temperature: 0, num_predict: maxTokens },
-      messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: `${instruction}\n출력 스키마: ${JSON.stringify(schema)}\n입력: ${JSON.stringify(data)}` }] });
+      messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: `${instruction}\n출력 스키마: ${JSON.stringify(schema)}\n입력: ${JSON.stringify(data)}` }] }, remaining);
     // 토큰 한도로 중단된 결과는 우연히 JSON처럼 보여도 완성 결과로 저장하지 않는다.
     if (result.done_reason === 'length') throw new AiError('MODEL_OUTPUT_TRUNCATED');
     try { observe({ stage: 'generation', code: 'OK', outputTokens: result.eval_count ?? null,
@@ -233,9 +239,10 @@ export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_
       articleInput(input);
       // 요약의 숫자도 기사(제목·본문)에 있어야 한다. 걸리면 거부된 숫자를 알려 주고 한 번만 다시 요약한다.
       const instruction = '요약은 총 150자 이내의 짧은 3문장. 숫자는 본문 표기 그대로만 쓰고(계산·반올림·추정 금지) 꼭 필요할 때만 쓴다. 본문에 실제 등장하는 핵심 금융 용어는 최대 2개만 선택한다. 각 설명은 40자 이내 한 문장. 불필요한 설명 없이 간결하게 반환한다.';
+      const deadline = now() + requestBudgetMs;
       let result, hint = '';
       for (let attempt = 0; attempt < 2; attempt++) {
-        result = await generate(analysisSchema, instruction + hint, { title: input.title, content: input.content });
+        result = await generate(analysisSchema, instruction + hint, { title: input.title, content: input.content }, 1000, deadline);
         if (typeof result.summary !== 'string' || !result.summary.trim() || result.summary.length > 2000
             || !Array.isArray(result.terms) || result.terms.length > 7) throw new AiError('INVALID_ANALYSIS');
         const bad = unsupportedNumbers(result.summary, `${input.title} ${input.content}`);
@@ -261,14 +268,15 @@ export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_
       articleInput(input);
       const source = sentences(input.content);
       const instruction = '정확히 5장 카드: 핵심, 요약, 배경, 용어, 확인 순서. 각 카드 sourceSentenceIds는 제공된 문장 id로만 작성한다. 근거 없는 영향은 추측하지 않는다. 짧게: title 15자, body 40자 이내. 숫자는 근거 문장 표기 그대로(반올림·축약 금지). 각 카드 templateType은 T01~T10. 부연 설명 금지.';
+      const deadline = now() + requestBudgetMs;
       let cards, hint = '';
       for (let attempt = 0; attempt < 2; attempt++) {
         try {
-          cards = validateCards(await generate(cardSchema, instruction + hint, { title: input.title, sentences: source }, 1600), source, input.title);
+          cards = validateCards(await generate(cardSchema, instruction + hint, { title: input.title, sentences: source }, 1600, deadline), source, input.title);
           break;
         } catch (error) {
           if (error.code === 'UNSUPPORTED_NUMBER') note({ stage: 'card-rejected', code: error.code, numbers: error.detail?.numbers ?? null });
-          if (attempt || error.status === 503) throw error;
+          if (attempt || error.status === 503 || deadline - now() < MIN_CALL_MS) throw error;
           hint = retryHint(error, '카드');
         }
       }
@@ -280,19 +288,21 @@ export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_
       // 숫자를 묻는 문제는 모델이 표기를 자주 바꿔 검증에 걸리고 출력도 길어진다 → 개념·원인·결과 중심으로 묻는다.
       // 필요한 수보다 1개 더 출제해 통과한 문제만 쓴다. 모자라면 한 번 더, 부족한 만큼만 다시 출제한다.
       const rules = '각 문제는 제공된 문장 id(sourceSentenceIds)에 근거한다. 주로 기사의 핵심 개념·원인·결과·대상을 묻고, 숫자를 정답으로 묻는 문제는 최대 1개. 숫자·날짜를 쓰면 근거 문장 표기 그대로(연도 추가·반올림·축약 금지). 해설에는 가능하면 숫자를 쓰지 않는다. 보기 4개는 서로 다르고 정답은 1개, answerIndex는 0~3. 오답 보기는 기사 내용과 분명히 다르게(기사 속 다른 사실을 오답으로 쓰지 않는다). 질문 50자, 보기 25자, 해설 60자 이내. 기사에 없는 사실 금지. 투자 권유 금지.';
+      const deadline = now() + requestBudgetMs;
       const accepted = [];
       let hint = '', lastError = new AiError('INVALID_QUIZ');
       for (let attempt = 0; attempt < 2 && accepted.length < 3; attempt++) {
+        if (attempt && deadline - now() < MIN_CALL_MS) break; // 재시도할 시간이 없으면 마지막 오류로 끝낸다
         const ask = 3 - accepted.length + 1;
         const avoid = accepted.length ? ` 이미 채택된 질문과 겹치지 않게 한다: ${JSON.stringify(accepted.map(q => q.question))}.` : '';
         const raw = await generate(quizPoolSchema(ask), `기사 이해도 확인용 4지선다 퀴즈 정확히 ${ask}문제. ${rules}${avoid}${hint}`,
-          { title: input.title, sentences: source }, 380 * ask);
+          { title: input.title, sentences: source }, 380 * ask, deadline);
         const { valid, errors } = screenQuizzes(raw, source, input.title, accepted);
         errors.forEach(e => note({ stage: 'quiz-item-rejected', code: e.code, numbers: e.detail?.numbers ?? null }));
         if (errors.length) lastError = errors[0];
         if (valid.length) {
           const exam = valid.map(q => ({ question: q.question, choices: q.choices }));
-          const solved = await generate(solveSchema(valid.length), '기사 문장만 근거로 보기 4개를 각각 검토한다. 유일하게 맞는 보기가 있을 때만 그 번호(0~3)를 answers 배열에 순서대로 쓴다. 맞는 보기가 2개 이상이거나 근거가 부족하면 반드시 -1을 쓴다. 더 강한 근거의 보기를 임의로 고르지 않는다. 공동 참여자 일부를 묻는 보기처럼 둘 다 맞는 경우도 -1이다.', { sentences: source, quizzes: exam }, 60 + 20 * valid.length);
+          const solved = await generate(solveSchema(valid.length), '기사 문장만 근거로 보기 4개를 각각 검토한다. 유일하게 맞는 보기가 있을 때만 그 번호(0~3)를 answers 배열에 순서대로 쓴다. 맞는 보기가 2개 이상이거나 근거가 부족하면 반드시 -1을 쓴다. 더 강한 근거의 보기를 임의로 고르지 않는다. 공동 참여자 일부를 묻는 보기처럼 둘 다 맞는 경우도 -1이다.', { sentences: source, quizzes: exam }, 60 + 20 * valid.length, deadline);
           const answers = Array.isArray(solved?.answers) && solved.answers.length === valid.length ? solved.answers : [];
           const passed = valid.filter((q, i) => answers[i] === q.answerIndex);
           if (passed.length < valid.length) {

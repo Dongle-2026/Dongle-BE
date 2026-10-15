@@ -251,6 +251,33 @@ test('요약에 기사에 없는 숫자가 있으면 한 번 다시 요약하고
   await assert.rejects(() => always.process(article), /UNSUPPORTED_NUMBER/);
 });
 
+test('요청 전체 마감: 첫 시도가 오래 걸리면 재시도하지 않고, 모델 호출은 남은 시간만큼만 기다린다', async () => {
+  let clock = 0;
+  const timeouts = [];
+  const bad = JSON.stringify({ quizzes: [goodQuiz({ explanation: '2025년 5년 만기다.' })] });
+  const realTimeout = AbortSignal.timeout;
+  AbortSignal.timeout = (ms) => { timeouts.push(ms); return realTimeout.call(AbortSignal, ms); };
+  try {
+    const ai = createAi({ requestBudgetMs: 500000, now: () => clock, fetchImpl: async () => {
+      clock += 490000; // 첫 출제에 490초 → 남은 10초
+      return { ok: true, json: async () => ({ message: { content: bad } }) };
+    } });
+    await assert.rejects(() => ai.quiz(quizArticle), /UNSUPPORTED_NUMBER/);
+    assert.equal(timeouts.length, 1); // 재시도 호출 없음
+    assert.equal(timeouts[0], 240000); // 첫 호출은 모델 호출 제한(240초)이 더 짧음
+
+    clock = 0; timeouts.length = 0;
+    const slow = createAi({ requestBudgetMs: 300000, now: () => clock, fetchImpl: async () => {
+      clock += 200000;
+      return { ok: true, json: async () => ({ message: { content: '{"quizzes":[]}' } }) };
+    } });
+    await assert.rejects(() => slow.quiz(quizArticle), /INVALID_QUIZ/);
+    assert.deepEqual(timeouts, [240000, 100000]); // 두 번째 호출은 남은 100초만 기다림
+  } finally {
+    AbortSignal.timeout = realTimeout;
+  }
+});
+
 test('"N가지"처럼 문제 구조를 말하는 작은 개수는 검사하지 않는다', () => {
   assert.deepEqual(unsupportedNumbers('기사가 든 2가지 이유는?', '금리와 환율이 원인이다.'), []);
   assert.deepEqual(unsupportedNumbers('2개 은행', '금리와 환율이 원인이다.'), ['2']);
