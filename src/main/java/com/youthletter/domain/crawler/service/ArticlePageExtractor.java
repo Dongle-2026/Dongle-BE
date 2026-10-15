@@ -4,6 +4,7 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 
 import java.net.URI;
+import java.util.regex.Pattern;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -12,6 +13,9 @@ import java.time.format.DateTimeParseException;
 /** 기사 원문 페이지에서 대표 이미지(og:image → twitter:image, http(s)만)와 제목을 뽑는다. */
 public final class ArticlePageExtractor {
     static final int MAX_LENGTH = 1000;
+    // 기사 사진이 없을 때 사이트가 넣는 로고·기본 이미지(예: 한경 /img/logo/logo-news-sns.png)는 썸네일로 쓰지 않는다.
+    private static final Pattern PLACEHOLDER_IMAGE = Pattern.compile(
+            "(?i)(^|/)(logo|logos)(/|[-_.])|/[^/]*(no[-_]?image|default[-_]?(img|image|thumb|og))[^/]*$");
 
     private ArticlePageExtractor() {}
 
@@ -51,9 +55,20 @@ public final class ArticlePageExtractor {
             URI uri = URI.create(url);
             String scheme = uri.getScheme();
             if (uri.getHost() == null || scheme == null || !(scheme.equalsIgnoreCase("https") || scheme.equalsIgnoreCase("http"))) return null;
-            return url;
+            return isPlaceholder(url) ? null : url;
         } catch (IllegalArgumentException e) {
             return null;
+        }
+    }
+
+    /** 로고·기본 이미지 주소인지. 경로만 검사한다(쿼리 문자열 무시). */
+    public static boolean isPlaceholder(String url) {
+        if (url == null) return false;
+        try {
+            String path = URI.create(url.strip()).getPath();
+            return path != null && PLACEHOLDER_IMAGE.matcher(path).find();
+        } catch (IllegalArgumentException e) {
+            return false;
         }
     }
 

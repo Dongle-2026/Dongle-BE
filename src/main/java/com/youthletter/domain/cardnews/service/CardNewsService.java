@@ -54,7 +54,7 @@ public class CardNewsService {
 
         var result = aiClient.generateCards(new com.youthletter.domain.news.client.dto.AiProcessRequest(
                 article.getSourceUrl(), article.getTitle(), article.getContent(), article.getCategory()));
-        validator.validate(result, article.getContent());
+        validator.validate(result, article.getTitle(), article.getContent());
         return writer.save(articleId, result);
     }
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAi, validateCards, validateQuizzes, checkSelfSolved, unsupportedNumbers, retryHint, sentences, articleInput } from '../src/ai.js';
+import { createAi, validateCards, validateQuizzes, screenQuizzes, checkSelfSolved, unsupportedNumbers, numberValue, retryHint, sentences, articleInput } from '../src/ai.js';
 
 const article = { title: '금리 안내', content: '기준금리는 3%입니다. 청년 지원을 안내합니다.' };
 const source = sentences(article.content);
@@ -104,12 +104,13 @@ test('퀴즈 3문제를 근거 문장과 함께 검증해 반환한다', async (
       goodQuiz({ question: '가입 대상 나이는?', choices: ['만 19~34세', '만 40세 이상', '제한 없음', '만 15세 이하'], answerIndex: 0, explanation: '만 19~34세 청년이 대상이다.', sourceSentenceIds: [3, 3] })] }) } }) };
   } });
   const result = await ai.quiz(quizArticle);
-  assert.equal(result.promptVersion, 'quiz-v5-unique');
+  assert.equal(result.promptVersion, 'quiz-v6-pool');
   assert.equal(calls, 2);
   assert.equal(result.quizzes.length, 3);
   assert.deepEqual(result.quizzes[2].sourceSentenceIds, [3]);
   assert.equal(requested.format.properties.quizzes.items.properties.choices.minItems, undefined);
-  assert.equal(requested.options.num_predict, 1100);
+  assert.equal(requested.options.num_predict, 1520); // 3문제 + 예비 1문제
+  assert.equal(requested.format.properties.quizzes.type, 'array');
 });
 test('퀴즈 검증: 개수·중복 보기·정답 범위·근거 없는 숫자를 거부한다', () => {
   const three = (q) => ({ quizzes: [q, goodQuiz({ question: 'b' }), goodQuiz({ question: 'c' })] });
@@ -156,13 +157,84 @@ test('재시도 때 거부된 숫자를 구체적으로 알려준다', async () 
   const bad = JSON.stringify({ quizzes: [goodQuiz({ explanation: '2025년 5년 만기다.' }), goodQuiz({ question: 'b' }), goodQuiz({ question: 'c' })] });
   const prompts = [];
   const ai = createAi({ fetchImpl: async (url, init) => {
-    prompts.push(JSON.parse(init.body).messages[1].content);
+    const body = JSON.parse(init.body);
+    if (body.format.properties.answers) {
+      const n = JSON.parse(body.messages[1].content.split('입력: ')[1]).quizzes.length;
+      return { ok: true, json: async () => ({ message: { content: JSON.stringify({ answers: Array(n).fill(2) }) } }) };
+    }
+    prompts.push(body.messages[1].content);
     return { ok: true, json: async () => ({ message: { content: bad } }) };
   } });
+  // b·c는 채택, 1번은 두 번 모두 거부 → 3문제를 못 채우면 저장하지 않는다
   await assert.rejects(() => ai.quiz(quizArticle), /UNSUPPORTED_NUMBER/);
   assert.equal(prompts.length, 2);
   assert.match(prompts[1], /1번 문제의 숫자 2025는 근거 문장에 없다/);
+  assert.match(prompts[1], /이미 채택된 질문과 겹치지 않게/);
   assert.match(retryHint({ code: 'QUIZ_SELF_CHECK_FAILED' }, '문제'), /정답을 하나로 고를 수 없었다/);
+});
+
+test('한 문제가 거부돼도 나머지는 채택하고, 부족한 만큼만 다시 출제한다', async () => {
+  const events = [];
+  const batches = [
+    { quizzes: [goodQuiz({ explanation: '2025년 5년 만기다.' }), goodQuiz({ question: 'b' }), goodQuiz({ question: 'c' }), goodQuiz({ question: 'd' })] },
+    { quizzes: [goodQuiz({ question: 'b' }), goodQuiz({ question: 'e' })] },
+  ];
+  const asked = [];
+  let solveCalls = 0;
+  const ai = createAi({ observe: e => events.push(e), fetchImpl: async (url, init) => {
+    const body = JSON.parse(init.body);
+    if (body.format.properties.answers) {
+      solveCalls++;
+      // 첫 묶음: b 통과, c 통과, d 자기 풀이 불일치 / 둘째 묶음: e 통과
+      const answers = solveCalls === 1 ? [2, 2, 0] : [2];
+      return { ok: true, json: async () => ({ message: { content: JSON.stringify({ answers }) } }) };
+    }
+    asked.push(Number(body.messages[1].content.match(/정확히 (\d)문제/)[1]));
+    return { ok: true, json: async () => ({ message: { content: JSON.stringify(batches[asked.length - 1]) } }) };
+  } });
+  const result = await ai.quiz(quizArticle);
+  assert.deepEqual(result.quizzes.map(q => q.question), ['b', 'c', 'e']);
+  assert.deepEqual(asked, [4, 2]);
+  const rejected = events.filter(e => e.stage === 'quiz-item-rejected');
+  assert.deepEqual(rejected.find(e => e.code === 'UNSUPPORTED_NUMBER').numbers, ['2025']);
+  assert.ok(rejected.some(e => e.code === 'QUIZ_SELF_CHECK_FAILED'));
+});
+
+test('후보 검증: 형식 오류·중복·이미 채택된 질문을 걸러낸다', () => {
+  const { valid, errors } = screenQuizzes({ quizzes: [goodQuiz(), goodQuiz(), goodQuiz({ answerIndex: 7 }), goodQuiz({ question: 'x' })] },
+    quizSource, quizArticle.title, [{ question: 'x' }]);
+  assert.equal(valid.length, 1);
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].code, 'INVALID_QUIZ');
+  assert.deepEqual(screenQuizzes(null, quizSource).valid, []);
+});
+
+test('숫자는 표기가 달라도 같은 값이면 인정한다', () => {
+  assert.equal(numberValue('1천만'), numberValue('1,000만'));
+  assert.equal(numberValue('1천만'), numberValue('10000000'));
+  assert.equal(numberValue('3조5천억'), '3500000000000');
+  assert.equal(numberValue('50퍼센트'), '50%');
+  assert.notEqual(numberValue('50'), numberValue('50%'));
+  assert.deepEqual(unsupportedNumbers('1천만원 지원', '지원금은 1천만원이다.'), []);
+  assert.deepEqual(unsupportedNumbers('1,000만원 지원', '지원금은 1천만원이다.'), []);
+  assert.deepEqual(unsupportedNumbers('3조5천억원 규모', '총 3조5천억원 규모다.'), []);
+  assert.deepEqual(unsupportedNumbers('50% 증가', '50퍼센트 늘었다.'), []);
+  assert.deepEqual(unsupportedNumbers('5천만원', '지원금은 1천만원이다.'), ['5천만']);
+  assert.deepEqual(unsupportedNumbers('50만원', '50% 늘었다.'), ['50만']);
+});
+
+test('"N가지"처럼 문제 구조를 말하는 작은 개수는 검사하지 않는다', () => {
+  assert.deepEqual(unsupportedNumbers('기사가 든 2가지 이유는?', '금리와 환율이 원인이다.'), []);
+  assert.deepEqual(unsupportedNumbers('2개 은행', '금리와 환율이 원인이다.'), ['2']);
+  assert.deepEqual(unsupportedNumbers('30가지 상품', '상품을 출시했다.'), ['30']);
+});
+
+test('제목의 숫자도 질문·정답·카드의 근거로 인정한다', () => {
+  const article = { title: '청년 1만명 지원', content: '정부가 청년 지원을 늘린다. 신청은 다음 달부터다.' };
+  const src = sentences(article.content);
+  const q = goodQuiz({ question: '몇 명을 지원하나?', choices: ['1천명', '5천명', '1만명', '10만명'], answerIndex: 2, explanation: '청년 지원을 늘린다.', sourceSentenceIds: [1] });
+  assert.equal(screenQuizzes({ quizzes: [q] }, src, article.title).valid.length, 1);
+  assert.equal(screenQuizzes({ quizzes: [q] }, src, '').errors[0].code, 'UNSUPPORTED_NUMBER');
 });
 
 test('해설의 숫자는 기사 안에만 있으면 되고, 질문·정답의 숫자는 근거 문장에 있어야 한다', () => {
