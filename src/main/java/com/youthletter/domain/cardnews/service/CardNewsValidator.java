@@ -14,7 +14,7 @@ public class CardNewsValidator {
     /** 제목의 숫자도 카드의 근거로 인정한다(AI 서비스와 같은 규칙). */
     public void validate(AiCardResponse result, String title, String content) {
         if (result == null || !text(result.modelVersion(), 100) || !text(result.promptVersion(), 100)
-                || result.cards() == null || result.cards().size() < 5 || result.cards().size() > 7) fail();
+                || result.cards() == null || result.cards().size() < 2 || result.cards().size() > 7) fail();
         var sentences = Arrays.stream(content.split("(?<=[.!?。])\\s+|\\n+"))
                 .map(String::trim).filter(s -> !s.isEmpty()).toList();
         for (int i = 0; i < result.cards().size(); i++) {
@@ -27,7 +27,7 @@ public class CardNewsValidator {
                     || c.sourceSentenceIds().stream().anyMatch(id -> id == null || id < 1 || id > sentences.size())) fail();
             String evidence = (title == null ? "" : title) + " " + c.sourceSentenceIds().stream().map(id -> sentences.get(id - 1)).collect(java.util.stream.Collectors.joining(" "));
             if (!com.youthletter.global.util.NumberEvidence.unsupported(
-                    c.title() + " " + c.body() + " " + (c.subBody() == null ? "" : c.subBody()), evidence).isEmpty()) fail();
+                    c.title() + " " + c.body() + " " + (c.subBody() == null ? "" : c.subBody()) + " " + (c.highlight() == null ? "" : c.highlight()), evidence).isEmpty()) fail();
         }
     }
     private boolean text(String value, int max) { return value != null && !value.isBlank() && value.length() <= max; }

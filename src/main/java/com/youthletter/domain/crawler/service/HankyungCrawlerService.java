@@ -16,6 +16,9 @@ import java.util.List;
 @Service
 public class HankyungCrawlerService {
 
+    @org.springframework.beans.factory.annotation.Value("${crawler.max-articles:0}")
+    private int maxArticles;
+
     private static final String BASE_URL = "https://www.hankyung.com";
     private static final String FINANCE_URL = BASE_URL + "/economy";
     private static final long REQUEST_DELAY_MS = 1000;
@@ -43,7 +46,8 @@ public class HankyungCrawlerService {
         List<CrawledArticleDto> articles = new ArrayList<>();
 
         try {
-            List<String> articleUrls = collectArticleUrls().stream().filter(url -> !alreadySaved.test(url)).toList();
+            List<String> articleUrls = collectArticleUrls().stream().filter(url -> !alreadySaved.test(url))
+                    .limit(maxArticles > 0 ? maxArticles : Long.MAX_VALUE).toList();
             log.info("[Crawler] 한경 금융 뉴스 신규 URL: {}건", articleUrls.size());
 
             for (int i = 0; i < articleUrls.size(); i++) {

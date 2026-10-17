@@ -1,3 +1,5 @@
+import { rankSentences, clozeQuizzes, termCandidates, isGenericTerm } from './fast-content.js';
+
 export class AiError extends Error {
   constructor(code, status = 502, detail = null) { super(code); this.code = code; this.status = status; this.detail = detail; }
 }
@@ -5,6 +7,9 @@ export class AiError extends Error {
 const string = (max) => ({ type: 'string', minLength: 1, maxLength: max });
 const object = (properties) => ({ type: 'object', additionalProperties: false, properties, required: Object.keys(properties) });
 const termsSchema = { type: 'array', maxItems: 7, items: object({ term: string(200), explanation: string(500) }) };
+// 형식이 맞는 용어만 남기고 같은 용어는 처음 것만 쓴다.
+const unique = terms => (Array.isArray(terms) ? terms : []).filter(t => t && typeof t.term === 'string' && t.term
+  && typeof t.explanation === 'string' && t.explanation.trim()).filter((t, i, all) => all.findIndex(x => x.term === t.term) === i);
 const analysisSchema = object({ summary: string(2000), terms: termsSchema });
 const cardSchema = object({ cards: { type: 'array', minItems: 5, maxItems: 7, items: object({
   templateType: { type: 'string', enum: ['T01','T02','T03','T04','T05','T06','T07','T08','T09','T10'] },
@@ -108,7 +113,7 @@ export function sentences(content) {
 }
 
 export function validateCards(value, source, title = '') {
-  if (!Array.isArray(value?.cards) || value.cards.length < 5 || value.cards.length > 7) throw new AiError('INVALID_CARDS');
+  if (!Array.isArray(value?.cards) || value.cards.length < 2 || value.cards.length > 7) throw new AiError('INVALID_CARDS');
   return value.cards.map((card, index) => {
     if (!/^T(0[1-9]|10)$/.test(card.templateType) || typeof card.title !== 'string'
         || !card.title.trim() || card.title.length > 50 || typeof card.body !== 'string'
@@ -123,6 +128,21 @@ export function validateCards(value, source, title = '') {
     return { cardOrder: index + 1, templateType: card.templateType, title: card.title, body: card.body,
       subBody: null, highlight: null, sourceSentenceIds: ids };
   });
+}
+
+// 발췌 카드: 선택한 원문 문장을 그대로 본문으로 쓰며 새 사실을 생성하지 않는다.
+export function selectedCards(value, source, title = '') {
+  const ids = value?.sentenceIds;
+  const count = Math.min(5, source.filter(s => s.text.length <= 200).length);
+  if (count < 2 || !Array.isArray(ids) || ids.length !== count || new Set(ids).size !== count || !ids.includes(1)
+      || ids.some(id => !Number.isInteger(id) || id < 1 || id > source.length || source[id - 1].text.length > 200)) {
+    throw new AiError('INVALID_CARD_SELECTION');
+  }
+  return validateCards({ cards: [...ids].sort((a, b) => a - b).map((id, index) => ({
+    templateType: index === 0 ? 'T01' : index === ids.length - 1 ? 'T10' : 'T02',
+    title: ['기사의 핵심', '주요 내용', '기사 속 근거', '추가로 살펴보기', '함께 확인할 내용'][index],
+    body: source[id - 1].text, sourceSentenceIds: [id]
+  })) }, source, title);
 }
 
 // 퀴즈는 기사 문장 근거로만 출제한다. 질문·정답의 숫자는 근거 문장(또는 제목)에, 해설의 숫자는 기사 안에 있어야 한다(오답 보기는 예외).
@@ -195,7 +215,12 @@ export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_
   model = process.env.OLLAMA_CHAT_MODEL ?? 'qwen3:8b', embedModel = process.env.OLLAMA_EMBED_MODEL ?? 'nomic-embed-text',
   timeoutMs = Number(process.env.OLLAMA_TIMEOUT_MS ?? 300000), observe = () => {},
   // 요청 1건(재시도 포함) 전체 마감. Spring이 AI 응답을 기다리는 시간(AI_TIMEOUT_SECONDS, 기본 540초)보다 짧게 둔다.
-  requestBudgetMs = Number(process.env.AI_REQUEST_BUDGET_MS ?? 500000), now = () => performance.now() } = {}) {
+  requestBudgetMs = Number(process.env.AI_REQUEST_BUDGET_MS ?? 500000), now = () => performance.now(),
+  // 파이프라인 모드(docker-compose.pipeline.yml): 기사당 용어 최소 개수, 발췌 요약, 원문 발췌 카드, 원문 빈칸 퀴즈.
+  minimumTerms = Number(process.env.MIN_ARTICLE_TERMS ?? 0),
+  summaryMode = process.env.SUMMARY_MODE ?? 'generated',
+  quizMode = process.env.QUIZ_GENERATION_MODE ?? 'generated',
+  cardMode = process.env.CARD_GENERATION_MODE ?? 'rewrite' } = {}) {
   const MIN_CALL_MS = 20000; // 남은 시간이 이보다 짧으면 새 모델 호출을 시작하지 않는다
   async function call(path, body, limitMs = timeoutMs) {
     const started = performance.now();
@@ -221,7 +246,8 @@ export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_
   async function generate(schema, instruction, data, maxTokens = 1000, deadline = Infinity) {
     const remaining = deadline - now();
     if (remaining < MIN_CALL_MS) throw new AiError('OLLAMA_TIMEOUT', 503);
-    const result = await call('/api/chat', { model, stream: false, think: false, format: generationSchema(schema),
+    // think 옵션은 추론 모델(qwen·deepseek)만 받는다. gemma 등에 보내면 Ollama가 거부한다.
+    const result = await call('/api/chat', { model, stream: false, ...(/qwen|deepseek/i.test(model) ? { think: false } : {}), format: generationSchema(schema),
       options: { temperature: 0, num_predict: maxTokens },
       messages: [{ role: 'system', content: SYSTEM }, { role: 'user', content: `${instruction}\n출력 스키마: ${JSON.stringify(schema)}\n입력: ${JSON.stringify(data)}` }] }, remaining);
     // 토큰 한도로 중단된 결과는 우연히 JSON처럼 보여도 완성 결과로 저장하지 않는다.
@@ -240,6 +266,7 @@ export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_
     },
     async process(input) {
       articleInput(input);
+      if (minimumTerms > 0) return this.processWithTerms(input);
       // 요약의 숫자도 기사(제목·본문)에 있어야 한다. 걸리면 거부된 숫자를 알려 주고 한 번만 다시 요약한다.
       const instruction = '요약은 총 150자 이내의 짧은 3문장. 숫자는 본문 표기 그대로만 쓰고(계산·반올림·추정 금지) 꼭 필요할 때만 쓴다. 본문에 실제 등장하는 핵심 금융 용어는 최대 2개만 선택한다. 각 설명은 40자 이내 한 문장. 불필요한 설명 없이 간결하게 반환한다.';
       const deadline = now() + requestBudgetMs;
@@ -267,9 +294,65 @@ export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_
           || !embedding.some(v => v !== 0)) throw new AiError('INVALID_EMBEDDING');
       return { summary: result.summary, terms, embedding };
     },
+    // 기사당 용어 minimumTerms개 이상. 원문에 있는 후보 중에서만 고르고, 사전에 있는 좋은 용어는 재사용한다.
+    async processWithTerms(input) {
+      const required = Math.max(5, minimumTerms);
+      const candidates = termCandidates(input.content.slice(0, 6000));
+      if (candidates.length < minimumTerms) throw new AiError('INSUFFICIENT_TERMS');
+      const known = unique(input.terms).filter(t => t.term.length >= 2 && input.content.includes(t.term)
+        && t.explanation.length <= 500 && !isGenericTerm(t.term, input.content));
+      // 사전에 있는 좋은 용어는 그대로 쓰고, 모자란 개수만 모델에 요청한다.
+      let result = known.length ? { terms: known.slice(0, 7) } : null;
+      const deadline = now() + requestBudgetMs;
+      // 작은 모델은 같은 용어를 반복하기도 한다 → 넉넉히 요청하고, 부족하면 고른 용어를 뺀 후보로 한 번 더 요청한다.
+      for (let attempt = 0; !result || (attempt < 2 && unique(result.terms).length < minimumTerms); attempt++) {
+        const picked = unique(result?.terms ?? []);
+        const remaining = candidates.filter(c => !picked.some(p => p.term === c || p.term.includes(c) || c.includes(p.term)));
+        const want = Math.min(7, Math.max(required - picked.length + 2, 3));
+        if (result && remaining.length < required - picked.length) break;
+        const withSummary = summaryMode !== 'extractive' && !result;
+        const schema = object({ ...(withSummary ? { summary: analysisSchema.properties.summary } : {}),
+          terms: { ...termsSchema, minItems: Math.min(want, remaining.length), maxItems: want,
+            items: object({ term: { type: 'string', enum: remaining }, explanation: string(500) }) } });
+        let next;
+        try {
+          next = await generate(schema, `${withSummary ? '요약은 총 120자 이내 짧은 3문장. 숫자는 본문 표기 그대로만 쓴다. ' : ''}candidates 중 청년이 배워야 할 학습용 핵심 용어를 서로 다르게 ${want}개 골라 설명한다. candidates 앞쪽일수록 중요하다. 경제·금융·정책 용어를 우선하고 부족하면 사회·기술·산업 개념을 선택한다. 사람·지역 이름, 날짜, '기사·신문·아동'처럼 일반 단어는 용어로 쓰지 않는다. explanation은 기사 내용·수치·기관명을 언급하지 말고 사전처럼 그 term 자체의 일반적인 뜻만 설명한다. term은 후보 문자열 그대로 쓴다. 각 explanation은 쉬운 한국어로 30자 이내 한 문장. 같은 용어를 반복하지 않는다.`,
+            { title: input.title, content: input.content.slice(0, 6000), candidates: remaining }, 700, deadline);
+        } catch (error) {
+          // 작은 모델이 반복 출력으로 한도를 넘기면 다음 시도에서 다시 요청한다.
+          if (attempt || !['MODEL_OUTPUT_TRUNCATED', 'INVALID_MODEL_JSON'].includes(error.code)) throw error;
+          next = { terms: [] };
+        }
+        result = result ? { ...result, terms: [...picked, ...(next.terms ?? [])] } : next;
+      }
+      result.terms = unique(result.terms).filter(t => !isGenericTerm(t.term, input.content)).slice(0, 7);
+      // 모델 요약에 기사에 없는 숫자가 있으면 원문 앞 문장 발췌로 대신한다.
+      if (summaryMode === 'extractive' || typeof result.summary !== 'string' || !result.summary.trim()
+          || result.summary.length > 2000 || unsupportedNumbers(result.summary, `${input.title} ${input.content}`).length) {
+        result.summary = sentences(input.content).slice(0, 3).map(s => s.text).join(' ').slice(0, 2000);
+      }
+      const terms = result.terms.map(t => {
+        if (t.term.length > 200 || t.explanation.length > 500) throw new AiError('INVALID_TERM');
+        const startIdx = input.content.indexOf(t.term);
+        if (startIdx < 0) return null; // 모델이 바꾸어 쓴 용어는 하이라이트하지 않는다.
+        return { term: t.term, explanation: t.explanation, startIdx, endIdx: startIdx + t.term.length };
+      }).filter(Boolean);
+      if (terms.length < minimumTerms) throw new AiError('INSUFFICIENT_TERMS', 502, { accepted: terms.length, required: minimumTerms });
+      // 임베딩 모델 입력 한도를 넘는 긴 기사는 잘라서 임베딩한다(DB 원문은 그대로).
+      const vectors = await call('/api/embed', { model: embedModel, input: `search_document: ${input.title}\n${input.content}`, truncate: true });
+      const embedding = vectors.embeddings?.[0];
+      if (!Array.isArray(embedding) || embedding.length !== 768 || embedding.some(v => !Number.isFinite(v))
+          || !embedding.some(v => v !== 0)) throw new AiError('INVALID_EMBEDDING');
+      return { summary: result.summary, terms, embedding };
+    },
     async cards(input) {
       articleInput(input);
       const source = sentences(input.content);
+      if (cardMode === 'ranked') {
+        const selection = rankSentences(source, input.terms);
+        if (!selection) throw new AiError('INSUFFICIENT_CARD_EVIDENCE');
+        return { modelVersion: model, promptVersion: 'card-v7-ranked-excerpts', cards: selectedCards(selection, source, input.title) };
+      }
       const instruction = '정확히 5장 카드: 핵심, 요약, 배경, 용어, 확인 순서. 각 카드 sourceSentenceIds는 제공된 문장 id로만 작성한다. 근거 없는 영향은 추측하지 않는다. 짧게: title 15자, body 40자 이내. 숫자는 근거 문장 표기 그대로(반올림·축약 금지). 각 카드 templateType은 T01~T10. 부연 설명 금지.';
       const deadline = now() + requestBudgetMs;
       let cards, hint = '';
@@ -288,6 +371,11 @@ export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_
     async quiz(input) {
       articleInput(input);
       const source = sentences(input.content);
+      if (quizMode === 'cloze') {
+        const value = clozeQuizzes(source, input.terms);
+        if (!value) throw new AiError('INSUFFICIENT_QUIZ_TERMS');
+        return { modelVersion: model, promptVersion: 'quiz-v7-source-cloze', quizzes: validateQuizzes(value, source, input.title) };
+      }
       // 숫자를 묻는 문제는 모델이 표기를 자주 바꿔 검증에 걸리고 출력도 길어진다 → 개념·원인·결과 중심으로 묻는다.
       // 통과한 문제만 쓴다. 모자라면 한 번 더, 부족한 수보다 1개 더 출제한다.
       // 첫 출제를 4문제로 하면 출력이 길어져 느린 장비에서 모델 호출 시간 제한에 걸린다(실측) → 첫 출제는 3문제.
@@ -319,6 +407,13 @@ export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_
       }
       if (accepted.length < 3) throw lastError;
       return { modelVersion: model, promptVersion: 'quiz-v6-pool-evidence', quizzes: accepted.slice(0, 3) };
+    },
+    // 한 번의 용어 추출 결과로 카드·퀴즈까지 만든다. 용어가 5개 미만이면 저장하지 않는다.
+    async bundle(input) {
+      const article = await this.process(input);
+      if (article.terms.length < 5) throw new AiError('INSUFFICIENT_TERMS');
+      const enriched = { ...input, terms: article.terms };
+      return { article, cards: await this.cards(enriched), quiz: await this.quiz(enriched), modelVersion: model };
     },
     async insight(input) {
       // 숫자는 Spring에서 문장화한다. 모델은 숫자 없는 일반 행동 제안만 작성한다.

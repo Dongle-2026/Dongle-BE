@@ -1,0 +1,81 @@
+# ./run-pipeline 로 실행. 기존 개발 DB와 분리된 영속 볼륨을 사용한다.
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: youthletter_pipeline
+      POSTGRES_USER: youthletter
+      POSTGRES_PASSWORD: ${PIPELINE_DB_PASSWORD:?run-pipeline으로 실행하세요}
+      TZ: UTC
+    ports: ["127.0.0.1:${PIPELINE_DB_PORT:-15436}:5432"]
+    volumes:
+      - pipeline_db:/var/lib/postgresql/data
+      - ${PIPELINE_INIT_DIR:-./docker/postgres}/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ${PIPELINE_INIT_DIR:-./docker/postgres}/02-apply-migrations.sh:/docker-entrypoint-initdb.d/02-apply-migrations.sh:ro
+      - ${PIPELINE_INIT_DIR:-./docker/postgres}/upgrade-capstone.sql:/migrations/upgrade-capstone.sql:ro
+      - ${PIPELINE_MIGRATIONS_DIR:-./src/main/resources/db/migration}:/migrations/db:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U youthletter -d youthletter_pipeline"]
+      interval: 3s
+      timeout: 3s
+      retries: 60
+    restart: unless-stopped
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  ai-service:
+    build: ./ai-service
+    environment:
+      HOST: 0.0.0.0
+      PORT: 3000
+      AI_SERVICE_TOKEN: ${PIPELINE_AI_TOKEN:?}
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-gemma3:4b}
+      OLLAMA_EMBED_MODEL: ${OLLAMA_EMBED_MODEL:-nomic-embed-text}
+      CARD_GENERATION_MODE: ranked
+      QUIZ_GENERATION_MODE: cloze
+      MIN_ARTICLE_TERMS: "5"
+      SUMMARY_MODE: extractive
+      OLLAMA_TIMEOUT_MS: ${OLLAMA_TIMEOUT_MS:-240000}
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    restart: unless-stopped
+  backend:
+    build: .
+    ports: ["127.0.0.1:${PIPELINE_API_PORT:-18082}:8080"]
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/youthletter_pipeline
+      DB_USERNAME: youthletter
+      DB_PASSWORD: ${PIPELINE_DB_PASSWORD:?}
+      JWT_SECRET: ${PIPELINE_JWT_SECRET:?}
+      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
+      SPRING_JPA_SHOW_SQL: "false"
+      SPRING_DATA_REDIS_HOST: redis
+      AI_SERVICE_BASE_URL: http://ai-service:3000
+      AI_SERVICE_TOKEN: ${PIPELINE_AI_TOKEN:?}
+      AI_USE_STUB: "false"
+      AI_MODEL_VERSION: ${OLLAMA_CHAT_MODEL:-gemma3:4b}
+      AI_SERVICE_BUNDLE_MODE: "true"
+      AI_JOBS_ENABLED: "true"
+      CONTENT_PIPELINE_ENABLED: "true"
+      CONTENT_PIPELINE_INTERVAL_MS: ${PIPELINE_INTERVAL_MS:-21600000}
+      CRAWLER_MAX_ARTICLES: ${PIPELINE_LIMIT:-0}
+      CRAWLER_CRON: "-"
+      POLICY_NOTIFICATION_CRON: "-"
+      PUSH_ENABLED: "false"
+      LOGGING_LEVEL_COM_YOUTHLETTER: INFO
+      LOGGING_LEVEL_ORG_HIBERNATE_SQL: WARN
+      LOGGING_LEVEL_ORG_HIBERNATE_ORM_JDBC_BIND: WARN
+      TZ: UTC
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      ai-service: {condition: service_started}
+    restart: unless-stopped
+volumes:
+  pipeline_db:

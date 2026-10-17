@@ -8,6 +8,17 @@ import reactor.core.publisher.Mono;
 import static org.assertj.core.api.Assertions.*;
 
 class AiServiceClientTest {
+    @Test void validationFailureKeepsItsCodeAndIsNotRetried() {
+        var client = new AiServiceClient(WebClient.builder().exchangeFunction(request ->
+                Mono.just(ClientResponse.create(HttpStatus.BAD_GATEWAY)
+                        .header("Content-Type", "application/json")
+                        .body("{\"error\":\"QUIZ_SELF_CHECK_FAILED\"}").build())).build());
+        assertThatThrownBy(() -> client.generateQuiz(nullRequest()))
+                .isInstanceOfSatisfying(AiServiceException.class, e -> {
+                    assertThat(e.getUpstreamCode()).isEqualTo("QUIZ_SELF_CHECK_FAILED");
+                    assertThat(e.isRetryable()).isFalse();
+                });
+    }
     @Test void timeoutCodeMapsToGatewayTimeout() {
         var client = new AiServiceClient(WebClient.builder().exchangeFunction(request -> {
             assertThat(request.headers().getFirst("X-Request-ID")).hasSize(36);

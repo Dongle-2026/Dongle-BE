@@ -31,6 +31,20 @@ public class AiServiceClient {
     @Value("${ai-service.timeout-seconds:540}")
     private long timeoutSeconds = 540;
 
+    public com.youthletter.domain.news.client.dto.AiBundleResponse generateBundle(AiProcessRequest request) {
+        var bundle = post("/api/ai/bundle", request, com.youthletter.domain.news.client.dto.AiBundleResponse.class);
+        var result = bundle.article();
+        if (result == null || result.summary() == null || result.summary().isBlank()
+                || result.terms() == null || result.terms().stream().map(AiProcessResponse.TermDto::term).distinct().count() < 5
+                || result.embedding() == null || result.embedding().size() != 768
+                || result.embedding().stream().anyMatch(v -> v == null || !Float.isFinite(v))
+                || result.embedding().stream().allMatch(v -> v == 0)
+                || bundle.modelVersion() == null || bundle.modelVersion().isBlank()) {
+            throw new AiServiceException(ErrorCode.AI_SERVICE_ERROR, "INVALID_BUNDLE", false);
+        }
+        return bundle;
+    }
+
     public AiCardResponse generateCards(AiProcessRequest request) {
         return post("/api/ai/card-news", request, AiCardResponse.class);
     }
@@ -78,7 +92,8 @@ public class AiServiceClient {
             }
             log.warn("AI request failed: requestId={}, path={}, status={}, code={}, durationMs={}",
                     requestId, path, status, code, (System.nanoTime() - started) / 1_000_000);
-            throw new BusinessException(timeout ? ErrorCode.AI_SERVICE_TIMEOUT : ErrorCode.AI_SERVICE_ERROR);
+            throw new AiServiceException(timeout ? ErrorCode.AI_SERVICE_TIMEOUT : ErrorCode.AI_SERVICE_ERROR,
+                    timeout ? "OLLAMA_TIMEOUT" : code, timeout || status == 0 || status == 429 || status == 503);
         }
     }
 
@@ -87,7 +102,9 @@ public class AiServiceClient {
             String code = new com.fasterxml.jackson.databind.ObjectMapper().readTree(body).path("error").asText();
             return java.util.Set.of("OLLAMA_TIMEOUT", "OLLAMA_UNAVAILABLE", "OLLAMA_ERROR", "AI_BUSY",
                     "INVALID_MODEL_JSON", "MODEL_OUTPUT_TRUNCATED", "INVALID_ANALYSIS", "INVALID_TERM", "INVALID_EMBEDDING",
-                    "INVALID_CARDS", "INVALID_QUIZ", "QUIZ_SELF_CHECK_FAILED", "UNSUPPORTED_NUMBER", "INVALID_ADVICE", "INVALID_ARTICLE",
+                    "INVALID_CARDS", "INVALID_CARD_SELECTION", "INSUFFICIENT_CARD_EVIDENCE", "CARD_FACT_CHECK_FAILED",
+                    "INSUFFICIENT_TERMS", "INSUFFICIENT_QUIZ_TERMS", "INVALID_BUNDLE",
+                    "INVALID_QUIZ", "QUIZ_SELF_CHECK_FAILED", "UNSUPPORTED_NUMBER", "INVALID_ADVICE", "INVALID_ARTICLE",
                     "INVALID_FACTS", "UNAUTHORIZED").contains(code) ? code : "AI_UNKNOWN_ERROR";
         } catch (Exception ignored) { return "AI_UNKNOWN_ERROR"; }
     }

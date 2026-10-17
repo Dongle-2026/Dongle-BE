@@ -8,6 +8,17 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class HankyungCrawlerServiceTest {
+    @Test void limitAppliesToNewArticlesAfterDuplicateFiltering() throws Exception {
+        var crawler = spy(new HankyungCrawlerService());
+        org.springframework.test.util.ReflectionTestUtils.setField(crawler, "maxArticles", 1);
+        doReturn(List.of("existing", "first", "second")).when(crawler).collectArticleUrls();
+        doReturn(new com.youthletter.domain.crawler.dto.CrawledArticleDto("first", "제목", "본문", "금융", null, null))
+                .when(crawler).parseArticle("first");
+        assertThat(crawler.crawl(url -> url.equals("existing"))).hasSize(1);
+        verify(crawler, never()).parseArticle("existing");
+        verify(crawler, never()).parseArticle("second");
+    }
+
     @Test void unavailableListingDoesNotLookLikeSuccessfulEmptyCrawl() throws Exception {
         var crawler = spy(new HankyungCrawlerService());
         doThrow(new HttpStatusException("rate limited",429,"https://www.hankyung.com/economy"))

@@ -32,7 +32,7 @@ export function createApp(ai = createAi({ observe: event => console.info(JSON.st
   });
   // 로컬 모델 과부하 방지: 대기열을 무한히 쌓지 않는다.
   let busy = false;
-  for (const [path, method] of [['process', 'process'], ['card-news', 'cards'], ['spending-insight', 'insight'], ['quiz', 'quiz']]) {
+  for (const [path, method] of [['process', 'process'], ['bundle', 'bundle'], ['card-news', 'cards'], ['spending-insight', 'insight'], ['quiz', 'quiz']]) {
     app.post(`/api/ai/${path}`, async (req, res) => {
       if (busy) { res.locals.errorCode = 'AI_BUSY'; return res.status(429).json({ error: 'AI_BUSY' }); }
       busy = true;

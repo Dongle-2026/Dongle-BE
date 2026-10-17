@@ -38,6 +38,7 @@ spring:
 
 ai-service:
   base-url: ${AI_SERVICE_BASE_URL:http://127.0.0.1:3000}
+  bundle-mode: ${AI_SERVICE_BUNDLE_MODE:false}
   use-stub: ${AI_USE_STUB:false}
   model-version: ${AI_MODEL_VERSION:qwen3:8b}
   token: ${AI_SERVICE_TOKEN:}

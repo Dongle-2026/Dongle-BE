@@ -1,0 +1,5 @@
+#!/bin/sh
+# 어느 디렉터리에서 호출해도 저장소 기준으로 실행한다.
+set -eu
+cd "$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+exec python3 -u scripts/run_pipeline.py "$@"

@@ -36,3 +36,6 @@ docker/postgres/data/
 .env.deploy
 backups/
 *.dump
+
+# One-command content pipeline secrets
+.env.pipeline.local

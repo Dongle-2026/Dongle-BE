@@ -15,10 +15,25 @@ class CardNewsValidatorTest {
     @Test void acceptsGroundedCards() {
         assertThatCode(() -> validator.validate(response("금리는 3%입니다.",1), "금리는 3%입니다.")).doesNotThrowAnyException();
     }
+    @Test void acceptsShortArticleCardsButRejectsSingleCard() {
+        var all = response("금리는 3%입니다.", 1);
+        assertThatCode(() -> validator.validate(new AiCardResponse("model", "v6", all.cards().subList(0, 3)),
+                "금리는 3%입니다.")).doesNotThrowAnyException();
+        assertThatCode(() -> validator.validate(new AiCardResponse("model", "v7", all.cards().subList(0, 2)),
+                "금리는 3%입니다.")).doesNotThrowAnyException();
+        assertThatThrownBy(() -> validator.validate(new AiCardResponse("model", "v6", all.cards().subList(0, 1)),
+                "금리는 3%입니다.")).isInstanceOf(BusinessException.class);
+    }
     @Test void rejectsUnknownNumbers() {
         assertThatThrownBy(() -> validator.validate(response("금리는 99%입니다.",1), "금리는 3%입니다.")).isInstanceOf(BusinessException.class);
     }
     @Test void rejectsMissingEvidence() {
         assertThatThrownBy(() -> validator.validate(response("금리 안내",2), "금리는 3%입니다.")).isInstanceOf(BusinessException.class);
+    }
+    @Test void rejectsUnsupportedHighlight() {
+        var cards = IntStream.rangeClosed(1,5).mapToObj(i -> new AiCardResponse.Card(i, CardTemplateType.T01,
+                "금리", "금리는 3%입니다.", null, "99% 혜택", List.of(1))).toList();
+        assertThatThrownBy(() -> validator.validate(new AiCardResponse("model", "v4", cards), "금리는 3%입니다."))
+                .isInstanceOf(BusinessException.class);
     }
 }
