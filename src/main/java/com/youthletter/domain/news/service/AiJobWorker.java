@@ -46,11 +46,11 @@ public class AiJobWorker {
                 jobs.complete(claim, client.process(request), null, model);
             } else if (claim.job().kind() == AiJobService.Kind.QUIZ) {
                 var quiz = client.generateQuiz(request);
-                quizValidator.validate(quiz, article.getContent());
+                quizValidator.validate(quiz, article.getTitle(), article.getContent());
                 jobs.completeQuiz(claim, quiz);
             } else {
                 var result = client.generateCards(request);
-                validator.validate(result, article.getContent());
+                validator.validate(result, article.getTitle(), article.getContent());
                 jobs.complete(claim, null, result, model);
             }
         } catch (com.youthletter.domain.news.client.AiServiceException e) {

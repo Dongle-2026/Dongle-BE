@@ -1,3 +1,5 @@
+> **2026-10-13 후속 상태:** [최신 작업표](FOLLOWUP_WORK_2026-10-13.md)에서 미완료·검수 대기·외부 설정을 추적합니다. 아래 과거 기록의 미구현 표시는 현재 코드와 다를 수 있습니다.
+
 # 구현 및 연결 현황
 
 ## 최신 업데이트 — 2026-10-03
@@ -36,6 +38,7 @@ Flyway 자동 실행은 없다. **서비스를 중지하고 백업한 후** 기�
 9. `src/main/resources/db/migration/V24__article_thumbnail.sql` (기사 썸네일 URL). 적용 후 `POST /api/admin/news/thumbnails`로 기존 기사 채우기(1회 최대 100건)
 10. `src/main/resources/db/migration/V25__quiz_reveals.sql` (퀴즈 정답 보기 기록, 재실행 안전)
 11. `src/main/resources/db/migration/V26__push_logs.sql` (푸시 발송 기록·하루 1회 보장, 재실행 안전)
+12. `src/main/resources/db/migration/V27__content_reports.sql` (퀴즈·카드 오류 신고·관리자 처리, 재실행 안전). 새 서버 readiness 검사 전에 적용. 이번에는 격리 DB 15434에만 적용·재적용 검증했으며 기존 DB는 변경하지 않았다.
 
 이번 작업에서는 테스트 DB(5433)에만 적용했다. 개발 DB(15432)·운영 DB는 미적용이다. V17은 기존 소비 ID보다 큰 값에서 시작하고 번호는 건너뛸 수 있다. V18의 기존 알림은 미읽음으로 시작한다. 기존 is_sent에는 가짜 발송과 사용자 읽음이 혼재하여 읽음 상태를 복원할 근거가 없다. 기존 발송 이력은 삭제하지 않는다.
 

@@ -17,7 +17,7 @@ import java.util.List;
  * 예: java -jar app.jar --ops.run=titles,reclassify,thumbnails --server.port=18082 (작업 후 자동 종료)
  * - titles: 섹션명이 붙어 저장된 기존 기사 제목을 원문에서 다시 읽어 정정
  * - reclassify: 기존 기사 카테고리 재분류(titles 다음에 실행)
- * - thumbnails: 썸네일 없는 기사의 og:image를 100건씩 끝까지 채움
+ * - thumbnails: 로고·기본 이미지 썸네일을 비우고, 썸네일 없는 기사의 og:image를 100건씩 끝까지 채움
  * ops.run이 비어 있으면(기본) 아무것도 하지 않는다.
  */
 @Slf4j
@@ -57,6 +57,7 @@ public class MaintenanceRunner implements ApplicationRunner {
                 }
                 case "reclassify" -> log.info("[Ops] 카테고리 재분류: {}건 변경", categoryService.reclassifyAll());
                 case "thumbnails" -> {
+                    log.info("[Ops] 로고·기본 이미지 썸네일 비움: {}건", thumbnailService.clearPlaceholders());
                     int total = 0;
                     ThumbnailBackfillService.Result r;
                     do {

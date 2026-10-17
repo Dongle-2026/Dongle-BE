@@ -1,7 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createAi as createAiImpl, selectedCards, checkCardReview, validateCards, validateQuizzes, checkSelfSolved, unsupportedNumbers, retryHint, sentences, articleInput } from '../src/ai.js';
-const createAi = (options = {}) => createAiImpl({cardMode:'rewrite',quizMode:'generated',minimumTerms:0, ...options});
+import { createAi, validateCards, validateQuizzes, screenQuizzes, checkSelfSolved, unsupportedNumbers, numberValue, supportSentenceIds, retryHint, sentences, articleInput } from '../src/ai.js';
 
 const article = { title: '금리 안내', content: '기준금리는 3%입니다. 청년 지원을 안내합니다.' };
 const source = sentences(article.content);
@@ -14,7 +13,7 @@ test('JSON 스키마와 제한된 출력량을 모델에 전달한다', async ()
       assert.equal(request.format.properties.terms.type, 'array');
       assert.deepEqual(request.format.required, ['summary', 'terms']);
       assert.equal(request.think, false);
-      assert.equal(request.options.num_predict, 700);
+      assert.equal(request.options.num_predict, 1000);
       return { ok: true, json: async () => ({ message: { content: '{"summary":"요약","terms":[]}' } }) };
     }
     return { ok: true, json: async () => ({ embeddings: [Array(768).fill(0.01)] }) };
@@ -75,10 +74,10 @@ test('1536차원 결과를 허용하지 않는다', async () => {
 test('카드 검증 실패 시 한 번만 재생성한다', async () => {
   let calls = 0;
   const ai = createAi({ fetchImpl: async () => {
-    calls++; return { ok: true, json: async () => ({ message: { content: JSON.stringify(calls === 1 ? { cards: [] } : calls === 2 ? cards() : { reviews: Array.from({ length: 5 }, (_, i) => ({ cardOrder: i + 1, supported: true })) }) } }) };
+    calls++; return { ok: true, json: async () => ({ message: { content: JSON.stringify(calls === 1 ? { cards: [] } : cards()) } }) };
   } });
   assert.equal((await ai.cards(article)).cards.length, 5);
-  assert.equal(calls, 3);
+  assert.equal(calls, 2);
 });
 test('소비 제안에 모델이 숫자를 넣으면 거부한다', async () => {
   const ai = createAi({ fetchImpl: async () => ({ ok: true, json: async () => ({ message: { content: '{"advice":"15% 절약하세요"}' } }) }) });
@@ -98,25 +97,20 @@ test('퀴즈 3문제를 근거 문장과 함께 검증해 반환한다', async (
   let requested, calls = 0;
   const ai = createAi({ fetchImpl: async (url, init) => {
     calls++;
-    if (calls === 2) {
-      const review = JSON.parse(init.body);
-      assert.match(review.messages[1].content, /"index":0/);
-      assert.ok(review.format.properties.reasoning);
-      assert.equal(review.options.num_predict, 650);
-      return { ok: true, json: async () => ({ message: { content: '{"answers":[2,1,0]}' } }) };
-    }
+    if (calls === 2) return { ok: true, json: async () => ({ message: { content: '{"answers":[2,1,0]}' } }) }; // 자기 풀이 일치
     requested = JSON.parse(init.body);
     return { ok: true, json: async () => ({ message: { content: JSON.stringify({ quizzes: [goodQuiz(),
       goodQuiz({ question: '정부기여금 최대 금액은?', choices: ['월 1만원', '월 2.4만원', '월 5만원', '없음'], answerIndex: 1, explanation: '최대 월 2.4만원이다.', sourceSentenceIds: [2] }),
       goodQuiz({ question: '가입 대상 나이는?', choices: ['만 19~34세', '만 40세 이상', '제한 없음', '만 15세 이하'], answerIndex: 0, explanation: '만 19~34세 청년이 대상이다.', sourceSentenceIds: [3, 3] })] }) } }) };
   } });
   const result = await ai.quiz(quizArticle);
-  assert.equal(result.promptVersion, 'quiz-v6-evidence-reasoning');
+  assert.equal(result.promptVersion, 'quiz-v6-pool-evidence');
   assert.equal(calls, 2);
   assert.equal(result.quizzes.length, 3);
   assert.deepEqual(result.quizzes[2].sourceSentenceIds, [3]);
   assert.equal(requested.format.properties.quizzes.items.properties.choices.minItems, undefined);
-  assert.equal(requested.options.num_predict, 1100);
+  assert.equal(requested.options.num_predict, 1140); // 첫 출제는 3문제
+  assert.equal(requested.format.properties.quizzes.type, 'array');
 });
 test('퀴즈 검증: 개수·중복 보기·정답 범위·근거 없는 숫자를 거부한다', () => {
   const three = (q) => ({ quizzes: [q, goodQuiz({ question: 'b' }), goodQuiz({ question: 'c' })] });
@@ -163,14 +157,142 @@ test('재시도 때 거부된 숫자를 구체적으로 알려준다', async () 
   const bad = JSON.stringify({ quizzes: [goodQuiz({ explanation: '2025년 5년 만기다.' }), goodQuiz({ question: 'b' }), goodQuiz({ question: 'c' })] });
   const prompts = [];
   const ai = createAi({ fetchImpl: async (url, init) => {
-    prompts.push(JSON.parse(init.body).messages[1].content);
+    const body = JSON.parse(init.body);
+    if (body.format.properties.answers) {
+      const n = JSON.parse(body.messages[1].content.split('입력: ')[1]).quizzes.length;
+      return { ok: true, json: async () => ({ message: { content: JSON.stringify({ answers: Array(n).fill(2) }) } }) };
+    }
+    prompts.push(body.messages[1].content);
     return { ok: true, json: async () => ({ message: { content: bad } }) };
   } });
+  // b·c는 채택, 1번은 두 번 모두 거부 → 3문제를 못 채우면 저장하지 않는다
   await assert.rejects(() => ai.quiz(quizArticle), /UNSUPPORTED_NUMBER/);
   assert.equal(prompts.length, 2);
   assert.match(prompts[1], /1번 문제의 숫자 2025는 근거 문장에 없다/);
-  assert.match(prompts[1], /previousAttempt/);
+  assert.match(prompts[1], /이미 채택된 질문과 겹치지 않게/);
   assert.match(retryHint({ code: 'QUIZ_SELF_CHECK_FAILED' }, '문제'), /정답을 하나로 고를 수 없었다/);
+});
+
+test('한 문제가 거부돼도 나머지는 채택하고, 부족한 만큼만 다시 출제한다', async () => {
+  const events = [];
+  const batches = [
+    { quizzes: [goodQuiz({ explanation: '2025년 5년 만기다.' }), goodQuiz({ question: 'b' }), goodQuiz({ question: 'c' }), goodQuiz({ question: 'd' })] },
+    { quizzes: [goodQuiz({ question: 'b' }), goodQuiz({ question: 'e' })] },
+  ];
+  const asked = [];
+  let solveCalls = 0;
+  const ai = createAi({ observe: e => events.push(e), fetchImpl: async (url, init) => {
+    const body = JSON.parse(init.body);
+    if (body.format.properties.answers) {
+      solveCalls++;
+      // 첫 묶음: b 통과, c 통과, d 자기 풀이 불일치 / 둘째 묶음: e 통과
+      const answers = solveCalls === 1 ? [2, 2, 0] : [2];
+      return { ok: true, json: async () => ({ message: { content: JSON.stringify({ answers }) } }) };
+    }
+    asked.push(Number(body.messages[1].content.match(/정확히 (\d)문제/)[1]));
+    return { ok: true, json: async () => ({ message: { content: JSON.stringify(batches[asked.length - 1]) } }) };
+  } });
+  const result = await ai.quiz(quizArticle);
+  assert.deepEqual(result.quizzes.map(q => q.question), ['b', 'c', 'e']);
+  assert.deepEqual(asked, [3, 2]);
+  const rejected = events.filter(e => e.stage === 'quiz-item-rejected');
+  assert.deepEqual(rejected.find(e => e.code === 'UNSUPPORTED_NUMBER').numbers, ['2025']);
+  assert.ok(rejected.some(e => e.code === 'QUIZ_SELF_CHECK_FAILED'));
+});
+
+test('후보 검증: 형식 오류·중복·이미 채택된 질문을 걸러낸다', () => {
+  const { valid, errors } = screenQuizzes({ quizzes: [goodQuiz(), goodQuiz(), goodQuiz({ answerIndex: 7 }), goodQuiz({ question: 'x' })] },
+    quizSource, quizArticle.title, [{ question: 'x' }]);
+  assert.equal(valid.length, 1);
+  assert.equal(errors.length, 1);
+  assert.equal(errors[0].code, 'INVALID_QUIZ');
+  assert.deepEqual(screenQuizzes(null, quizSource).valid, []);
+});
+
+test('숫자는 표기가 달라도 같은 값이면 인정한다', () => {
+  assert.equal(numberValue('1천만'), numberValue('1,000만'));
+  assert.equal(numberValue('1천만'), numberValue('10000000'));
+  assert.equal(numberValue('3조5천억'), '3500000000000');
+  assert.equal(numberValue('50퍼센트'), '50%');
+  assert.notEqual(numberValue('50'), numberValue('50%'));
+  assert.deepEqual(unsupportedNumbers('1천만원 지원', '지원금은 1천만원이다.'), []);
+  assert.deepEqual(unsupportedNumbers('1,000만원 지원', '지원금은 1천만원이다.'), []);
+  assert.deepEqual(unsupportedNumbers('3조5천억원 규모', '총 3조5천억원 규모다.'), []);
+  assert.deepEqual(unsupportedNumbers('50% 증가', '50퍼센트 늘었다.'), []);
+  assert.deepEqual(unsupportedNumbers('5천만원', '지원금은 1천만원이다.'), ['5천만']);
+  assert.deepEqual(unsupportedNumbers('50만원', '50% 늘었다.'), ['50만']);
+  assert.deepEqual(unsupportedNumbers('14만 9576명', '14만9576명이다.'), []);
+  assert.deepEqual(unsupportedNumbers('14만9576명', '14만 9576명이다.'), []);
+  assert.deepEqual(unsupportedNumbers('14만 명', '14만9576명이다.'), ['14만']);
+});
+
+test('근거 문장 자동 추가: 기사 속 같은 값의 문장 중 인용 문장에서 가장 가까운 것', () => {
+  const src = sentences('A는 1만3700건이다. B는 늘었다. C도 늘었다. D는 1만3700건이 아니다. 2023년부터 시행했다.');
+  assert.deepEqual(supportSentenceIds('1만3700건', [3], src), [3, 4]); // 1번(거리 2)보다 4번(거리 1)
+  assert.deepEqual(supportSentenceIds('1만3700건, 2023년부터', [2], src), [2, 1, 5]);
+  assert.deepEqual(supportSentenceIds('9999건', [2], src), [2]); // 기사에 없음 → 추가 없음
+  assert.deepEqual(supportSentenceIds('1만3700건', [1, 1], src), [1]); // 이미 근거 있음
+  const many = sentences('1이다. 2이다. 3이다. 4이다. 5이다. 없다.');
+  assert.equal(supportSentenceIds('1 2 3 4 5', [6], many).length, 4); // 최대 3개 추가
+  const card = cards(); card.cards[0].body = '청년 지원'; card.cards[1].body = '기준금리 3%'; card.cards[1].sourceSentenceIds = [2];
+  assert.deepEqual(validateCards(card, source)[1].sourceSentenceIds, [2, 1]);
+});
+
+test('요약에 기사에 없는 숫자가 있으면 한 번 다시 요약하고, 또 있으면 저장하지 않는다', async () => {
+  const prompts = [];
+  const summaries = ['인구의 30%가 약자다.', '기준금리는 3%다.'];
+  const ai = createAi({ fetchImpl: async (url, init) => {
+    if (url.endsWith('/embed')) return { ok: true, json: async () => ({ embeddings: [Array(768).fill(0.01)] }) };
+    prompts.push(JSON.parse(init.body).messages[1].content);
+    return { ok: true, json: async () => ({ message: { content: JSON.stringify({ summary: summaries[prompts.length - 1], terms: [] }) } }) };
+  } });
+  assert.equal((await ai.process(article)).summary, '기준금리는 3%다.');
+  assert.match(prompts[1], /이전 요약의 숫자 30%는 기사에 없다/);
+  const always = createAi({ fetchImpl: async (url) => url.endsWith('/embed')
+    ? { ok: true, json: async () => ({ embeddings: [Array(768).fill(0.01)] }) }
+    : { ok: true, json: async () => ({ message: { content: '{"summary":"인구의 30%","terms":[]}' } }) } });
+  await assert.rejects(() => always.process(article), /UNSUPPORTED_NUMBER/);
+});
+
+test('요청 전체 마감: 첫 시도가 오래 걸리면 재시도하지 않고, 모델 호출은 남은 시간만큼만 기다린다', async () => {
+  let clock = 0;
+  const timeouts = [];
+  const bad = JSON.stringify({ quizzes: [goodQuiz({ explanation: '2025년 5년 만기다.' })] });
+  const realTimeout = AbortSignal.timeout;
+  AbortSignal.timeout = (ms) => { timeouts.push(ms); return realTimeout.call(AbortSignal, ms); };
+  try {
+    const ai = createAi({ requestBudgetMs: 500000, now: () => clock, fetchImpl: async () => {
+      clock += 490000; // 첫 출제에 490초 → 남은 10초
+      return { ok: true, json: async () => ({ message: { content: bad } }) };
+    } });
+    await assert.rejects(() => ai.quiz(quizArticle), /UNSUPPORTED_NUMBER/);
+    assert.equal(timeouts.length, 1); // 재시도 호출 없음
+    assert.equal(timeouts[0], 300000); // 첫 호출은 모델 호출 제한(300초)이 더 짧음
+
+    clock = 0; timeouts.length = 0;
+    const slow = createAi({ requestBudgetMs: 300000, now: () => clock, fetchImpl: async () => {
+      clock += 200000;
+      return { ok: true, json: async () => ({ message: { content: '{"quizzes":[]}' } }) };
+    } });
+    await assert.rejects(() => slow.quiz(quizArticle), /INVALID_QUIZ/);
+    assert.deepEqual(timeouts, [300000, 100000]); // 두 번째 호출은 남은 100초만 기다림
+  } finally {
+    AbortSignal.timeout = realTimeout;
+  }
+});
+
+test('"N가지"처럼 문제 구조를 말하는 작은 개수는 검사하지 않는다', () => {
+  assert.deepEqual(unsupportedNumbers('기사가 든 2가지 이유는?', '금리와 환율이 원인이다.'), []);
+  assert.deepEqual(unsupportedNumbers('2개 은행', '금리와 환율이 원인이다.'), ['2']);
+  assert.deepEqual(unsupportedNumbers('30가지 상품', '상품을 출시했다.'), ['30']);
+});
+
+test('제목의 숫자도 질문·정답·카드의 근거로 인정한다', () => {
+  const article = { title: '청년 1만명 지원', content: '정부가 청년 지원을 늘린다. 신청은 다음 달부터다.' };
+  const src = sentences(article.content);
+  const q = goodQuiz({ question: '몇 명을 지원하나?', choices: ['1천명', '5천명', '1만명', '10만명'], answerIndex: 2, explanation: '청년 지원을 늘린다.', sourceSentenceIds: [1] });
+  assert.equal(screenQuizzes({ quizzes: [q] }, src, article.title).valid.length, 1);
+  assert.equal(screenQuizzes({ quizzes: [q] }, src, '').errors[0].code, 'UNSUPPORTED_NUMBER');
 });
 
 test('해설의 숫자는 기사 안에만 있으면 되고, 질문·정답의 숫자는 근거 문장에 있어야 한다', () => {
@@ -179,8 +301,10 @@ test('해설의 숫자는 기사 안에만 있으면 되고, 질문·정답의 �
   assert.equal(validateQuizzes(three(goodQuiz({ explanation: '5년 만기이며 정부기여금은 최대 월 2.4만원이다.' })), quizSource)[0].answerIndex, 2);
   // 해설에 기사에 없는 숫자 → 거부
   assert.throws(() => validateQuizzes(three(goodQuiz({ explanation: '2025년부터 5년 만기다.' })), quizSource), /UNSUPPORTED_NUMBER/);
-  // 정답 보기의 숫자가 근거 문장(1번)에 없고 다른 문장에만 있음 → 거부
-  assert.throws(() => validateQuizzes(three(goodQuiz({ choices: ['1년', '3년', '2.4만원', '10년'] })), quizSource), /UNSUPPORTED_NUMBER/);
+  // 정답 보기의 숫자가 인용 문장(1번)에 없고 다른 문장(2번)에만 있음 → 2번 문장을 근거에 추가
+  assert.deepEqual(validateQuizzes(three(goodQuiz({ choices: ['1년', '3년', '2.4만원', '10년'] })), quizSource)[0].sourceSentenceIds, [1, 2]);
+  // 기사 어디에도 없는 숫자 → 거부
+  assert.throws(() => validateQuizzes(three(goodQuiz({ choices: ['1년', '3년', '7만원', '10년'] })), quizSource), /UNSUPPORTED_NUMBER/);
 });
 
 test('100분의 N과 N%는 같은 값으로 인정한다', () => {
@@ -189,87 +313,9 @@ test('100분의 N과 N%는 같은 값으로 인정한다', () => {
   assert.deepEqual(unsupportedNumbers('50% 이상', '100분의 30 이상'), ['50%']);
 });
 
-test('해설의 유효한 문장 인용 번호는 사실 숫자로 오인하지 않는다', () => {
-  const quizzes = [goodQuiz({explanation:'문서 1에 따르면 5년 만기다.'}),
-    goodQuiz({question:'b'}), goodQuiz({question:'c'})];
-  assert.equal(validateQuizzes({quizzes}, quizSource)[0].explanation, '기사에 따르면 5년 만기다.');
-  quizzes[0].explanation = '문서 99에 따르면 5년 만기다.';
-  assert.throws(()=>validateQuizzes({quizzes}, quizSource), /UNSUPPORTED_NUMBER/);
-  quizzes[0].explanation = '2025년에 시작한 5년 만기다.';
-  assert.throws(()=>validateQuizzes({quizzes}, quizSource), /UNSUPPORTED_NUMBER/);
-});
-
 test('행사명 숫자만으로 달력 연도를 만들지 않는다', () => {
   assert.deepEqual(unsupportedNumbers('2026년 22일 시상', '오는 22일 2026 한국광고주대회를 연다.'), ['2026년']);
   assert.deepEqual(unsupportedNumbers('2026년 시상', '2026 년에 시상한다.'), []);
   assert.deepEqual(unsupportedNumbers('2026 광고주대회', '2026 한국광고주대회'), []);
   assert.deepEqual(unsupportedNumbers('2026년', '12026년'), ['2026']);
-});
-
-
-test('카드 의미 검증은 누락·중복 순서·문자열 true·불확실 판정을 거부한다', () => {
-  const validated = validateCards(cards(), source);
-  const good = () => ({ reviews: validated.map(c => ({ cardOrder: c.cardOrder, supported: true })) });
-  assert.equal(checkCardReview(validated, good()).length, 5);
-  for (const bad of [ {}, { reviews: [] }, { reviews: good().reviews.slice(1) },
-      { reviews: good().reviews.map(r => ({ ...r, cardOrder: 1 })) },
-      { reviews: good().reviews.map(r => ({ ...r, supported: 'true' })) },
-      { reviews: good().reviews.map(r => ({ ...r, supported: false })) } ]) {
-    assert.throws(() => checkCardReview(validated, bad), /CARD_FACT_CHECK_FAILED/);
-  }
-});
-
-test('숫자가 같아도 의미 검수가 거부한 카드는 재생성 후에도 실패하면 반환하지 않는다', async () => {
-  let calls = 0;
-  const ai = createAi({ fetchImpl: async (url, init) => {
-    calls++;
-    const request = JSON.parse(init.body);
-    if (calls === 2) {
-      assert.match(request.messages[1].content, /기준금리는 3%입니다/);
-      assert.match(request.messages[1].content, /evidence/);
-    }
-    if (calls === 3) assert.match(request.messages[1].content, /의미 변경/);
-    const value = calls % 2 ? cards() : { reviews: Array.from({ length: 5 }, (_, i) => ({ cardOrder: i + 1, supported: i !== 0 })) };
-    return { ok: true, json: async () => ({ message: { content: JSON.stringify(value) } }) };
-  } });
-  await assert.rejects(() => ai.cards(article), /CARD_FACT_CHECK_FAILED/);
-  assert.equal(calls, 4);
-});
-
-test('카드 전체 시간 예산이 끝나면 남은 재생성 없이 중단한다', async () => {
-  let calls = 0;
-  const ai = createAi({ operationTimeoutMs: 0, fetchImpl: async () => { calls++; throw new Error('unexpected'); } });
-  await assert.rejects(() => ai.cards(article), /OLLAMA_TIMEOUT/);
-  assert.equal(calls, 0);
-});
-
-
-test('발췌 카드는 원문 문장을 수정하지 않고 원문 순서와 근거를 유지한다', () => {
-  const source = sentences('대상에서 제외할 전망이다. 최대 한도는 3억원이다. 일부 조건이 있다. 아직 개편안이다. 시행일은 미정이다. 추가 설명이다.');
-  const result = selectedCards({ sentenceIds: [6, 4, 1, 2, 5] }, source);
-  assert.deepEqual(result.map(c => c.body), [1, 2, 4, 5, 6].map(id => source[id - 1].text));
-  for (const ids of [[2,3,4,5,6], [1,1,2,3,4], [1,2,3,4,99], [1,2,3,4]]) {
-    assert.throws(() => selectedCards({sentenceIds: ids}, source), /INVALID_CARD_SELECTION/);
-  }
-});
-
-test('발췌 가능한 원문은 문장 선택만 요청한다', async () => {
-  let calls = 0;
-  const ai = createAi({ cardMode: 'extractive', fetchImpl: async () => {
-    calls++; return { ok:true, json:async()=>({message:{content:'{"sentenceIds":[1,2,3,4,5]}'}}) };
-  } });
-  const result = await ai.cards({title:'기사',content:'첫 문장이다. 둘째 문장이다. 셋째 문장이다. 넷째 문장이다. 마지막 문장이다.'});
-  assert.equal(calls, 0);
-  assert.equal(result.promptVersion, 'card-v6-adaptive-excerpts');
-  assert.equal(result.cards[0].body, '첫 문장이다.');
-});
-
-test('짧은 원문은 3장으로 발췌하며 발표일과 행사일을 바꾸지 않는다', async () => {
-  const ai = createAi({cardMode:'extractive',fetchImpl:async()=>{throw new Error('unexpected model call');}});
-  const input = {title:'ESG 행사',content:'신한카드는 행사를 진행했다고 14일 밝혔다. 기후위기를 알리기 위해 마련됐다. 상생마켓과 특강이 펼쳐졌다.'};
-  const result = await ai.cards(input);
-  assert.equal(result.cards.length, 3);
-  assert.deepEqual(result.cards.map(c=>c.body), sentences(input.content).map(s=>s.text));
-  assert.equal(result.cards[2].templateType, 'T10');
-  await assert.rejects(()=>ai.cards(article), /INSUFFICIENT_CARD_EVIDENCE/);
 });

@@ -11,6 +11,9 @@ import java.util.Optional;
 
 public interface CardNewsRepository extends JpaRepository<CardNews, Long> {
 
+    @Query("SELECT DISTINCT cn FROM CardNews cn JOIN FETCH cn.article LEFT JOIN FETCH cn.cards WHERE cn.article.id IN :ids AND cn.status = :status")
+    java.util.List<CardNews> findFeedCards(java.util.List<Long> ids, CardNewsStatus status);
+
     Optional<CardNews> findByArticleId(Long articleId);
 
     boolean existsByArticleId(Long articleId);

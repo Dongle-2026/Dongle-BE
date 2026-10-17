@@ -46,6 +46,21 @@ class ArticlePageExtractorTest {
         assertThat(extract("<meta property='og:image' content=''>")).isNull();
     }
 
+    @Test void rejectsSiteLogoAndDefaultImages() {
+        assertThat(extract("<meta property='og:image' content='https://static.hankyung.com/img/logo/logo-news-sns.png?v=20260101'>"
+                + "<meta name='twitter:image' content='https://img.hankyung.com/photo/202610/AA.1.jpg'>"))
+                .isEqualTo("https://img.hankyung.com/photo/202610/AA.1.jpg");
+        assertThat(extract("<meta property='og:image' content='https://static.hankyung.com/img/logo/logo-news-sns.png'>")).isNull();
+        for (String url : new String[]{"https://x.com/images/logo.png", "https://x.com/logo_og.jpg", "https://x.com/img/noimage.gif",
+                "https://x.com/img/default-og.png", "https://x.com/static/logos/brand.svg"}) {
+            assertThat(ArticlePageExtractor.isPlaceholder(url)).as(url).isTrue();
+        }
+        for (String url : new String[]{"https://img.hankyung.com/photo/202610/AD.41496436.1.jpg",
+                "https://x.com/photo/catalogue.jpg", "https://x.com/news/logistics-port.jpg", "https://x.com/a.jpg?ref=logo"}) {
+            assertThat(ArticlePageExtractor.isPlaceholder(url)).as(url).isFalse();
+        }
+    }
+
     @Test void titleUsesHeadlineOnlyNotSectionLogo() {
         var doc = Jsoup.parse("<h1 class='logo-area'>경제</h1><h1 class='headline'> 청년도약계좌 확대 </h1>");
         assertThat(ArticlePageExtractor.title(doc)).isEqualTo("청년도약계좌 확대");

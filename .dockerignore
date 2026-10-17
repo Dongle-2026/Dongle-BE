@@ -1,0 +1,11 @@
+.git
+.gradle
+build
+.env
+.env.*
+**/.env
+**/.env.*
+**/node_modules
+backups
+*.dump
+.idea
