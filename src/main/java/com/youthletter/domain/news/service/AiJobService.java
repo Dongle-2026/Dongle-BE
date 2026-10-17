@@ -23,6 +23,8 @@ public class AiJobService {
     private final NewsAiWriter newsWriter;
     private final CardNewsWriter cardWriter;
     private final com.youthletter.domain.quiz.service.QuizWriter quizWriter;
+    @org.springframework.beans.factory.annotation.Value("${ai-service.bundle-mode:false}")
+    private boolean bundleMode;
     private static final RowMapper<Job> MAPPER = (rs, row) -> new Job(rs.getLong("id"), rs.getLong("article_id"),
             Kind.valueOf(rs.getString("kind")), rs.getString("status"), rs.getInt("attempts"),
             rs.getString("error_code"), rs.getObject("created_at", java.time.OffsetDateTime.class).withOffsetSameInstant(java.time.ZoneOffset.UTC).toLocalDateTime(),
@@ -44,6 +46,20 @@ public class AiJobService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.AI_JOB_NOT_FOUND));
     }
 
+    @Transactional(readOnly = true)
+    public List<AiProcessResponse.TermDto> knownTerms(String content) {
+        return jdbc.query("""
+            SELECT name,COALESCE(NULLIF(simple_definition,''),definition) AS explanation FROM financial_terms
+            WHERE length(name)>=2 AND length(name)<=40 AND strpos(?,name)>0
+            AND COALESCE(NULLIF(simple_definition,''),definition,'')<>''
+            ORDER BY length(name) DESC,name LIMIT 12
+            """, (rs,row) -> {
+                String name = rs.getString("name");
+                int start = content.indexOf(name);
+                return new AiProcessResponse.TermDto(name,rs.getString("explanation"),start,start+name.length());
+            }, content);
+    }
+
     @Transactional
     public Optional<Claim> claim() {
         // 짧은 전역 claim 잠금: 여러 Spring 인스턴스에서도 큐 작업 한 건만 실행한다.
@@ -55,7 +71,15 @@ public class AiJobService {
             """);
         if (Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM ai_jobs WHERE status='RUNNING')", Boolean.class)))
             return Optional.empty();
-        var queued = jdbc.query("SELECT * FROM ai_jobs WHERE status='QUEUED' AND available_at<=now() ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED", MAPPER);
+        String queueSql = bundleMode ? """
+            SELECT j.* FROM ai_jobs j JOIN news_articles a ON a.id=j.article_id
+            WHERE j.status='QUEUED' AND j.available_at<=now()
+            ORDER BY CASE WHEN (SELECT count(*) FROM financial_terms t
+                WHERE length(t.name) BETWEEN 2 AND 40 AND strpos(a.content,t.name)>0
+                AND length(COALESCE(NULLIF(t.simple_definition,''),t.definition,'')) BETWEEN 1 AND 500)>=5
+                THEN 0 ELSE 1 END,j.id LIMIT 1 FOR UPDATE OF j SKIP LOCKED
+            """ : "SELECT * FROM ai_jobs WHERE status='QUEUED' AND available_at<=now() ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED";
+        var queued = jdbc.query(queueSql, MAPPER);
         if (queued.isEmpty()) return Optional.empty();
         String token = UUID.randomUUID().toString();
         Job job = jdbc.queryForObject("""
@@ -87,13 +111,36 @@ public class AiJobService {
         return true;
     }
 
+    /** 한 번의 AI 추출 결과로 요약·용어·카드·퀴즈와 세 작업 상태를 함께 저장한다. */
+    @Transactional
+    public boolean completeBundle(Claim claim, AiBundleResponse bundle) {
+        if (!owns(claim)) return false;
+        if (bundle.article() == null || bundle.article().terms() == null
+                || bundle.article().terms().stream().map(AiProcessResponse.TermDto::term).distinct().count() < 5)
+            throw new BusinessException(ErrorCode.AI_SERVICE_ERROR, "기사당 용어는 최소 5개가 필요합니다.");
+        newsWriter.replace(claim.job.articleId(), bundle.article(), bundle.modelVersion());
+        cardWriter.save(claim.job.articleId(), bundle.cards());
+        quizWriter.saveIfAbsent(claim.job.articleId(), bundle.quiz());
+        jdbc.update("""
+            UPDATE ai_jobs j SET status='SUCCEEDED',error_code=NULL,lease_token=NULL,lease_until=NULL,updated_at=now()
+            WHERE article_id=? AND (id=? OR (status IN ('QUEUED','FAILED') AND
+                id=(SELECT max(k.id) FROM ai_jobs k WHERE k.article_id=j.article_id AND k.kind=j.kind)))
+            """, claim.job.articleId(), claim.job.id());
+        return true;
+    }
+
     @Transactional
     public void fail(Claim claim, ErrorCode error) {
+        fail(claim, error.name(), error == ErrorCode.AI_SERVICE_ERROR || error == ErrorCode.AI_SERVICE_TIMEOUT);
+    }
+
+    @Transactional
+    public void fail(Claim claim, String errorCode, boolean retryable) {
         if (!owns(claim)) return;
-        boolean retry = claim.job.attempts() < 3 && (error == ErrorCode.AI_SERVICE_ERROR || error == ErrorCode.AI_SERVICE_TIMEOUT);
+        boolean retry = claim.job.attempts() < 3 && retryable;
         jdbc.update("""
             UPDATE ai_jobs SET status=?, error_code=?, lease_token=NULL, lease_until=NULL,
                 available_at=now()+interval '30 seconds', updated_at=now() WHERE id=?
-            """, retry ? "QUEUED" : "FAILED", error.name(), claim.job.id());
+            """, retry ? "QUEUED" : "FAILED", errorCode, claim.job.id());
     }
 }

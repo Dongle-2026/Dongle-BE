@@ -23,6 +23,7 @@ public class AiJobWorker {
     private final CardNewsValidator validator;
     private final com.youthletter.domain.quiz.service.QuizValidator quizValidator;
     @Value("${ai-service.model-version:qwen3:8b}") private String model;
+    @Value("${ai-service.bundle-mode:false}") private boolean bundleMode;
 
     @Scheduled(fixedDelayString="${ai-jobs.poll-ms:3000}")
     public void tick() {
@@ -34,8 +35,14 @@ public class AiJobWorker {
             if (client.isStubMode()) throw new BusinessException(ErrorCode.AI_STUB_DISABLED);
             var article = articles.findById(claim.job().articleId())
                     .orElseThrow(() -> new BusinessException(ErrorCode.ARTICLE_NOT_FOUND));
-            var request = new AiProcessRequest(article.getSourceUrl(), article.getTitle(), article.getContent(), article.getCategory());
-            if (claim.job().kind() == AiJobService.Kind.ARTICLE) {
+            var request = new AiProcessRequest(article.getSourceUrl(), article.getTitle(), article.getContent(), article.getCategory(),
+                    bundleMode ? jobs.knownTerms(article.getContent()) : java.util.List.of());
+            if (bundleMode) {
+                var bundle = client.generateBundle(request);
+                validator.validate(bundle.cards(), article.getContent());
+                quizValidator.validate(bundle.quiz(), article.getContent());
+                jobs.completeBundle(claim, bundle);
+            } else if (claim.job().kind() == AiJobService.Kind.ARTICLE) {
                 jobs.complete(claim, client.process(request), null, model);
             } else if (claim.job().kind() == AiJobService.Kind.QUIZ) {
                 var quiz = client.generateQuiz(request);
@@ -46,6 +53,8 @@ public class AiJobWorker {
                 validator.validate(result, article.getContent());
                 jobs.complete(claim, null, result, model);
             }
+        } catch (com.youthletter.domain.news.client.AiServiceException e) {
+            jobs.fail(claim, e.getUpstreamCode(), e.isRetryable());
         } catch (BusinessException e) {
             jobs.fail(claim, e.getErrorCode());
         } catch (RuntimeException e) {
