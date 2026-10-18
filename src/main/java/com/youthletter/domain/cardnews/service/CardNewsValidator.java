@@ -25,7 +25,7 @@ public class CardNewsValidator {
                     || (c.highlight() != null && c.highlight().length() > 100)
                     || c.sourceSentenceIds() == null || c.sourceSentenceIds().isEmpty()
                     || c.sourceSentenceIds().stream().anyMatch(id -> id == null || id < 1 || id > sentences.size())) fail();
-            String evidence = (title == null ? "" : title) + " " + c.sourceSentenceIds().stream().map(id -> sentences.get(id - 1)).collect(java.util.stream.Collectors.joining(" "));
+            String evidence = (title == null ? "" : title) + "\n" + c.sourceSentenceIds().stream().map(id -> sentences.get(id - 1)).collect(java.util.stream.Collectors.joining("\n"));
             if (!com.youthletter.global.util.NumberEvidence.unsupported(
                     c.title() + " " + c.body() + " " + (c.subBody() == null ? "" : c.subBody()) + " " + (c.highlight() == null ? "" : c.highlight()), evidence).isEmpty()) fail();
         }

@@ -187,3 +187,13 @@ test('같은 개념의 다른 이름(AI·인공지능)은 뜻 고르기 보기�
     assert.ok(q.choices.filter(c=>c.includes('컴퓨터가 사람처럼')).length<=1,all);
   }
 });
+
+test('제목 끝 숫자와 근거 문장 첫 숫자를 한 숫자로 합치지 않는다(…51조 + 18일…)',async()=>{
+  const {unsupportedNumbers}=await import('../src/ai.js');
+  const title='나랏빚 여유 부렸다간… 4년뒤 이자만 年 51조';
+  const source=sentences('올해 세수가 늘었다. 18일 국회 자료에 따르면 국고채 이자는 34조4220억원이다. 이자 부담이 커졌다.');
+  const cards=selectedCards({sentenceIds:[1,2,3]},source,title);
+  assert.equal(cards.length,3);
+  // 같은 줄의 띄어쓰기는 여전히 한 숫자로 읽는다
+  assert.deepEqual(unsupportedNumbers('14만 9576명','14만9576명이 참여했다'),[]);
+});

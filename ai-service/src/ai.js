@@ -61,7 +61,8 @@ const withPercent = (t) => t.replace(/100분의\s?(\d+(?:\.\d+)?)/g, (m, n) => `
 // "두 가지 이유"처럼 문제 구조를 설명하는 작은 개수는 기사 사실이 아니므로 검사하지 않는다.
 const isStructuralCount = (text, index, token) => /^\d$|^10$/.test(token) && /^\s?가지/.test(text.slice(index + token.length));
 // "14만 9576명"처럼 단위 뒤를 띄어 써도 한 숫자로 읽는다.
-const joinUnitSpaces = (t) => t.replace(/(\d[만억조천])\s+(?=\d)/g, '$1');
+// 같은 줄 안의 띄어쓰기만 합친다. 제목과 근거 문장은 줄바꿈으로 이어 붙여 '…51조' + '18일…'이 한 숫자가 되지 않게 한다.
+const joinUnitSpaces = (t) => t.replace(/(\d[만억조천])[ \t]+(?=\d)/g, '$1');
 export function unsupportedNumbers(rawText, rawEvidence) {
   const text = joinUnitSpaces(rawText), evidence = joinUnitSpaces(rawEvidence);
   const evidenceValues = new Set((withPercent(evidence).match(NUMBER_TOKEN) ?? []).map(numberValue));
@@ -86,7 +87,7 @@ export function unsupportedNumbers(rawText, rawEvidence) {
 const MAX_ADDED_EVIDENCE = 3;
 export function supportSentenceIds(text, ids, source, title = '') {
   const cited = [...new Set(ids)];
-  const evidence = () => [title, ...cited.map(id => source[id - 1].text)].join(' ');
+  const evidence = () => [title, ...cited.map(id => source[id - 1].text)].join('\n');
   const distance = (s) => Math.min(...cited.map(id => Math.abs(id - s.id)));
   let added = 0;
   for (const number of unsupportedNumbers(text, evidence())) {
@@ -122,7 +123,7 @@ export function validateCards(value, source, title = '') {
       throw new AiError('INVALID_CARDS');
     }
     const ids = supportSentenceIds(`${card.title} ${card.body}`, card.sourceSentenceIds, source, title);
-    const evidence = [title, ...ids.map(id => source[id - 1].text)].join(' ');
+    const evidence = [title, ...ids.map(id => source[id - 1].text)].join('\n');
     const bad = unsupportedNumbers(`${card.title} ${card.body}`, evidence);
     if (bad.length) throw new AiError('UNSUPPORTED_NUMBER', 502, { item: index + 1, numbers: bad });
     return { cardOrder: index + 1, templateType: card.templateType, title: card.title, body: card.body,
@@ -170,10 +171,10 @@ export function validateQuizItem(q, source, quizIndex = 0, title = '') {
     throw new AiError('INVALID_QUIZ', 502, { item: quizIndex + 1 });
   }
   const ids = supportSentenceIds(`${q.question} ${q.choices[q.answerIndex]}`, q.sourceSentenceIds, source, title);
-  const evidence = [title, ...ids.map(id => source[id - 1].text)].join(' ');
+  const evidence = [title, ...ids.map(id => source[id - 1].text)].join('\n');
   // 질문·정답은 근거 문장 기준(핵심 사실), 해설은 보조 설명이므로 기사 전체 기준으로 숫자를 확인한다.
   const bad = [...unsupportedNumbers(`${q.question} ${q.choices[q.answerIndex]}`, evidence),
-    ...unsupportedNumbers(q.explanation, [title, ...source.map(s => s.text)].join(' '))];
+    ...unsupportedNumbers(q.explanation, [title, ...source.map(s => s.text)].join('\n'))];
   if (bad.length) throw new AiError('UNSUPPORTED_NUMBER', 502, { item: quizIndex + 1, numbers: [...new Set(bad)] });
   return { question: q.question.trim(), choices: q.choices.map(c => c.trim()), answerIndex: q.answerIndex,
     explanation: q.explanation.trim(), sourceSentenceIds: ids };

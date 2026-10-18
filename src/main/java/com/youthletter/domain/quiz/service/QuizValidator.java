@@ -31,10 +31,10 @@ public class QuizValidator {
                     || q.sourceSentenceIds().stream().anyMatch(id -> id == null || id < 1 || id > sentenceCount)
                     || !questions.add(q.question().strip())) throw invalid();
             List<String> sentences = QuizText.sentences(articleContent);
-            String evidence = heading + " " + String.join(" ", q.sourceSentenceIds().stream().map(id -> sentences.get(id - 1)).toList());
+            String evidence = heading + "\n" + String.join("\n", q.sourceSentenceIds().stream().map(id -> sentences.get(id - 1)).toList());
             // 질문·정답은 근거 문장, 해설은 기사 전체 기준(AI 서비스와 같은 규칙)
             if (!com.youthletter.global.util.NumberEvidence.unsupported(q.question() + " " + q.choices().get(q.answerIndex()), evidence).isEmpty()
-                    || !com.youthletter.global.util.NumberEvidence.unsupported(q.explanation(), heading + " " + articleContent).isEmpty()) throw invalid();
+                    || !com.youthletter.global.util.NumberEvidence.unsupported(q.explanation(), heading + "\n" + articleContent).isEmpty()) throw invalid();
         }
     }
 
