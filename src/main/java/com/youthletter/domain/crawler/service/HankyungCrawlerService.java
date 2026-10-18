@@ -19,6 +19,14 @@ public class HankyungCrawlerService implements NewsCrawler {
     @org.springframework.beans.factory.annotation.Value("${crawler.max-articles:0}")
     private int maxArticles;
 
+    @org.springframework.beans.factory.annotation.Value("${crawler.hankyung.interval-ms:3600000}")
+    private long intervalMs = 3_600_000;
+
+    @Override
+    public java.time.Duration interval() {
+        return java.time.Duration.ofMillis(intervalMs);
+    }
+
     private static final String BASE_URL = "https://www.hankyung.com";
     private static final long REQUEST_DELAY_MS = 1000;
     /** 유료 기사 미리보기처럼 본문이 짧은 기사는 요약·카드뉴스를 만들 수 없어 저장하지 않는다. */

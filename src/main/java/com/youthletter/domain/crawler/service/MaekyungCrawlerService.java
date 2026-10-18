@@ -27,6 +27,15 @@ public class MaekyungCrawlerService implements NewsCrawler {
     @Value("${crawler.maekyung.max-per-section:10}")
     private int maxPerSection = 10;
 
+    /** 매일경제는 기사 회전이 빨라 30분마다 확인한다. */
+    @Value("${crawler.maekyung.interval-ms:1800000}")
+    private long intervalMs = 1_800_000;
+
+    @Override
+    public java.time.Duration interval() {
+        return java.time.Duration.ofMillis(intervalMs);
+    }
+
     record Section(String feed, String category) {}
     record Entry(String url, String category, java.time.LocalDateTime publishedAt) {}
     private static final List<Section> SECTIONS = List.of(
