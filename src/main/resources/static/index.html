@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>유스레터 기능 확인</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#1d2433; --muted:#6b7385; --line:#e3e6ec; --accent:#2f6fed; --accent-soft:#e8efff;
+          --ok:#1f8a4c; --ok-soft:#e6f5ec; --bad:#c93a3a; --bad-soft:#fbeaea; --hl:#fff1b8; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.6 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+  header { background:var(--card); border-bottom:1px solid var(--line); padding:12px 16px; display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center; position:sticky; top:0; z-index:5; }
+  header h1 { font-size:17px; margin:0; }
+  header .grow { flex:1; }
+  header input { width:220px; }
+  nav { display:flex; gap:4px; overflow-x:auto; padding:8px 16px; background:var(--card); border-bottom:1px solid var(--line); }
+  nav button { border:0; background:none; padding:8px 12px; border-radius:8px; cursor:pointer; color:var(--muted); font-weight:600; white-space:nowrap; }
+  nav button.on { background:var(--accent-soft); color:var(--accent); }
+  main { max-width:960px; margin:0 auto; padding:16px; }
+  section.tab { display:none; } section.tab.on { display:block; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:16px; margin-bottom:12px; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:8px; }
+  input, select, textarea { font:inherit; padding:7px 10px; border:1px solid var(--line); border-radius:8px; background:#fff; color:var(--ink); min-width:0; }
+  textarea { width:100%; min-height:90px; font-family:ui-monospace, Menlo, monospace; font-size:13px; }
+  button.b { font:inherit; padding:7px 14px; border-radius:8px; border:1px solid var(--accent); background:var(--accent); color:#fff; cursor:pointer; }
+  button.b.ghost { background:#fff; color:var(--accent); }
+  button.b:disabled { opacity:.5; cursor:default; }
+  .muted { color:var(--muted); font-size:13px; }
+  .pill { display:inline-block; padding:1px 8px; border-radius:99px; background:var(--accent-soft); color:var(--accent); font-size:12px; font-weight:600; }
+  .pill.ok { background:var(--ok-soft); color:var(--ok); } .pill.bad { background:var(--bad-soft); color:var(--bad); }
+  .list .item { padding:10px 0; border-bottom:1px solid var(--line); cursor:pointer; display:flex; gap:12px; }
+  .list .item:last-child { border-bottom:0; }
+  .list .item img { width:84px; height:56px; object-fit:cover; border-radius:6px; background:var(--line); flex:none; }
+  .list .item .t { font-weight:600; }
+  mark { background:var(--hl); padding:0 1px; border-radius:3px; cursor:help; }
+  .body { white-space:pre-wrap; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:12px; }
+  .cn { border:1px solid var(--line); border-radius:12px; padding:14px; background:linear-gradient(180deg, var(--accent-soft), #fff 60%); min-height:150px; }
+  .cn .o { font-size:12px; color:var(--muted); }
+  .quiz .q { white-space:pre-line; font-weight:600; margin-bottom:8px; }
+  .quiz .choice { display:block; width:100%; text-align:left; margin:4px 0; padding:8px 12px; border:1px solid var(--line); border-radius:8px; background:#fff; cursor:pointer; font:inherit; color:var(--ink); }
+  .quiz .choice.correct { border-color:var(--ok); background:var(--ok-soft); } .quiz .choice.wrong { border-color:var(--bad); background:var(--bad-soft); }
+  pre { background:#0f1420; color:#d8dee9; padding:12px; border-radius:8px; overflow:auto; font-size:12.5px; max-height:460px; margin:0; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; } @media (max-width:640px) { .grid2 { grid-template-columns:1fr; } header input { width:100%; } }
+  h2 { font-size:16px; margin:0 0 10px; } h3 { font-size:15px; margin:12px 0 6px; }
+  .hidden { display:none; }
+</style>
+</head>
+<body>
+<header>
+  <h1>유스레터 기능 확인</h1>
+  <span class="grow"></span>
+  <label class="muted">서버 <input id="base" placeholder="같은 서버 (비우면 현재 주소)"></label>
+  <span id="who" class="pill">로그인 안 됨</span>
+</header>
+<nav id="tabs">
+  <button data-tab="news" class="on">뉴스</button>
+  <button data-tab="cards">카드뉴스</button>
+  <button data-tab="quiz">퀴즈</button>
+  <button data-tab="terms">용어 사전</button>
+  <button data-tab="account">계정</button>
+  <button data-tab="me">마이페이지</button>
+  <button data-tab="console">API 콘솔</button>
+</nav>
+<main>
+  <!-- 뉴스 -->
+  <section class="tab on" id="tab-news">
+    <div class="card">
+      <div class="row">
+        <input id="newsKeyword" placeholder="검색어">
+        <input id="newsCategory" placeholder="카테고리 (예: 투자, 부동산)">
+        <button class="b" id="newsSearch">목록</button>
+        <button class="b ghost" id="newsToday">오늘의 뉴스</button>
+        <span class="grow"></span>
+        <button class="b ghost" id="newsPrev">이전</button><span id="newsPage" class="muted">1쪽</span><button class="b ghost" id="newsNext">다음</button>
+      </div>
+      <div id="newsList" class="list"></div>
+    </div>
+    <div class="card hidden" id="newsDetail"></div>
+  </section>
+
+  <!-- 카드뉴스 -->
+  <section class="tab" id="tab-cards">
+    <div class="card">
+      <div class="row"><input id="cardArticle" placeholder="기사 ID" size="8"><button class="b" id="cardLoad">카드뉴스 보기</button>
+        <span class="muted">뉴스 탭에서 기사를 고르면 자동으로 채워집니다.</span></div>
+      <div id="cardMeta" class="muted"></div>
+    </div>
+    <div id="cardList" class="cards"></div>
+  </section>
+
+  <!-- 퀴즈 -->
+  <section class="tab" id="tab-quiz">
+    <div class="card">
+      <div class="row"><input id="quizArticle" placeholder="기사 ID" size="8"><button class="b" id="quizLoad">퀴즈 불러오기</button>
+        <span class="muted">정답 제출은 로그인이 필요합니다. 오답이면 정답은 공개되지 않고 다시 풀 수 있습니다.</span></div>
+    </div>
+    <div id="quizList"></div>
+  </section>
+
+  <!-- 용어 사전 -->
+  <section class="tab" id="tab-terms">
+    <div class="card">
+      <div class="row"><input id="termQuery" placeholder="용어 검색 (예: 금리)"><button class="b" id="termSearch">검색</button>
+        <button class="b ghost" id="termAll">전체 목록</button><span class="grow"></span>
+        <button class="b ghost" id="termPrev">이전</button><span id="termPage" class="muted">1쪽</span><button class="b ghost" id="termNext">다음</button></div>
+      <div id="termList" class="list"></div>
+    </div>
+    <div class="card hidden" id="termDetail"></div>
+  </section>
+
+  <!-- 계정 -->
+  <section class="tab" id="tab-account">
+    <div class="grid2">
+      <div class="card"><h2>로그인</h2>
+        <div class="row"><input id="loginEmail" placeholder="이메일" style="flex:1"></div>
+        <div class="row"><input id="loginPw" type="password" placeholder="비밀번호" style="flex:1"></div>
+        <div class="row"><button class="b" id="loginBtn">로그인</button><button class="b ghost" id="logoutBtn">로그아웃</button></div>
+        <div class="row"><a class="b ghost" style="text-decoration:none" href="/oauth2/authorization/kakao">카카오 로그인</a>
+          <a class="b ghost" style="text-decoration:none" href="/oauth2/authorization/google">구글 로그인</a></div>
+        <div class="muted">소셜 로그인 후 /auth/callback.html이 토큰을 저장하고 이 페이지로 돌아옵니다.</div>
+      </div>
+      <div class="card"><h2>회원가입</h2>
+        <div class="row"><input id="suEmail" placeholder="이메일" style="flex:1"></div>
+        <div class="row"><input id="suPw" type="password" placeholder="비밀번호 8자 이상" style="flex:1"></div>
+        <div class="row"><input id="suName" placeholder="이름" style="flex:1"><input id="suNick" placeholder="닉네임" style="flex:1"></div>
+        <div class="row"><button class="b" id="signupBtn">가입</button></div>
+      </div>
+    </div>
+    <div class="card"><h2>응답</h2><pre id="accountOut">-</pre></div>
+  </section>
+
+  <!-- 마이페이지 -->
+  <section class="tab" id="tab-me">
+    <div class="card"><div class="row">
+      <button class="b" data-me="/api/users/me">내 정보</button>
+      <button class="b ghost" data-me="/api/users/me/learning-stats">학습 통계</button>
+      <button class="b ghost" data-me="/api/users/me/bookmarks?page=0&size=10">북마크 뉴스</button>
+      <button class="b ghost" data-me="/api/users/me/learned-terms">학습한 용어</button>
+      <button class="b ghost" data-me="/api/me/saved-terms">저장한 용어</button>
+      <button class="b ghost" data-me="/api/me/activity">학습 활동</button>
+    </div></div>
+    <div class="card"><pre id="meOut">로그인 후 버튼을 누르세요.</pre></div>
+  </section>
+
+  <!-- API 콘솔 -->
+  <section class="tab" id="tab-console">
+    <div class="card">
+      <div class="row">
+        <select id="cMethod"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option></select>
+        <input id="cPath" value="/api/health" style="flex:1">
+        <button class="b" id="cSend">보내기</button>
+      </div>
+      <textarea id="cBody" placeholder='요청 본문 JSON (선택). 예: {"selectedIndex":0}'></textarea>
+      <div class="muted" style="margin-top:6px">로그인 토큰이 있으면 Authorization 헤더에 자동으로 붙습니다. 그 밖의 API(정책·소비·관리자 등)는 여기서 확인하세요. 전체 명세: <a href="/swagger-ui.html">Swagger</a></div>
+    </div>
+    <div class="card"><div id="cStatus" class="muted"></div><pre id="cOut">-</pre></div>
+  </section>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const store = { get(k){ try { return localStorage.getItem(k); } catch { return null; } },
+                set(k,v){ try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k,v); } catch {} } };
+const el = (tag, attrs = {}, ...kids) => { const n = document.createElement(tag);
+  for (const [k,v] of Object.entries(attrs)) { if (k === 'class') n.className = v; else if (k.startsWith('on')) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v); }
+  for (const kid of kids.flat()) if (kid != null) n.append(kid instanceof Node ? kid : String(kid)); return n; };
+const fmt = iso => { if (!iso) return ''; const d = new Date(iso); return isNaN(d) ? iso : d.toLocaleString('ko-KR', { timeZone:'Asia/Seoul', dateStyle:'medium', timeStyle:'short' }); };
+
+$('#base').value = store.get('base') || '';
+$('#base').addEventListener('change', e => store.set('base', e.target.value.trim() || null));
+const base = () => ($('#base').value.trim() || '').replace(/\/$/, '');
+
+async function api(method, path, body) {
+  const headers = { 'Accept':'application/json' };
+  const token = store.get('accessToken');
+  if (token) headers.Authorization = 'Bearer ' + token;
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  const res = await fetch(base() + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  const text = await res.text();
+  let json; try { json = text ? JSON.parse(text) : null; } catch { json = text; }
+  return { status: res.status, ok: res.ok, json, data: json && json.data !== undefined ? json.data : json };
+}
+const show = (pre, r) => { pre.textContent = (r.status ? `HTTP ${r.status}\n` : '') + JSON.stringify(r.json, null, 2); };
+const fail = (box, r) => { box.replaceChildren(el('div', { class:'muted' }, `요청 실패 (HTTP ${r.status}) `, r.json && r.json.message ? r.json.message : '')); };
+
+/* 탭 */
+function openTab(name) {
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === name));
+  document.querySelectorAll('section.tab').forEach(s => s.classList.toggle('on', s.id === 'tab-' + name));
+  store.set('tab', name);
+}
+document.querySelectorAll('#tabs button').forEach(b => b.addEventListener('click', () => openTab(b.dataset.tab)));
+openTab((location.hash || '').slice(1) || store.get('tab') || 'news');
+
+/* 로그인 표시 */
+async function refreshWho() {
+  if (!store.get('accessToken')) { $('#who').textContent = '로그인 안 됨'; $('#who').className = 'pill'; return; }
+  const r = await api('GET', '/api/users/me').catch(() => null);
+  if (r && r.ok) { $('#who').textContent = (r.data.nickname || r.data.email || '로그인됨'); $('#who').className = 'pill ok'; }
+  else { $('#who').textContent = '토큰 만료'; $('#who').className = 'pill bad'; }
+}
+
+/* 뉴스 */
+let newsPage = 0;
+async function loadNews(page = 0) {
+  newsPage = Math.max(0, page);
+  const q = new URLSearchParams({ page:newsPage, size:10 });
+  if ($('#newsKeyword').value.trim()) q.set('keyword', $('#newsKeyword').value.trim());
+  if ($('#newsCategory').value.trim()) q.set('category', $('#newsCategory').value.trim());
+  const r = await api('GET', '/api/news?' + q);
+  if (!r.ok) return fail($('#newsList'), r);
+  renderNewsList(r.data.content || []);
+  $('#newsPage').textContent = `${newsPage + 1} / ${Math.max(1, r.data.totalPages)}쪽 · 전체 ${r.data.totalElements}건`;
+  $('#newsNext').disabled = r.data.last; $('#newsPrev').disabled = r.data.first;
+}
+function renderNewsList(items) {
+  if (!items.length) return $('#newsList').replaceChildren(el('div', { class:'muted' }, '기사가 없습니다.'));
+  $('#newsList').replaceChildren(...items.map(n => el('div', { class:'item', onclick: () => openArticle(n.id) },
+    n.image ? el('img', { src:n.image, alt:'', loading:'lazy' }) : null,
+    el('div', {}, el('div', { class:'t' }, n.title),
+      el('div', { class:'muted' }, `#${n.id} · ${n.category || ''} · ${n.sourceName || ''} · ${fmt(n.publishedAt)}`),
+      n.summary ? el('div', {}, n.summary.slice(0, 120) + (n.summary.length > 120 ? '…' : '')) : null))));
+}
+$('#newsSearch').onclick = () => loadNews(0);
+$('#newsNext').onclick = () => loadNews(newsPage + 1);
+$('#newsPrev').onclick = () => loadNews(newsPage - 1);
+$('#newsToday').onclick = async () => { const r = await api('GET', '/api/news/today'); if (!r.ok) return fail($('#newsList'), r);
+  renderNewsList(r.data || []); $('#newsPage').textContent = '오늘의 뉴스'; };
+
+function highlighted(content, highlights) {
+  const parts = [], hs = [...(highlights || [])].sort((a, b) => a.positionStart - b.positionStart);
+  let at = 0;
+  for (const h of hs) {
+    if (h.positionStart < at || h.positionEnd > content.length) continue;
+    parts.push(content.slice(at, h.positionStart));
+    parts.push(el('mark', { title: `${h.termName}: ${h.simpleDefinition || ''}` }, content.slice(h.positionStart, h.positionEnd)));
+    at = h.positionEnd;
+  }
+  parts.push(content.slice(at));
+  return parts;
+}
+async function openArticle(id) {
+  $('#cardArticle').value = id; $('#quizArticle').value = id;
+  const box = $('#newsDetail'); box.classList.remove('hidden'); box.replaceChildren(el('div', { class:'muted' }, '불러오는 중…'));
+  const [r, g] = await Promise.all([api('GET', `/api/news/${id}`), api('GET', `/api/news/${id}/generation`)]);
+  if (!r.ok) return fail(box, r);
+  const n = r.data;
+  const status = (g.ok ? g.data : []).map(s => el('span', { class:'pill ' + (s.status === 'SUCCEEDED' ? 'ok' : s.status === 'FAILED' ? 'bad' : '') },
+    `${{ ARTICLE:'요약·용어', CARD:'카드뉴스', QUIZ:'퀴즈' }[s.kind] || s.kind} ${s.status}`));
+  box.replaceChildren(
+    el('h2', {}, n.title),
+    el('div', { class:'muted' }, `#${n.id} · ${n.category || ''} · ${n.sourceName || ''} · ${fmt(n.publishedAt)} · 모델 ${n.modelVersion || '-'} `,
+      n.sourceUrl ? el('a', { href:n.sourceUrl, target:'_blank', rel:'noopener' }, '원문') : null),
+    el('div', { class:'row', style:'margin-top:8px' }, ...status),
+    el('h3', {}, '요약'), el('div', {}, n.summary || '요약 없음'),
+    el('h3', {}, `용어 (${(n.termHighlights || []).length}개)`),
+    el('div', {}, ...(n.termHighlights || []).map(h => el('div', {}, el('b', {}, h.termName), ' — ', h.simpleDefinition || ''))),
+    el('h3', {}, '본문 (노란색 = 용어 하이라이트)'), el('div', { class:'body' }, ...highlighted(n.content || '', n.termHighlights)),
+    el('div', { class:'row', style:'margin-top:12px' },
+      el('button', { class:'b', onclick: () => { openTab('cards'); loadCards(); } }, '카드뉴스 보기'),
+      el('button', { class:'b ghost', onclick: () => { openTab('quiz'); loadQuiz(); } }, '퀴즈 풀기'),
+      el('button', { class:'b ghost', onclick: async () => { const x = await api('POST', `/api/news/${id}/bookmark`); alert(x.ok ? '북마크 처리됨' : `실패 (HTTP ${x.status})`); } }, '북마크 토글'),
+      el('button', { class:'b ghost', onclick: async () => { const x = await api('POST', `/api/news/${id}/read`); alert(x.ok ? '읽음 처리됨' : `실패 (HTTP ${x.status})`); } }, '읽음 처리')));
+  box.scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+/* 카드뉴스 */
+async function loadCards() {
+  const id = $('#cardArticle').value.trim(); if (!id) return;
+  const r = await api('GET', `/api/card-news/article/${id}`);
+  if (!r.ok) { $('#cardMeta').textContent = `카드뉴스 없음 (HTTP ${r.status}) ${r.json && r.json.message || ''}`; return $('#cardList').replaceChildren(); }
+  const c = r.data;
+  $('#cardMeta').textContent = `${c.articleTitle} · ${c.totalCards}장 · ${c.status} · ${c.modelVersion || ''} ${c.promptVersion || ''}`;
+  $('#cardList').replaceChildren(...(c.cards || []).map(x => el('div', { class:'cn' },
+    el('div', { class:'o' }, `${x.cardOrder} / ${c.totalCards} · ${x.templateLabel || x.templateType}`),
+    el('h3', {}, x.title), el('div', {}, x.body),
+    x.highlight ? el('div', { class:'pill', style:'margin-top:8px' }, x.highlight) : null)));
+}
+$('#cardLoad').onclick = loadCards;
+
+/* 퀴즈 */
+async function loadQuiz() {
+  const id = $('#quizArticle').value.trim(); if (!id) return;
+  const r = await api('GET', `/api/news/${id}/body`);
+  if (!r.ok) return fail($('#quizList'), r);
+  const quizzes = r.data.quizzes || [];
+  if (!quizzes.length) return $('#quizList').replaceChildren(el('div', { class:'card muted' }, `퀴즈가 없습니다 (상태: ${r.data.quizStatus || '-'})`));
+  $('#quizList').replaceChildren(...quizzes.map((q, i) => {
+    const result = el('div', { class:'muted' });
+    const buttons = q.choices.map((c, ci) => el('button', { class:'choice', onclick: () => answer(q, ci, buttons, result) },
+      `${'ABCD'[ci]}. ${typeof c === 'string' ? c : (c.text || c.label || JSON.stringify(c))}`));
+    return el('div', { class:'card quiz' }, el('div', { class:'muted' }, `문제 ${i + 1} · 꿀 ${q.honey ?? '-'}`),
+      el('div', { class:'q' }, q.question), ...buttons,
+      el('div', { class:'row', style:'margin-top:8px' }, el('button', { class:'b ghost', onclick: () => reveal(q, buttons, result) }, '정답 보기'), result));
+  }));
+}
+async function answer(q, index, buttons, result) {
+  const r = await api('POST', `/api/quizzes/${q.id}/answer`, { selectedIndex: index });
+  if (!r.ok) { result.textContent = r.status === 401 ? '로그인이 필요합니다 (계정 탭).' : `제출 실패 (HTTP ${r.status})`; return; }
+  buttons.forEach(b => b.classList.remove('correct', 'wrong'));
+  buttons[index].classList.add(r.data.isCorrect ? 'correct' : 'wrong');
+  if (r.data.correctIndex != null) buttons[r.data.correctIndex].classList.add('correct');
+  result.textContent = r.data.isCorrect ? `정답! +${r.data.earnedHoney}꿀 (누적 ${r.data.totalHoney}) ${r.data.explanation || ''}` : '오답입니다. 다시 풀어 보세요.';
+}
+async function reveal(q, buttons, result) {
+  const r = await api('POST', `/api/quizzes/${q.id}/reveal`);
+  if (!r.ok) { result.textContent = r.status === 401 ? '로그인이 필요합니다 (계정 탭).' : `실패 (HTTP ${r.status})`; return; }
+  buttons[r.data.correctIndex].classList.add('correct');
+  result.textContent = `정답 ${'ABCD'[r.data.correctIndex]} · ${r.data.explanation || ''} (이후 맞혀도 꿀 없음)`;
+}
+$('#quizLoad').onclick = loadQuiz;
+
+/* 용어 사전 */
+let termPage = 0;
+async function loadTerms(page = 0) {
+  termPage = Math.max(0, page);
+  const r = await api('GET', `/api/terms?page=${termPage}&size=20`);
+  if (!r.ok) return fail($('#termList'), r);
+  renderTerms(r.data.content || []);
+  $('#termPage').textContent = `${termPage + 1} / ${Math.max(1, r.data.totalPages)}쪽 · 전체 ${r.data.totalElements}개`;
+  $('#termNext').disabled = r.data.last; $('#termPrev').disabled = r.data.first;
+}
+function renderTerms(items) {
+  $('#termList').replaceChildren(...(items.length ? items.map(t => el('div', { class:'item', onclick: () => openTerm(t.id) },
+    el('div', {}, el('div', { class:'t' }, t.name || t.term), el('div', {}, t.simpleDefinition || t.definition || '')))) : [el('div', { class:'muted' }, '결과가 없습니다.')]));
+}
+async function openTerm(id) {
+  const box = $('#termDetail'); box.classList.remove('hidden');
+  const r = await api('GET', `/api/terms/${id}`); if (!r.ok) return fail(box, r);
+  const t = r.data;
+  box.replaceChildren(el('h2', {}, t.name || t.term), el('div', {}, t.simpleDefinition || ''),
+    t.definition && t.definition !== t.simpleDefinition ? el('div', { class:'muted' }, t.definition) : null,
+    el('h3', {}, '관련 뉴스'),
+    el('div', { class:'list' }, ...((t.relatedNews || t.relatedArticles || []).map(n => el('div', { class:'item', onclick: () => { openTab('news'); openArticle(n.id || n.articleId); } },
+      el('div', { class:'t' }, n.title))))),
+    el('div', { class:'row', style:'margin-top:8px' },
+      el('button', { class:'b ghost', onclick: async () => { const x = await api('POST', `/api/terms/${id}/learn`); alert(x.ok ? '학습 완료 처리' : `실패 (HTTP ${x.status})`); } }, '학습 완료'),
+      el('button', { class:'b ghost', onclick: async () => { const x = await api('POST', `/api/terms/${id}/save`); alert(x.ok ? '저장됨' : `실패 (HTTP ${x.status})`); } }, '용어 저장')));
+}
+$('#termAll').onclick = () => loadTerms(0);
+$('#termNext').onclick = () => loadTerms(termPage + 1);
+$('#termPrev').onclick = () => loadTerms(termPage - 1);
+$('#termSearch').onclick = async () => {
+  const q = $('#termQuery').value.trim(); if (!q) return loadTerms(0);
+  const r = await api('GET', `/api/terms/search?query=${encodeURIComponent(q)}&limit=20`);
+  if (!r.ok) return fail($('#termList'), r);
+  renderTerms(r.data || []); $('#termPage').textContent = `검색 결과 ${(r.data || []).length}개`;
+};
+
+/* 계정 */
+$('#loginBtn').onclick = async () => {
+  const r = await api('POST', '/api/auth/login', { email: $('#loginEmail').value.trim(), password: $('#loginPw').value });
+  show($('#accountOut'), r);
+  if (r.ok && r.data.accessToken) { store.set('accessToken', r.data.accessToken); store.set('refreshToken', r.data.refreshToken); refreshWho(); }
+};
+$('#logoutBtn').onclick = async () => {
+  const r = store.get('accessToken') ? await api('POST', '/api/auth/logout') : { status:0, json:'토큰 없음' };
+  store.set('accessToken', null); store.set('refreshToken', null); show($('#accountOut'), r); refreshWho();
+};
+$('#signupBtn').onclick = async () => {
+  const r = await api('POST', '/api/auth/signup', { email: $('#suEmail').value.trim(), password: $('#suPw').value,
+    name: $('#suName').value.trim(), nickname: $('#suNick').value.trim() });
+  show($('#accountOut'), r);
+};
+
+/* 마이페이지 */
+document.querySelectorAll('[data-me]').forEach(b => b.addEventListener('click', async () => show($('#meOut'), await api('GET', b.dataset.me))));
+
+/* API 콘솔 */
+$('#cSend').onclick = async () => {
+  const raw = $('#cBody').value.trim();
+  let body; if (raw) { try { body = JSON.parse(raw); } catch { $('#cStatus').textContent = '본문이 올바른 JSON이 아닙니다.'; return; } }
+  const started = performance.now();
+  const r = await api($('#cMethod').value, $('#cPath').value.trim(), body);
+  $('#cStatus').textContent = `HTTP ${r.status} · ${Math.round(performance.now() - started)}ms`;
+  $('#cOut').textContent = JSON.stringify(r.json, null, 2);
+};
+
+refreshWho();
+loadNews(0);
+</script>
+</body>
+</html>

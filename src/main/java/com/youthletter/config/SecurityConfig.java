@@ -82,7 +82,7 @@ public class SecurityConfig {
                     "/auth/callback.html",
                     "/favicon.ico",
                     "/error",
-                    "/login.html"
+                    "/"
                 ).permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
