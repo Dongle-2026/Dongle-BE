@@ -21,6 +21,8 @@ public class HankyungCrawlerService {
 
     private static final String BASE_URL = "https://www.hankyung.com";
     private static final long REQUEST_DELAY_MS = 1000;
+    /** 유료 기사 미리보기처럼 본문이 짧은 기사는 요약·카드뉴스를 만들 수 없어 저장하지 않는다. */
+    static final int MIN_BODY_CHARS = 300;
 
     /** 수집할 섹션 목록(경로). 청년 금융과 가까운 경제·증권·부동산이 기본값이다. */
     @org.springframework.beans.factory.annotation.Value("${crawler.sections:economy,koreamarket/,realestate}")
@@ -53,6 +55,7 @@ public class HankyungCrawlerService {
                     .limit(maxArticles > 0 ? maxArticles : Long.MAX_VALUE).toList();
             log.info("[Crawler] 한경 금융 뉴스 신규 URL: {}건", articleUrls.size());
 
+            int skipped = 0;
             for (int i = 0; i < articleUrls.size(); i++) {
                 String url = articleUrls.get(i);
                 try {
@@ -60,6 +63,8 @@ public class HankyungCrawlerService {
                     CrawledArticleDto article = parseArticle(url);
                     if (article != null) {
                         articles.add(article);
+                    } else {
+                        skipped++;
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -71,7 +76,8 @@ public class HankyungCrawlerService {
                     log.warn("[Crawler] 기사 파싱 실패: {} - {}", url, e.getMessage());
                 }
             }
-            if (!articleUrls.isEmpty() && articles.isEmpty()) {
+            // 짧은 기사만 있어 건너뛴 경우는 정상 결과다. 받기·파싱 자체가 모두 실패했을 때만 오류로 본다.
+            if (!articleUrls.isEmpty() && articles.isEmpty() && skipped == 0) {
                 throw new IllegalStateException("No articles could be fetched or parsed");
             }
         } catch (Exception e) {
@@ -145,7 +151,8 @@ public class HankyungCrawlerService {
         }
 
         String content = extractContent(doc);
-        if (content.isEmpty()) {
+        if (content.length() < MIN_BODY_CHARS) {
+            log.info("[Crawler] 본문이 짧아 건너뜀({}자): {}", content.length(), url);
             return null;
         }
 

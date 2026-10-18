@@ -8,6 +8,13 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class HankyungCrawlerServiceTest {
+    @Test void shortPreviewArticlesAreSkippedWithoutFailingTheRun() throws Exception {
+        var crawler = spy(new HankyungCrawlerService());
+        doReturn(List.of("preview")).when(crawler).collectArticleUrls();
+        doReturn(null).when(crawler).parseArticle("preview");
+        assertThat(crawler.crawl(url -> false)).isEmpty();
+    }
+
     @Test void collectsEverySectionWithoutDuplicatesAndSurvivesOneFailingSection() throws Exception {
         var crawler = spy(new HankyungCrawlerService());
         org.springframework.test.util.ReflectionTestUtils.setField(crawler, "sections", List.of("economy", "koreamarket/", "realestate"));
