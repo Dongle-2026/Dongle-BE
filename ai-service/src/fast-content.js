@@ -150,8 +150,11 @@ function evidenceSentence(source, term) {
 /** 뜻 고르기(용어 → 설명)와 용어 고르기(설명 → 용어) 문제. 오답은 같은 기사의 다른 용어에서 고른다. */
 export function termQuizzes(source, terms = [], kinds = ['meaning', 'term']) {
   const pool = [];
+  // 'AI'와 '인공지능'처럼 같은 개념의 다른 이름은 설명이 거의 같아 보기가 둘 다 정답처럼 보인다 → 하나만 쓴다.
+  const core = e => e.trim().replace(/^[^\s.]{1,15}\.\s+/u, '').replace(/[.。\s]+$/u, '');
   for (const t of terms) {
-    if (!usableExplanation(t) || pool.some(p => p.term === t.term || p.explanation.trim() === t.explanation.trim())) continue;
+    if (!usableExplanation(t) || pool.some(p => p.term === t.term || core(p.explanation).includes(core(t.explanation))
+        || core(t.explanation).includes(core(p.explanation)))) continue;
     const sentence = evidenceSentence(source, t.term);
     if (sentence) pool.push({ term: t.term, explanation: t.explanation.trim(), sentenceId: sentence.id });
   }

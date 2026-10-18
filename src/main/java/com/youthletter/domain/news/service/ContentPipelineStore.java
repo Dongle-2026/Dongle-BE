@@ -18,9 +18,9 @@ public class ContentPipelineStore {
     public Long save(CrawledArticleDto article) {
         Long id = jdbc.queryForObject("""
             INSERT INTO news_articles(source_url,source_name,title,content,category,published_at,thumbnail_url)
-            VALUES (?,'한국경제',?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?)
             ON CONFLICT(source_url) DO UPDATE SET source_url=excluded.source_url RETURNING id
-            """, Long.class, article.url(), article.title(), article.content(), article.category(),
+            """, Long.class, article.url(), article.sourceName(), article.title(), article.content(), article.category(),
                 article.publishedAt() == null ? null : article.publishedAt().atOffset(ZoneOffset.UTC), article.thumbnailUrl());
         // 재실행 시 성공/실패 이력을 보존한다. 무한 재생성이나 검증 실패의 무한 재시도를 막는다.
         for (var kind : AiJobService.Kind.values()) {

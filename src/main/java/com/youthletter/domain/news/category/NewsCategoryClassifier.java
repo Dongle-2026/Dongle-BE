@@ -9,9 +9,14 @@ public final class NewsCategoryClassifier {
     private NewsCategoryClassifier() {}
 
     public static NewsCategory classify(String title, String content) {
+        return match(title, content).orElse(NewsCategory.FINANCE);
+    }
+
+    /** 키워드가 하나도 맞지 않으면 비어 있다(호출자가 다른 근거로 정할 수 있게). */
+    public static java.util.Optional<NewsCategory> match(String title, String content) {
         String t = title == null ? "" : title.toLowerCase(Locale.ROOT);
         String c = content == null ? "" : content.toLowerCase(Locale.ROOT);
-        NewsCategory best = NewsCategory.FINANCE;
+        NewsCategory best = null;
         int bestScore = 0;
         for (NewsCategory category : NewsCategory.values()) {
             int score = 0;
@@ -23,7 +28,7 @@ public final class NewsCategoryClassifier {
                 bestScore = score;
             }
         }
-        return best;
+        return java.util.Optional.ofNullable(best);
     }
 
     private static int occurrences(String text, String keyword) {

@@ -31,6 +31,14 @@ class HankyungCrawlerServiceTest {
         assertThatThrownBy(crawler::collectArticleUrls).isInstanceOf(HttpStatusException.class);
     }
 
+    @Test void videoPlayerControlsAreNotPartOfArticleBody() {
+        var doc = org.jsoup.Jsoup.parse("""
+            <div id="articletxt"><div class="video"><iframe src="https://www.youtube.com/embed/x"></iframe>
+            <button type="button" class="btn-close-video"><span class="blind">영상 모듈 닫기</span></button></div>
+            재개발·재건축에서 가장 중요한 건 기간이다.</div>""");
+        assertThat(new HankyungCrawlerService().extractContent(doc)).isEqualTo("재개발·재건축에서 가장 중요한 건 기간이다.");
+    }
+
     @Test void photoCaptionsAreNotPartOfArticleBody() {
         var doc = org.jsoup.Jsoup.parse("""
             <div id="articletxt"><figure class="article-figure"><div class="figure-img"><img src="a.jpg"></div>

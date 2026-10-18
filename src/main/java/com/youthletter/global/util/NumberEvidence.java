@@ -24,8 +24,9 @@ public final class NumberEvidence {
 
     public static List<String> unsupported(String rawText, String rawEvidence) {
         // "14만 9576명"처럼 단위 뒤를 띄어 써도 한 숫자로 읽는다(AI 서비스와 같은 규칙).
-        String text = rawText.replaceAll("(\\d[만억조천])\\s+(?=\\d)", "$1");
-        String evidence = rawEvidence.replaceAll("(\\d[만억조천])\\s+(?=\\d)", "$1");
+        // 같은 줄 안의 띄어쓰기만 합친다(제목·근거 문장은 줄바꿈으로 이어 붙여 서로 합쳐지지 않게).
+        String text = rawText.replaceAll("(\\d[만억조천])[ \\t]+(?=\\d)", "$1");
+        String evidence = rawEvidence.replaceAll("(\\d[만억조천])[ \\t]+(?=\\d)", "$1");
         // "100분의 30"과 "30%"는 같은 값이므로 근거 쪽 표기를 %로도 인정한다(AI 서비스와 같은 규칙).
         String ev = evidence.replaceAll("100분의\\s?(\\d+(?:\\.\\d+)?)", "$0 $1%");
         Set<String> evidenceValues = new HashSet<>();

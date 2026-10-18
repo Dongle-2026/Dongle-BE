@@ -173,3 +173,27 @@ test('빈칸·뜻 고르기·용어 고르기를 섞어 3문제를 만든다',as
   // 숫자가 든 설명이나 용어 이름이 드러나는 설명은 쓰지 않는다
   assert.deepEqual(termQuizzes(source,[{term:'예금',explanation:'예금은 1년 단위'},...ts.slice(1,4)]),[]);
 });
+
+test('같은 개념의 다른 이름(AI·인공지능)은 뜻 고르기 보기에 함께 나오지 않는다',async()=>{
+  const {termQuizzes}=await import('../src/fast-content.js');
+  const ts=[['인공지능','컴퓨터가 사람처럼 학습하고 판단하도록 만든 기술이에요.'],['AI','인공지능. 컴퓨터가 사람처럼 학습하고 판단하도록 만든 기술이에요.'],
+    ['예산','정부나 기관이 특정 목적에 사용하는 돈'],['이자','돈을 빌린 대가로 내는 비용'],['국가채무','정부가 갚아야 할 빚']].map(([term,explanation])=>({term,explanation}));
+  const source=sentences('올해 인공지능(AI) 호황으로 세수가 늘었다. 예산과 이자 부담이 커졌다. 국가채무 관리가 중요하다.');
+  const quizzes=termQuizzes(source,ts);
+  assert.equal(quizzes.length,2);
+  for(const q of quizzes){
+    const all=q.choices.join('|');
+    assert.ok(!(all.includes('인공지능')&&all.includes('AI'))||!/뜻으로/.test(q.question),all);
+    assert.ok(q.choices.filter(c=>c.includes('컴퓨터가 사람처럼')).length<=1,all);
+  }
+});
+
+test('제목 끝 숫자와 근거 문장 첫 숫자를 한 숫자로 합치지 않는다(…51조 + 18일…)',async()=>{
+  const {unsupportedNumbers}=await import('../src/ai.js');
+  const title='나랏빚 여유 부렸다간… 4년뒤 이자만 年 51조';
+  const source=sentences('올해 세수가 늘었다. 18일 국회 자료에 따르면 국고채 이자는 34조4220억원이다. 이자 부담이 커졌다.');
+  const cards=selectedCards({sentenceIds:[1,2,3]},source,title);
+  assert.equal(cards.length,3);
+  // 같은 줄의 띄어쓰기는 여전히 한 숫자로 읽는다
+  assert.deepEqual(unsupportedNumbers('14만 9576명','14만9576명이 참여했다'),[]);
+});

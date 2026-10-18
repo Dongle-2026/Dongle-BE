@@ -14,10 +14,18 @@ import java.util.List;
 
 @Slf4j
 @Service
-public class HankyungCrawlerService {
+public class HankyungCrawlerService implements NewsCrawler {
 
     @org.springframework.beans.factory.annotation.Value("${crawler.max-articles:0}")
     private int maxArticles;
+
+    @org.springframework.beans.factory.annotation.Value("${crawler.hankyung.interval-ms:3600000}")
+    private long intervalMs = 3_600_000;
+
+    @Override
+    public java.time.Duration interval() {
+        return java.time.Duration.ofMillis(intervalMs);
+    }
 
     private static final String BASE_URL = "https://www.hankyung.com";
     private static final long REQUEST_DELAY_MS = 1000;
@@ -47,6 +55,7 @@ public class HankyungCrawlerService {
      * 이미 저장된 기사(alreadySaved)는 다시 받지 않고, 기사 요청 사이에 1초 간격을 둔다.
      * 원문이 429(요청 과다)를 돌려주면 이번 수집을 멈춘다(다음 정기 실행에 이어짐).
      */
+    @Override
     public List<CrawledArticleDto> crawl(java.util.function.Predicate<String> alreadySaved) {
         List<CrawledArticleDto> articles = new ArrayList<>();
 
@@ -169,8 +178,8 @@ public class HankyungCrawlerService {
     /**
      * 본문 추출 (selector 후보를 순서대로 시도)
      */
-    /** 사진·그래픽 캡션("사진=뉴스1" 등)과 스크립트는 본문이 아니므로 제외한다. */
-    private static final String NON_BODY = "figure, figcaption, .figure-caption, .article-figure, script, style";
+    /** 사진·그래픽 캡션("사진=뉴스1" 등), 영상 플레이어 버튼("영상 모듈 닫기"), 스크립트는 본문이 아니므로 제외한다. */
+    private static final String NON_BODY = "figure, figcaption, .figure-caption, .article-figure, script, style, iframe, button, .blind";
 
     String extractContent(Document doc) {
         for (String selector : CONTENT_SELECTORS) {

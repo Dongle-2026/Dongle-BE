@@ -206,3 +206,12 @@ logging:
   level:
     com.youthletter: INFO
     org.hibernate.SQL: WARN
+
+# 매일경제 RSS 수집(기본 끔). 파이프라인·운영 Compose에서 켠다.
+crawler:
+  hankyung:
+    interval-ms: ${CRAWLER_HANKYUNG_INTERVAL_MS:3600000}
+  maekyung:
+    enabled: ${CRAWLER_MAEKYUNG_ENABLED:false}
+    max-per-section: ${CRAWLER_MAEKYUNG_MAX_PER_SECTION:10}
+    interval-ms: ${CRAWLER_MAEKYUNG_INTERVAL_MS:1800000}

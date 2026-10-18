@@ -48,4 +48,10 @@ class NumberEvidenceTest {
         assertThat(NumberEvidence.unsupported("17년 만에", "2017년 이후")).containsExactly("17");
         assertThat(NumberEvidence.unsupported("3.7%", "연 3.75%까지")).containsExactly("3.7%");
     }
+
+    @org.junit.jupiter.api.Test void titleAndSentenceOnSeparateLinesAreNotMergedIntoOneNumber() {
+        org.assertj.core.api.Assertions.assertThat(NumberEvidence.unsupported("18일 국회 자료",
+                "4년뒤 이자만 年 51조\n18일 국회 자료에 따르면")).isEmpty();
+        org.assertj.core.api.Assertions.assertThat(NumberEvidence.unsupported("14만 9576명", "14만9576명이 참여")).isEmpty();
+    }
 }
