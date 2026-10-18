@@ -20,8 +20,13 @@ public class HankyungCrawlerService {
     private int maxArticles;
 
     private static final String BASE_URL = "https://www.hankyung.com";
-    private static final String FINANCE_URL = BASE_URL + "/economy";
     private static final long REQUEST_DELAY_MS = 1000;
+    /** 유료 기사 미리보기처럼 본문이 짧은 기사는 요약·카드뉴스를 만들 수 없어 저장하지 않는다. */
+    static final int MIN_BODY_CHARS = 300;
+
+    /** 수집할 섹션 목록(경로). 청년 금융과 가까운 경제·증권·부동산이 기본값이다. */
+    @org.springframework.beans.factory.annotation.Value("${crawler.sections:economy,koreamarket/,realestate}")
+    private List<String> sections = List.of("economy", "koreamarket/", "realestate");
 
     private static final List<String> CONTENT_SELECTORS = List.of(
             "div#articletxt",
@@ -50,6 +55,7 @@ public class HankyungCrawlerService {
                     .limit(maxArticles > 0 ? maxArticles : Long.MAX_VALUE).toList();
             log.info("[Crawler] 한경 금융 뉴스 신규 URL: {}건", articleUrls.size());
 
+            int skipped = 0;
             for (int i = 0; i < articleUrls.size(); i++) {
                 String url = articleUrls.get(i);
                 try {
@@ -57,6 +63,8 @@ public class HankyungCrawlerService {
                     CrawledArticleDto article = parseArticle(url);
                     if (article != null) {
                         articles.add(article);
+                    } else {
+                        skipped++;
                     }
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -68,7 +76,8 @@ public class HankyungCrawlerService {
                     log.warn("[Crawler] 기사 파싱 실패: {} - {}", url, e.getMessage());
                 }
             }
-            if (!articleUrls.isEmpty() && articles.isEmpty()) {
+            // 짧은 기사만 있어 건너뛴 경우는 정상 결과다. 받기·파싱 자체가 모두 실패했을 때만 오류로 본다.
+            if (!articleUrls.isEmpty() && articles.isEmpty() && skipped == 0) {
                 throw new IllegalStateException("No articles could be fetched or parsed");
             }
         } catch (Exception e) {
@@ -81,17 +90,37 @@ public class HankyungCrawlerService {
     }
 
     /**
-     * 목록 페이지에서 기사 URL 수집
+     * 섹션별 목록 페이지에서 기사 URL을 모은다. 섹션 요청 사이에도 1초 간격을 둔다.
+     * 한 섹션이 실패해도 나머지 섹션은 수집하고, 모든 섹션이 실패하면 예외를 던진다.
      */
     List<String> collectArticleUrls() throws Exception {
-        Document doc = Jsoup.connect(FINANCE_URL)
+        List<String> urls = new ArrayList<>();
+        Exception lastError = null;
+        int succeeded = 0;
+        for (int i = 0; i < sections.size(); i++) {
+            String section = sections.get(i).strip();
+            if (section.isEmpty()) continue;
+            if (i > 0) Thread.sleep(REQUEST_DELAY_MS);
+            try {
+                for (String url : listingUrls(BASE_URL + "/" + section)) if (!urls.contains(url)) urls.add(url);
+                succeeded++;
+            } catch (Exception e) {
+                lastError = e;
+                log.warn("[Crawler] 섹션 목록 실패: {} - {}", section, e.getMessage());
+            }
+        }
+        if (succeeded == 0 && lastError != null) throw lastError;
+        return urls;
+    }
+
+    /** 목록 페이지 하나에서 기사 URL 수집 */
+    List<String> listingUrls(String listUrl) throws Exception {
+        Document doc = Jsoup.connect(listUrl)
                 .userAgent("Mozilla/5.0")
                 .timeout(10_000)
                 .get();
 
-        // 목록 페이지에서 기사 URL 수집
         Elements links = doc.select("ul.news-list a[href], div.article-list a[href]");
-
         // 실패 시 fallback
         if (links.isEmpty()) {
             links = doc.select("a[href*='/article/']");
@@ -104,7 +133,6 @@ public class HankyungCrawlerService {
                 urls.add(href);
             }
         }
-
         return urls;
     }
 
@@ -123,7 +151,8 @@ public class HankyungCrawlerService {
         }
 
         String content = extractContent(doc);
-        if (content.isEmpty()) {
+        if (content.length() < MIN_BODY_CHARS) {
+            log.info("[Crawler] 본문이 짧아 건너뜀({}자): {}", content.length(), url);
             return null;
         }
 

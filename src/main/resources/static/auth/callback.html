@@ -29,7 +29,7 @@
       document.getElementById('msg').textContent = '로그인 실패: ' + (params.get('message') || error);
 
     } else if (accessToken && refreshToken) {
-      // 1. localhost:8080 localStorage에 저장 → test.html에서 바로 사용 가능
+      // 1. 백엔드 localStorage에 저장 → 기능 확인 페이지(index.html)에서 바로 사용 가능
       localStorage.setItem('accessToken', accessToken);
       localStorage.setItem('refreshToken', refreshToken);
 
@@ -47,8 +47,8 @@
         window.location.replace(dest);
       })
       .catch(() => {
-        // 프론트엔드 미실행 → 테스트 콘솔로 이동
-        window.location.replace('/test.html');
+        // 프론트엔드 미실행 → 백엔드 기능 확인 페이지로 이동
+        window.location.replace('/index.html#account');
       });
 
     } else {

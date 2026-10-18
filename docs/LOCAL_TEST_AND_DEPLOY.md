@@ -273,6 +273,34 @@ docker compose --env-file .env.deploy -p youthletter-prod -f docker-compose.prod
 
 배포 서버에서 발급한 API_ACCESS_TOKEN으로 검사한다. 로컬 토큰은 다른 서버에서 사용할 수 없다. health 200 + schema ready, 8 PASS, 허용 Origin 응답, 일반 사용자 관리자 접근 403을 확인한다.
 
+### 9-4-1. 수집한 콘텐츠를 운영 DB에 넣기
+
+로컬 `./run-pipeline`으로 모은 기사·요약·용어·카드뉴스·퀴즈를 운영 DB로 옮긴다. 운영 서버가 수집을 시작하기 전에 초기 데이터를 채우는 용도다.
+
+1. 운영 DB가 9-2/9-3 절차로 V28까지 적용돼 있어야 한다(`content_pipeline_runs` 테이블 존재).
+2. 콘텐츠를 옮기기 전 운영 DB를 백업한다(9-3의 `db_archive.py backup`).
+3. 파이프라인 DB와 운영 DB가 **같은 호스트**에서 Docker로 떠 있으면 바로 옮긴다. 운영 컨테이너 이름은 `youthletter-postgres`다.
+
+```sh
+python3 scripts/import_content.py --target-container youthletter-postgres --target-db "$DB_NAME" --target-user "$DB_USERNAME" --dry-run
+python3 scripts/import_content.py --target-container youthletter-postgres --target-db "$DB_NAME" --target-user "$DB_USERNAME"
+```
+
+4. 운영 서버가 **다른 컴퓨터**라면 파이프라인 DB를 파일로 뽑아 서버로 복사한 뒤, 서버에서 임시 DB로 복원하고 그 DB를 원본으로 지정한다.
+
+```sh
+# 로컬(파이프라인 DB 백업)
+python3 scripts/db_archive.py --compose-file docker-compose.pipeline.yml --project youthletter-pipeline --env-file .env.pipeline.local backup backups/pipeline-content.dump
+scp backups/pipeline-content.dump 서버:/경로/youthletter-backend/backups/
+# 서버(임시 DB로 복원 → 운영 DB로 옮기기)
+python3 scripts/db_archive.py --compose-file docker-compose.prod.yml --project youthletter-prod --env-file .env.deploy restore backups/pipeline-content.dump --new-database pipeline_import
+python3 scripts/import_content.py --source-container youthletter-postgres --source-db pipeline_import --source-user "$DB_USERNAME" \
+  --target-container youthletter-postgres --target-db "$DB_NAME" --target-user "$DB_USERNAME" --dry-run
+```
+
+dry-run의 `imported_articles` 개수를 확인한 뒤 `--dry-run` 없이 다시 실행한다. 같은 명령을 다시 실행해도 이미 옮긴 기사는 건너뛴다. 확인 후 임시 DB(`pipeline_import`)는 지워도 된다.
+`/api/news`, 기능 확인 페이지(`https://API도메인/`)에서 기사·카드뉴스·퀴즈가 보이면 완료다.
+
 ### 9-5. 실패 시 복구
 
 이전 Git 커밋/이미지 태그와 배포 설정을 릴리스별 보관한다. 앱만 실패하고 스키마가 이전 앱과 호환되면 이전 이미지를 다시 띄운다. DB 문제라면 쓰기를 중단하고 백업을 **새 DB명**으로 복원·검증한 뒤 .env.deploy의 DB_NAME을 복원 DB로 변경해 재기동한다. 원본 DB는 원인 조사용으로 남긴다. DB만 과거로 돌아가면 백업 이후 쓰기가 유실될 수 있어 복원 시점·사용자 영향을 확인해야 한다. 소유권/권한과 API readiness까지 확인한 후 서비스를 재개한다.
