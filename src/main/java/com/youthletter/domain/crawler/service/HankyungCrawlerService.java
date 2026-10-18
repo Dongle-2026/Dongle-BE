@@ -14,7 +14,7 @@ import java.util.List;
 
 @Slf4j
 @Service
-public class HankyungCrawlerService {
+public class HankyungCrawlerService implements NewsCrawler {
 
     @org.springframework.beans.factory.annotation.Value("${crawler.max-articles:0}")
     private int maxArticles;
@@ -47,6 +47,7 @@ public class HankyungCrawlerService {
      * 이미 저장된 기사(alreadySaved)는 다시 받지 않고, 기사 요청 사이에 1초 간격을 둔다.
      * 원문이 429(요청 과다)를 돌려주면 이번 수집을 멈춘다(다음 정기 실행에 이어짐).
      */
+    @Override
     public List<CrawledArticleDto> crawl(java.util.function.Predicate<String> alreadySaved) {
         List<CrawledArticleDto> articles = new ArrayList<>();
 
