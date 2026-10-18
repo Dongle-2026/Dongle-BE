@@ -114,8 +114,10 @@ oauthProvider, joinedAt, profileImageUrl이 이 DTO에 없다. 최신 앱의 Use
 서버 bookmarkedAt → 화면 savedAt
 ```
 
-서버 날짜 중 LocalDateTime에는 offset이 없다는 기존 문제가 남아 있다. 무조건 Z를
-붙이지 않고 저장·출력 시간대 통일 작업 후 앱 날짜 형식을 확정한다.
+서버 날짜(일시)는 **한국 시간 + 오프셋** ISO 8601로 응답한다(2026-10-18 변경).
+예: `"publishedAt": "2026-10-18T09:00:03+09:00"`. 서버 배포 시간대(UTC/Asia/Seoul)와 관계없이
+같은 시각이 나온다. 앱은 `new Date(value)`/`DateTime.parse(value)`로 그대로 읽으면 된다.
+날짜만 있는 값(LocalDate, 예: spentAt)은 기존처럼 `2026-10-18` 형식이다.
 
 ## 4. 신규 설계할 계약 — 아직 구현 완료 아님
 
@@ -178,7 +180,7 @@ DELETE /api/me 후 같은 토큰 401·기기 0건. 스모크 데이터는 삭제
 ## 7. 2026-10-11 추가 구현 — 노션 29개 경로 전부 등록
 
 공통 규칙(3장)은 그대로다. 성공 `{status, message, data}`, 목록은 Spring Page(`content`, `last`), page는 0부터,
-ID는 숫자, 날짜는 오프셋 없는 `LocalDateTime`. **null 필드는 JSON에서 생략**되므로 앱은 "없음 = null"로 처리한다.
+ID는 숫자, 일시는 한국 시간 오프셋 포함 ISO 8601(예: `2026-10-18T09:00:03+09:00`). **null 필드는 JSON에서 생략**되므로 앱은 "없음 = null"로 처리한다.
 
 ### 인증 (A1)
 
