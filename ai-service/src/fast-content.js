@@ -72,12 +72,23 @@ export function termCandidates(content, limit = 40) {
   return [...counts.keys()].sort((a, b) => score(b) - score(a) || content.indexOf(a) - content.indexOf(b)).slice(0, limit);
 }
 
+// 사진·그래픽 출처 캡션이나 기자 이메일 줄은 기사 내용이 아니다.
+export function isCaptionSentence(text) {
+  return /(?:사진|그래픽|자료|출처|일러스트)\s*=/u.test(text) || /[\w.-]+@[\w-]+\.(?:com|co\.kr|net|kr)/i.test(text);
+}
+
+// 빈칸이 단어 중간이 되지 않도록, 용어 앞은 한글·영숫자가 아니고 뒤는 조사만 붙은 경우만 허용한다.
+const PARTICLE_AFTER = /^(?:으로|에서|에게|까지|부터|보다|처럼|이라|이다|이며|과의|와의|은|는|이|가|을|를|의|에|와|과|도|로|만)?(?![가-힣A-Za-z0-9])/u;
+export function wholeWordAt(text, term, at) {
+  return !/[가-힣A-Za-z0-9]/u.test(text[at - 1] ?? '') && PARTICLE_AFTER.test(text.slice(at + term.length));
+}
+
 export function rankSentences(source, terms = []) {
-  const candidates = source.filter(s => s.text.length <= 200);
-  const first = candidates.find(s => s.id === 1);
+  const candidates = source.filter(s => s.text.length <= 200 && !isCaptionSentence(s.text));
+  const first = candidates[0];
   if (!first || candidates.length < 2) return null;
   const score = s => terms.reduce((sum, t) => sum + (s.text.includes(t.term) ? 1 : 0), 0);
-  return { sentenceIds: [first, ...candidates.filter(s => s.id !== 1)
+  return { sentenceIds: [first, ...candidates.slice(1)
     .sort((a, b) => score(b) - score(a) || a.id - b.id)].slice(0, 5).map(s => s.id) };
 }
 
@@ -85,12 +96,16 @@ export function clozeQuizzes(source, terms = []) {
   const names = [...new Set(terms.map(t => t.term).filter(t => typeof t === 'string'
     && t.length >= 2 && t.length <= 40 && source.some(s => s.text.includes(t))))];
   if (names.length < 5) return null;
-  const quizzes = [];
-  for (const name of names) {
+  const quizzes = [], usedSentences = new Set(), usedNames = new Set();
+  // 1차: 문제마다 다른 문장. 짧은 기사라 모자라면 2차에서 같은 문장의 다른 용어도 쓴다.
+  for (const distinct of [true, false]) for (const name of names) {
+    if (quizzes.length === 3) break;
+    if (usedNames.has(name)) continue;
     for (const sentence of source) {
-      const at = sentence.text.indexOf(name);
+      if ((distinct && usedSentences.has(sentence.id)) || isCaptionSentence(sentence.text)) continue;
+      let at = sentence.text.indexOf(name);
+      while (at >= 0 && !wholeWordAt(sentence.text, name, at)) at = sentence.text.indexOf(name, at + 1);
       if (at < 0) continue;
-      if (/[\d,.]/.test(sentence.text[at - 1] ?? '')) continue;
       // 양쪽을 공백 경계에서 자른다. 날짜·금액의 중간을 잘라 새 숫자를 만들지 않는다.
       let start = Math.max(0, at - 25);
       if (start > 0) { const space = sentence.text.indexOf(' ', start); start = space >= 0 && space < at ? space + 1 : 0; }
@@ -99,14 +114,22 @@ export function clozeQuizzes(source, terms = []) {
       const quote = sentence.text.slice(start, at) + '□' + sentence.text.slice(at + name.length, end);
       const question = `기사 원문의 빈칸에 들어갈 표현은?\n“${start ? '…' : ''}${quote}${end < sentence.text.length ? '…' : ''}”`;
       if (question.length > 120) continue;
-      const choices = [name, ...names.filter(n => n !== name).slice(0, 3)];
-      if (choices.length !== 4) continue;
+      // 오답 보기는 문제마다 다른 용어로 돌려 쓴다. 정답 위치도 문제마다 바꾼다.
+      const others = names.filter(n => n !== name);
+      const k = quizzes.length;
+      const wrong = [0, 1, 2].map(i => others[(k + i) % others.length]);
+      if (new Set(wrong).size !== 3) continue;
+      const answerIndex = k % 4;
+      const choices = [...wrong];
+      choices.splice(answerIndex, 0, name);
       const explanation = `원문의 표현은 ‘${name}’입니다. 해당 문장을 다시 확인하세요.`;
-      if (!quizzes.some(q => q.question === question)) quizzes.push({question, choices, answerIndex:0,
-        explanation, sourceSentenceIds:[sentence.id]});
+      if (!quizzes.some(q => q.question === question)) {
+        quizzes.push({question, choices, answerIndex, explanation, sourceSentenceIds:[sentence.id]});
+        usedSentences.add(sentence.id);
+        usedNames.add(name);
+      }
       break;
     }
-    if (quizzes.length === 3) break;
   }
   return quizzes.length === 3 ? {quizzes} : null;
 }

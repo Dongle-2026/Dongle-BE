@@ -140,11 +140,16 @@ public class HankyungCrawlerService {
     /**
      * 본문 추출 (selector 후보를 순서대로 시도)
      */
-    private String extractContent(Document doc) {
+    /** 사진·그래픽 캡션("사진=뉴스1" 등)과 스크립트는 본문이 아니므로 제외한다. */
+    private static final String NON_BODY = "figure, figcaption, .figure-caption, .article-figure, script, style";
+
+    String extractContent(Document doc) {
         for (String selector : CONTENT_SELECTORS) {
             Element element = doc.selectFirst(selector);
             if (element != null) {
-                String text = element.text().trim();
+                Element body = element.clone();
+                body.select(NON_BODY).remove();
+                String text = body.text().trim();
                 if (!text.isEmpty()) {
                     return text;
                 }

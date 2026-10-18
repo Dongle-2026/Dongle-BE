@@ -8,6 +8,14 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class HankyungCrawlerServiceTest {
+    @Test void photoCaptionsAreNotPartOfArticleBody() {
+        var doc = org.jsoup.Jsoup.parse("""
+            <div id="articletxt"><figure class="article-figure"><div class="figure-img"><img src="a.jpg"></div>
+            <figcaption class="figure-caption">사진=뉴스1</figcaption></figure>
+            정부가 석유 최고가격을 4주 더 동결한다.<script>var x=1;</script></div>""");
+        assertThat(new HankyungCrawlerService().extractContent(doc)).isEqualTo("정부가 석유 최고가격을 4주 더 동결한다.");
+    }
+
     @Test void limitAppliesToNewArticlesAfterDuplicateFiltering() throws Exception {
         var crawler = spy(new HankyungCrawlerService());
         org.springframework.test.util.ReflectionTestUtils.setField(crawler, "maxArticles", 1);
