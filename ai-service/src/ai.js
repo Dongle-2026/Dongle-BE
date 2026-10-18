@@ -1,4 +1,4 @@
-import { rankSentences, clozeQuizzes, termCandidates, isGenericTerm } from './fast-content.js';
+import { rankSentences, clozeQuizzes, termCandidates, isGenericTerm, isCaptionSentence } from './fast-content.js';
 
 export class AiError extends Error {
   constructor(code, status = 502, detail = null) { super(code); this.code = code; this.status = status; this.detail = detail; }
@@ -133,9 +133,11 @@ export function validateCards(value, source, title = '') {
 // 발췌 카드: 선택한 원문 문장을 그대로 본문으로 쓰며 새 사실을 생성하지 않는다.
 export function selectedCards(value, source, title = '') {
   const ids = value?.sentenceIds;
-  const count = Math.min(5, source.filter(s => s.text.length <= 200).length);
-  if (count < 2 || !Array.isArray(ids) || ids.length !== count || new Set(ids).size !== count || !ids.includes(1)
-      || ids.some(id => !Number.isInteger(id) || id < 1 || id > source.length || source[id - 1].text.length > 200)) {
+  // 캡션·기자 이메일 줄은 카드로 쓰지 않는다. 첫 번째 본문 문장은 반드시 포함한다.
+  const eligible = source.filter(s => s.text.length <= 200 && !isCaptionSentence(s.text));
+  const count = Math.min(5, eligible.length);
+  if (count < 2 || !Array.isArray(ids) || ids.length !== count || new Set(ids).size !== count || !ids.includes(eligible[0].id)
+      || ids.some(id => !eligible.some(s => s.id === id))) {
     throw new AiError('INVALID_CARD_SELECTION');
   }
   return validateCards({ cards: [...ids].sort((a, b) => a - b).map((id, index) => ({
@@ -329,7 +331,7 @@ export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_
       // 모델 요약에 기사에 없는 숫자가 있으면 원문 앞 문장 발췌로 대신한다.
       if (summaryMode === 'extractive' || typeof result.summary !== 'string' || !result.summary.trim()
           || result.summary.length > 2000 || unsupportedNumbers(result.summary, `${input.title} ${input.content}`).length) {
-        result.summary = sentences(input.content).slice(0, 3).map(s => s.text).join(' ').slice(0, 2000);
+        result.summary = sentences(input.content).filter(s => !isCaptionSentence(s.text)).slice(0, 3).map(s => s.text).join(' ').slice(0, 2000);
       }
       const terms = result.terms.map(t => {
         if (t.term.length > 200 || t.explanation.length > 500) throw new AiError('INVALID_TERM');
@@ -372,7 +374,7 @@ export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_
       articleInput(input);
       const source = sentences(input.content);
       if (quizMode === 'cloze') {
-        const value = clozeQuizzes(source, input.terms);
+        const value = clozeQuizzes(source, input.terms, termCandidates(input.content));
         if (!value) throw new AiError('INSUFFICIENT_QUIZ_TERMS');
         return { modelVersion: model, promptVersion: 'quiz-v7-source-cloze', quizzes: validateQuizzes(value, source, input.title) };
       }

@@ -15,7 +15,7 @@ const STOP = new Set(['이번','지난','전날','이날','다양한','위해','
   '영향','발표','추진','개최','운영','지원','확대','강화','개선','도입','마련','협력','참여','성과','변화','수준','증가','감소',
   '상승','하락','전망','예정','예상','가능성','방향','목표','판매','생산','이용','사용','관리','개발','연구','조사','결과',
   '내용','의견','사업자','직원','고객','소비자','국민','주민','시민','학생','노동자','근로자','회장','사장','장관','의원',
-  '대통령','총리','중심','처리','절차','재정경제부','재경부','행시','반대','추가','불만','사건','출마','차기','협약식','조정관','업무시간','사과','판정','승진','CCTV','KB','지역희망나눔재단','전국푸드뱅크','발데싱','NCDR','박창훈','경찰대학','기획','논의','검토','협의','합의','발언','주장','지적','강조','요구','요청','제안','공개','출시','선정']);
+  '대통령','총리','중심','처리','절차','재정경제부','재경부','행시','반대','추가','불만','사건','출마','차기','협약식','조정관','업무시간','사과','판정','승진','CCTV','KB','지역희망나눔재단','전국푸드뱅크','발데싱','NCDR','박창훈','경찰대학','시간','구글','타임라인','기록','위치','데이터','자료','정보','수단','방법','날짜','기획','논의','검토','협의','합의','발언','주장','지적','강조','요구','요청','제안','공개','출시','선정']);
 // 금액 단위·조사가 붙은 형태는 용어가 아니다.
 const UNIT = /^(?:[0-9,.]*)(?:억|조|만|천)?(?:원|달러|억원|억달러|조원|만원|명|건|개|곳|배|퍼센트)$/u;
 const PARTICLE = /[이가을를은는의에와과도로]$/u;
@@ -72,25 +72,45 @@ export function termCandidates(content, limit = 40) {
   return [...counts.keys()].sort((a, b) => score(b) - score(a) || content.indexOf(a) - content.indexOf(b)).slice(0, limit);
 }
 
+// 사진·그래픽 출처 캡션이나 기자 이메일 줄은 기사 내용이 아니다.
+export function isCaptionSentence(text) {
+  return /(?:사진|그래픽|자료|출처|일러스트)\s*=/u.test(text) || /[\w.-]+@[\w-]+\.(?:com|co\.kr|net|kr)/i.test(text);
+}
+
+// 빈칸이 단어 중간이 되지 않도록, 용어 앞은 한글·영숫자가 아니고 뒤는 조사만 붙은 경우만 허용한다.
+const PARTICLE_AFTER = /^(?:에서는|에서도|으로는|으로도|에게는|이라는|에는|에도|와는|과는|이나|라는|이란|으로|에서|에게|까지|부터|보다|처럼|이라|이다|이며|과의|와의|란|나|은|는|이|가|을|를|의|에|와|과|도|로|만)?(?![가-힣A-Za-z0-9])/u;
+// '해킹돼·대출한'처럼 하다/되다가 붙은 명사도 단어 단위로 본다.
+const VERB_AFTER = /^(?:하|한|할|함|해|했|되|돼|된|될|됨|됐)/u;
+export function wholeWordAt(text, term, at) {
+  const after = text.slice(at + term.length);
+  return !/[가-힣A-Za-z0-9]/u.test(text[at - 1] ?? '') && (PARTICLE_AFTER.test(after) || VERB_AFTER.test(after));
+}
+
 export function rankSentences(source, terms = []) {
-  const candidates = source.filter(s => s.text.length <= 200);
-  const first = candidates.find(s => s.id === 1);
+  const candidates = source.filter(s => s.text.length <= 200 && !isCaptionSentence(s.text));
+  const first = candidates[0];
   if (!first || candidates.length < 2) return null;
   const score = s => terms.reduce((sum, t) => sum + (s.text.includes(t.term) ? 1 : 0), 0);
-  return { sentenceIds: [first, ...candidates.filter(s => s.id !== 1)
+  return { sentenceIds: [first, ...candidates.slice(1)
     .sort((a, b) => score(b) - score(a) || a.id - b.id)].slice(0, 5).map(s => s.id) };
 }
 
-export function clozeQuizzes(source, terms = []) {
-  const names = [...new Set(terms.map(t => t.term).filter(t => typeof t === 'string'
-    && t.length >= 2 && t.length <= 40 && source.some(s => s.text.includes(t))))];
-  if (names.length < 5) return null;
-  const quizzes = [];
-  for (const name of names) {
+// extra: 학습 용어만으로 3문제를 못 채울 때 쓰는 원문 후보 단어(termCandidates). 용어를 먼저 쓴다.
+export function clozeQuizzes(source, terms = [], extra = []) {
+  const valid = t => typeof t === 'string' && t.length >= 2 && t.length <= 40 && source.some(s => s.text.includes(t));
+  const learning = [...new Set(terms.map(t => t.term).filter(valid))];
+  if (learning.length < 5) return null;
+  const names = [...new Set([...learning, ...extra.filter(valid)])];
+  const quizzes = [], usedSentences = new Set(), usedNames = new Set();
+  // 1차: 문제마다 다른 문장. 짧은 기사라 모자라면 2차에서 같은 문장의 다른 용어도 쓴다.
+  for (const distinct of [true, false]) for (const name of names) {
+    if (quizzes.length === 3) break;
+    if (usedNames.has(name)) continue;
     for (const sentence of source) {
-      const at = sentence.text.indexOf(name);
+      if ((distinct && usedSentences.has(sentence.id)) || isCaptionSentence(sentence.text)) continue;
+      let at = sentence.text.indexOf(name);
+      while (at >= 0 && !wholeWordAt(sentence.text, name, at)) at = sentence.text.indexOf(name, at + 1);
       if (at < 0) continue;
-      if (/[\d,.]/.test(sentence.text[at - 1] ?? '')) continue;
       // 양쪽을 공백 경계에서 자른다. 날짜·금액의 중간을 잘라 새 숫자를 만들지 않는다.
       let start = Math.max(0, at - 25);
       if (start > 0) { const space = sentence.text.indexOf(' ', start); start = space >= 0 && space < at ? space + 1 : 0; }
@@ -99,14 +119,22 @@ export function clozeQuizzes(source, terms = []) {
       const quote = sentence.text.slice(start, at) + '□' + sentence.text.slice(at + name.length, end);
       const question = `기사 원문의 빈칸에 들어갈 표현은?\n“${start ? '…' : ''}${quote}${end < sentence.text.length ? '…' : ''}”`;
       if (question.length > 120) continue;
-      const choices = [name, ...names.filter(n => n !== name).slice(0, 3)];
-      if (choices.length !== 4) continue;
+      // 오답 보기는 문제마다 다른 용어로 돌려 쓴다. 정답 위치도 문제마다 바꾼다.
+      const others = names.filter(n => n !== name);
+      const k = quizzes.length;
+      const wrong = [0, 1, 2].map(i => others[(k + i) % others.length]);
+      if (new Set(wrong).size !== 3) continue;
+      const answerIndex = k % 4;
+      const choices = [...wrong];
+      choices.splice(answerIndex, 0, name);
       const explanation = `원문의 표현은 ‘${name}’입니다. 해당 문장을 다시 확인하세요.`;
-      if (!quizzes.some(q => q.question === question)) quizzes.push({question, choices, answerIndex:0,
-        explanation, sourceSentenceIds:[sentence.id]});
+      if (!quizzes.some(q => q.question === question)) {
+        quizzes.push({question, choices, answerIndex, explanation, sourceSentenceIds:[sentence.id]});
+        usedSentences.add(sentence.id);
+        usedNames.add(name);
+      }
       break;
     }
-    if (quizzes.length === 3) break;
   }
   return quizzes.length === 3 ? {quizzes} : null;
 }

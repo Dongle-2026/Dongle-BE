@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createAi, sentences, validateQuizzes} from '../src/ai.js';
-import {clozeQuizzes, isGenericTerm, termCandidates} from '../src/fast-content.js';
+import {clozeQuizzes, isGenericTerm, termCandidates, isCaptionSentence, rankSentences} from '../src/fast-content.js';
+import {selectedCards} from '../src/ai.js';
 
 const content = '은행은 예금과 적금을 취급한다. 대출 금리는 신용도에 따라 달라진다. 금융거래에는 위험이 있다.';
 const terms = ['예금','적금','대출','금리','신용도'].map(term=>({term,explanation:`${term}에 관한 쉬운 설명입니다.`}));
@@ -111,4 +112,48 @@ test('인명·용언 활용형·복수형은 용어로 쓰지 않는다',()=>{
   const text='박창훈 사장은 취업중인 한국인들과 이주한 사람들이 대우받아야 한다고 말했다. 신한카드 대출 금리.';
   for(const t of ['박창훈','취업중인','한국인들','이주한','대우받아야']) assert.ok(isGenericTerm(t,text),t);
   for(const t of ['금리','대출','가업상속공제']) assert.ok(!isGenericTerm(t,text),t);
+});
+
+test('빈칸은 단어 중간을 자르지 않고, 문제마다 다른 문장과 다른 정답 위치를 쓴다',()=>{
+  const ts=['공제','자산','투자','소득','세금'].map(term=>({term,explanation:`${term} 설명`}));
+  const source=sentences('사진=chat gpt 내년 가상자산 투자로 돈을 벌었다. 연간 기본공제 250만원을 뺀다. 공제 한도는 정해져 있다. 자산 관리가 중요하다. 소득에 세금이 붙는다.');
+  const {quizzes}=clozeQuizzes(source,ts);
+  assert.equal(quizzes.length,3);
+  for(const q of quizzes){
+    assert.ok(!/사진=/.test(q.question),q.question);
+    assert.ok(!/기본□|가상□/.test(q.question),q.question);
+  }
+  assert.equal(new Set(quizzes.map(q=>q.sourceSentenceIds[0])).size,3);
+  assert.equal(new Set(quizzes.map(q=>q.answerIndex)).size,3);
+  validateQuizzes({quizzes},source);
+});
+
+test('캡션·기자 이메일 문장은 카드와 요약에 쓰지 않는다',()=>{
+  assert.ok(isCaptionSentence('사진=뉴스1 정부가 석유 가격을 동결한다.'));
+  assert.ok(isCaptionSentence('정영효 기자 hugh@hankyung.com'));
+  assert.ok(!isCaptionSentence('정부가 석유 가격을 동결한다.'));
+  const source=sentences('사진=뉴스1 정부가 발표했다. 금리가 올랐다. 대출이 줄었다. 홍길동 기자 a@hankyung.com');
+  const cards=selectedCards(rankSentences(source,[]),source);
+  assert.deepEqual(cards.map(c=>c.sourceSentenceIds[0]),[2,3]);
+});
+
+test('두 글자 조사와 하다·되다가 붙은 용어도 빈칸으로 쓴다',async()=>{
+  const {wholeWordAt}=await import('../src/fast-content.js');
+  const ok=(text,term)=>wholeWordAt(text,term,text.indexOf(term));
+  assert.ok(ok('금융감독원에는 신고가 없다.','금융감독원'));
+  assert.ok(ok('페이지가 해킹돼 고객 정보가 샜다.','해킹'));
+  assert.ok(ok('금리가 올랐다.','금리'));
+  assert.ok(!ok('대출신청 웹사이트가 열렸다.','대출'));
+  assert.ok(!ok('OK저축은행 고객이 늘었다.','저축은행'));
+  assert.ok(!ok('연간 기본공제를 뺀다.','공제'));
+});
+
+test('학습 용어가 합성어 안에만 있으면 원문 후보 단어로 남은 빈칸을 채운다',()=>{
+  const ts=['대출','저축은행','은행','해킹','연소득'].map(term=>({term,explanation:'설명'}));
+  const source=sentences('OK저축은행 대출신청 페이지가 해킹돼 고객 정보가 샜다. 고객 연소득 정보도 포함됐다. 금융감독원에는 신고가 없었다. 회사는 보안 점검을 시작했다.');
+  assert.equal(clozeQuizzes(source,ts),null);
+  const {quizzes}=clozeQuizzes(source,ts,['금융감독원','보안','점검','고객']);
+  assert.equal(quizzes.length,3);
+  assert.deepEqual(quizzes.slice(0,2).map(q=>q.choices[q.answerIndex]),['해킹','연소득']);
+  validateQuizzes({quizzes},source);
 });
