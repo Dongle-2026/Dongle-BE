@@ -136,3 +136,24 @@ test('캡션·기자 이메일 문장은 카드와 요약에 쓰지 않는다',(
   const cards=selectedCards(rankSentences(source,[]),source);
   assert.deepEqual(cards.map(c=>c.sourceSentenceIds[0]),[2,3]);
 });
+
+test('두 글자 조사와 하다·되다가 붙은 용어도 빈칸으로 쓴다',async()=>{
+  const {wholeWordAt}=await import('../src/fast-content.js');
+  const ok=(text,term)=>wholeWordAt(text,term,text.indexOf(term));
+  assert.ok(ok('금융감독원에는 신고가 없다.','금융감독원'));
+  assert.ok(ok('페이지가 해킹돼 고객 정보가 샜다.','해킹'));
+  assert.ok(ok('금리가 올랐다.','금리'));
+  assert.ok(!ok('대출신청 웹사이트가 열렸다.','대출'));
+  assert.ok(!ok('OK저축은행 고객이 늘었다.','저축은행'));
+  assert.ok(!ok('연간 기본공제를 뺀다.','공제'));
+});
+
+test('학습 용어가 합성어 안에만 있으면 원문 후보 단어로 남은 빈칸을 채운다',()=>{
+  const ts=['대출','저축은행','은행','해킹','연소득'].map(term=>({term,explanation:'설명'}));
+  const source=sentences('OK저축은행 대출신청 페이지가 해킹돼 고객 정보가 샜다. 고객 연소득 정보도 포함됐다. 금융감독원에는 신고가 없었다. 회사는 보안 점검을 시작했다.');
+  assert.equal(clozeQuizzes(source,ts),null);
+  const {quizzes}=clozeQuizzes(source,ts,['금융감독원','보안','점검','고객']);
+  assert.equal(quizzes.length,3);
+  assert.deepEqual(quizzes.slice(0,2).map(q=>q.choices[q.answerIndex]),['해킹','연소득']);
+  validateQuizzes({quizzes},source);
+});

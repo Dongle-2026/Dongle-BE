@@ -78,9 +78,12 @@ export function isCaptionSentence(text) {
 }
 
 // 빈칸이 단어 중간이 되지 않도록, 용어 앞은 한글·영숫자가 아니고 뒤는 조사만 붙은 경우만 허용한다.
-const PARTICLE_AFTER = /^(?:으로|에서|에게|까지|부터|보다|처럼|이라|이다|이며|과의|와의|은|는|이|가|을|를|의|에|와|과|도|로|만)?(?![가-힣A-Za-z0-9])/u;
+const PARTICLE_AFTER = /^(?:에서는|에서도|으로는|으로도|에게는|이라는|에는|에도|와는|과는|이나|라는|이란|으로|에서|에게|까지|부터|보다|처럼|이라|이다|이며|과의|와의|란|나|은|는|이|가|을|를|의|에|와|과|도|로|만)?(?![가-힣A-Za-z0-9])/u;
+// '해킹돼·대출한'처럼 하다/되다가 붙은 명사도 단어 단위로 본다.
+const VERB_AFTER = /^(?:하|한|할|함|해|했|되|돼|된|될|됨|됐)/u;
 export function wholeWordAt(text, term, at) {
-  return !/[가-힣A-Za-z0-9]/u.test(text[at - 1] ?? '') && PARTICLE_AFTER.test(text.slice(at + term.length));
+  const after = text.slice(at + term.length);
+  return !/[가-힣A-Za-z0-9]/u.test(text[at - 1] ?? '') && (PARTICLE_AFTER.test(after) || VERB_AFTER.test(after));
 }
 
 export function rankSentences(source, terms = []) {
@@ -92,10 +95,12 @@ export function rankSentences(source, terms = []) {
     .sort((a, b) => score(b) - score(a) || a.id - b.id)].slice(0, 5).map(s => s.id) };
 }
 
-export function clozeQuizzes(source, terms = []) {
-  const names = [...new Set(terms.map(t => t.term).filter(t => typeof t === 'string'
-    && t.length >= 2 && t.length <= 40 && source.some(s => s.text.includes(t))))];
-  if (names.length < 5) return null;
+// extra: 학습 용어만으로 3문제를 못 채울 때 쓰는 원문 후보 단어(termCandidates). 용어를 먼저 쓴다.
+export function clozeQuizzes(source, terms = [], extra = []) {
+  const valid = t => typeof t === 'string' && t.length >= 2 && t.length <= 40 && source.some(s => s.text.includes(t));
+  const learning = [...new Set(terms.map(t => t.term).filter(valid))];
+  if (learning.length < 5) return null;
+  const names = [...new Set([...learning, ...extra.filter(valid)])];
   const quizzes = [], usedSentences = new Set(), usedNames = new Set();
   // 1차: 문제마다 다른 문장. 짧은 기사라 모자라면 2차에서 같은 문장의 다른 용어도 쓴다.
   for (const distinct of [true, false]) for (const name of names) {

@@ -374,7 +374,7 @@ export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_
       articleInput(input);
       const source = sentences(input.content);
       if (quizMode === 'cloze') {
-        const value = clozeQuizzes(source, input.terms);
+        const value = clozeQuizzes(source, input.terms, termCandidates(input.content));
         if (!value) throw new AiError('INSUFFICIENT_QUIZ_TERMS');
         return { modelVersion: model, promptVersion: 'quiz-v7-source-cloze', quizzes: validateQuizzes(value, source, input.title) };
       }
