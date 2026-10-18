@@ -20,8 +20,11 @@ public class HankyungCrawlerService {
     private int maxArticles;
 
     private static final String BASE_URL = "https://www.hankyung.com";
-    private static final String FINANCE_URL = BASE_URL + "/economy";
     private static final long REQUEST_DELAY_MS = 1000;
+
+    /** 수집할 섹션 목록(경로). 청년 금융과 가까운 경제·증권·부동산이 기본값이다. */
+    @org.springframework.beans.factory.annotation.Value("${crawler.sections:economy,koreamarket/,realestate}")
+    private List<String> sections = List.of("economy", "koreamarket/", "realestate");
 
     private static final List<String> CONTENT_SELECTORS = List.of(
             "div#articletxt",
@@ -81,17 +84,37 @@ public class HankyungCrawlerService {
     }
 
     /**
-     * 목록 페이지에서 기사 URL 수집
+     * 섹션별 목록 페이지에서 기사 URL을 모은다. 섹션 요청 사이에도 1초 간격을 둔다.
+     * 한 섹션이 실패해도 나머지 섹션은 수집하고, 모든 섹션이 실패하면 예외를 던진다.
      */
     List<String> collectArticleUrls() throws Exception {
-        Document doc = Jsoup.connect(FINANCE_URL)
+        List<String> urls = new ArrayList<>();
+        Exception lastError = null;
+        int succeeded = 0;
+        for (int i = 0; i < sections.size(); i++) {
+            String section = sections.get(i).strip();
+            if (section.isEmpty()) continue;
+            if (i > 0) Thread.sleep(REQUEST_DELAY_MS);
+            try {
+                for (String url : listingUrls(BASE_URL + "/" + section)) if (!urls.contains(url)) urls.add(url);
+                succeeded++;
+            } catch (Exception e) {
+                lastError = e;
+                log.warn("[Crawler] 섹션 목록 실패: {} - {}", section, e.getMessage());
+            }
+        }
+        if (succeeded == 0 && lastError != null) throw lastError;
+        return urls;
+    }
+
+    /** 목록 페이지 하나에서 기사 URL 수집 */
+    List<String> listingUrls(String listUrl) throws Exception {
+        Document doc = Jsoup.connect(listUrl)
                 .userAgent("Mozilla/5.0")
                 .timeout(10_000)
                 .get();
 
-        // 목록 페이지에서 기사 URL 수집
         Elements links = doc.select("ul.news-list a[href], div.article-list a[href]");
-
         // 실패 시 fallback
         if (links.isEmpty()) {
             links = doc.select("a[href*='/article/']");
@@ -104,7 +127,6 @@ public class HankyungCrawlerService {
                 urls.add(href);
             }
         }
-
         return urls;
     }
 

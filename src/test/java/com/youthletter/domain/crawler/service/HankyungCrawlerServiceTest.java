@@ -8,6 +8,22 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class HankyungCrawlerServiceTest {
+    @Test void collectsEverySectionWithoutDuplicatesAndSurvivesOneFailingSection() throws Exception {
+        var crawler = spy(new HankyungCrawlerService());
+        org.springframework.test.util.ReflectionTestUtils.setField(crawler, "sections", List.of("economy", "koreamarket/", "realestate"));
+        doReturn(List.of("a", "b")).when(crawler).listingUrls("https://www.hankyung.com/economy");
+        doThrow(new HttpStatusException("down", 503, "x")).when(crawler).listingUrls("https://www.hankyung.com/koreamarket/");
+        doReturn(List.of("b", "c")).when(crawler).listingUrls("https://www.hankyung.com/realestate");
+        assertThat(crawler.collectArticleUrls()).containsExactly("a", "b", "c");
+    }
+
+    @Test void allSectionsFailingIsAnError() throws Exception {
+        var crawler = spy(new HankyungCrawlerService());
+        org.springframework.test.util.ReflectionTestUtils.setField(crawler, "sections", List.of("economy"));
+        doThrow(new HttpStatusException("down", 503, "x")).when(crawler).listingUrls(anyString());
+        assertThatThrownBy(crawler::collectArticleUrls).isInstanceOf(HttpStatusException.class);
+    }
+
     @Test void photoCaptionsAreNotPartOfArticleBody() {
         var doc = org.jsoup.Jsoup.parse("""
             <div id="articletxt"><figure class="article-figure"><div class="figure-img"><img src="a.jpg"></div>
