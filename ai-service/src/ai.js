@@ -1,4 +1,4 @@
-import { rankSentences, clozeQuizzes, termCandidates, isGenericTerm, isCaptionSentence } from './fast-content.js';
+import { rankSentences, clozeQuizzes, mixedQuizzes, termCandidates, isGenericTerm, isCaptionSentence } from './fast-content.js';
 
 export class AiError extends Error {
   constructor(code, status = 502, detail = null) { super(code); this.code = code; this.status = status; this.detail = detail; }
@@ -373,10 +373,12 @@ export function createAi({ fetchImpl = fetch, baseUrl = process.env.OLLAMA_BASE_
     async quiz(input) {
       articleInput(input);
       const source = sentences(input.content);
-      if (quizMode === 'cloze') {
-        const value = clozeQuizzes(source, input.terms, termCandidates(input.content));
+      if (quizMode === 'cloze' || quizMode === 'mixed') {
+        const extra = termCandidates(input.content);
+        const value = quizMode === 'mixed' ? mixedQuizzes(source, input.terms, extra) : clozeQuizzes(source, input.terms, extra);
         if (!value) throw new AiError('INSUFFICIENT_QUIZ_TERMS');
-        return { modelVersion: model, promptVersion: 'quiz-v7-source-cloze', quizzes: validateQuizzes(value, source, input.title) };
+        return { modelVersion: model, promptVersion: quizMode === 'mixed' ? 'quiz-v8-mixed-cloze-terms' : 'quiz-v7-source-cloze',
+          quizzes: validateQuizzes(value, source, input.title) };
       }
       // 숫자를 묻는 문제는 모델이 표기를 자주 바꿔 검증에 걸리고 출력도 길어진다 → 개념·원인·결과 중심으로 묻는다.
       // 통과한 문제만 쓴다. 모자라면 한 번 더, 부족한 수보다 1개 더 출제한다.

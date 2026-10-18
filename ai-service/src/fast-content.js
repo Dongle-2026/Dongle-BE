@@ -138,3 +138,50 @@ export function clozeQuizzes(source, terms = [], extra = []) {
   }
   return quizzes.length === 3 ? {quizzes} : null;
 }
+
+// 용어 퀴즈에 쓸 수 있는 사전 설명: 숫자가 없고(기사 근거와 대조하기 어려움) 용어 이름이 드러나지 않으며 보기 길이에 맞는 것.
+const usableExplanation = t => typeof t?.explanation === 'string' && t.explanation.trim().length >= 5
+  && t.explanation.length <= 60 && !/\d/.test(t.explanation) && !t.explanation.includes(t.term);
+
+function evidenceSentence(source, term) {
+  return source.find(s => !isCaptionSentence(s.text) && s.text.includes(term));
+}
+
+/** 뜻 고르기(용어 → 설명)와 용어 고르기(설명 → 용어) 문제. 오답은 같은 기사의 다른 용어에서 고른다. */
+export function termQuizzes(source, terms = [], kinds = ['meaning', 'term']) {
+  const pool = [];
+  for (const t of terms) {
+    if (!usableExplanation(t) || pool.some(p => p.term === t.term || p.explanation.trim() === t.explanation.trim())) continue;
+    const sentence = evidenceSentence(source, t.term);
+    if (sentence) pool.push({ term: t.term, explanation: t.explanation.trim(), sentenceId: sentence.id });
+  }
+  if (pool.length < 4) return [];
+  const quizzes = [];
+  kinds.forEach((kind, k) => {
+    const answer = pool[k];
+    if (!answer) return;
+    const others = pool.filter(p => p !== answer);
+    const wrong = [0, 1, 2].map(i => others[(k * 2 + i) % others.length]);
+    const answerIndex = (k + 1) % 4;
+    const pick = kind === 'meaning' ? p => p.explanation : p => p.term;
+    const choices = wrong.map(pick);
+    choices.splice(answerIndex, 0, pick(answer));
+    if (new Set(choices).size !== 4) return;
+    const question = kind === 'meaning'
+      ? `기사에 나온 ‘${answer.term}’의 뜻으로 알맞은 것은?`
+      : `다음 설명에 해당하는 기사 속 용어는?\n“${answer.explanation}”`;
+    if (question.length > 120) return;
+    quizzes.push({ question, choices, answerIndex, sourceSentenceIds: [answer.sentenceId],
+      explanation: `‘${answer.term}’은(는) ${answer.explanation.replace(/[.。]\s*$/, '')}.`.slice(0, 150) });
+  });
+  return quizzes;
+}
+
+/** 빈칸 1문제 + 뜻 고르기 1문제 + 용어 고르기 1문제. 용어 문제를 못 만들면 빈칸 문제로 채운다. */
+export function mixedQuizzes(source, terms = [], extra = []) {
+  const cloze = clozeQuizzes(source, terms, extra);
+  if (!cloze) return null;
+  const typed = termQuizzes(source, terms);
+  const quizzes = [cloze.quizzes[0], ...typed, ...cloze.quizzes.slice(1)].slice(0, 3);
+  return quizzes.length === 3 && new Set(quizzes.map(q => q.question)).size === 3 ? { quizzes } : null;
+}

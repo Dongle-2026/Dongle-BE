@@ -157,3 +157,19 @@ test('학습 용어가 합성어 안에만 있으면 원문 후보 단어로 남
   assert.deepEqual(quizzes.slice(0,2).map(q=>q.choices[q.answerIndex]),['해킹','연소득']);
   validateQuizzes({quizzes},source);
 });
+
+test('빈칸·뜻 고르기·용어 고르기를 섞어 3문제를 만든다',async()=>{
+  const {mixedQuizzes,termQuizzes}=await import('../src/fast-content.js');
+  const ts=[['예금','은행에 돈을 맡기는 것'],['적금','매달 정해진 돈을 넣는 저축'],['대출','돈을 빌리는 것'],
+    ['금리','돈을 빌리거나 맡길 때 붙는 이자의 비율'],['신용도','빚을 갚을 능력에 대한 평가']].map(([term,explanation])=>({term,explanation}));
+  const source=sentences('은행은 예금과 적금을 취급한다. 대출 금리는 신용도에 따라 달라진다. 금융거래에는 위험이 있다.');
+  const {quizzes}=mixedQuizzes(source,ts,[]);
+  assert.equal(quizzes.length,3);
+  assert.match(quizzes[0].question,/빈칸/);
+  assert.match(quizzes[1].question,/뜻으로 알맞은 것은/);
+  assert.match(quizzes[2].question,/설명에 해당하는/);
+  assert.equal(quizzes[1].choices[quizzes[1].answerIndex],'은행에 돈을 맡기는 것');
+  validateQuizzes({quizzes},source);
+  // 숫자가 든 설명이나 용어 이름이 드러나는 설명은 쓰지 않는다
+  assert.deepEqual(termQuizzes(source,[{term:'예금',explanation:'예금은 1년 단위'},...ts.slice(1,4)]),[]);
+});
