@@ -170,8 +170,8 @@ public class HankyungCrawlerService implements NewsCrawler {
     /**
      * 본문 추출 (selector 후보를 순서대로 시도)
      */
-    /** 사진·그래픽 캡션("사진=뉴스1" 등)과 스크립트는 본문이 아니므로 제외한다. */
-    private static final String NON_BODY = "figure, figcaption, .figure-caption, .article-figure, script, style";
+    /** 사진·그래픽 캡션("사진=뉴스1" 등), 영상 플레이어 버튼("영상 모듈 닫기"), 스크립트는 본문이 아니므로 제외한다. */
+    private static final String NON_BODY = "figure, figcaption, .figure-caption, .article-figure, script, style, iframe, button, .blind";
 
     String extractContent(Document doc) {
         for (String selector : CONTENT_SELECTORS) {
