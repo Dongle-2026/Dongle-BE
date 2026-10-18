@@ -70,7 +70,10 @@ services:
       OAUTH2_REDIRECT_URI: ${OAUTH2_REDIRECT_URI:-https://youthletter.com/auth/callback}
       PUSH_ENABLED: ${PUSH_ENABLED:-false}
       EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
-      CRAWLER_CRON: ${CRAWLER_CRON:-0 0 */6 * * *}
+      # 수집은 콘텐츠 파이프라인(수집 → 요약·용어·카드뉴스·퀴즈 대기열)이 맡는다. 예전 크론 수집기는 카드·퀴즈를 만들지 않아 끈다.
+      CONTENT_PIPELINE_ENABLED: ${CONTENT_PIPELINE_ENABLED:-true}
+      CONTENT_PIPELINE_INTERVAL_MS: ${CONTENT_PIPELINE_INTERVAL_MS:-3600000}
+      CRAWLER_CRON: ${CRAWLER_CRON:--}
       POLICY_NOTIFICATION_CRON: ${POLICY_NOTIFICATION_CRON:-0 0 9 * * *}
       APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:3001,http://localhost:8080}
       DB_HOST: postgres
