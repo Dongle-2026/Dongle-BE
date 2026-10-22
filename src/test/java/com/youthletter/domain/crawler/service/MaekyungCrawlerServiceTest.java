@@ -11,6 +11,7 @@ import static org.mockito.ArgumentMatchers.*;
 class MaekyungCrawlerServiceTest {
     /** 수집 흐름 테스트용 실제 기사 길이 본문(짧은 본문은 건너뛰므로). */
     static final String BODY = "금리가 올랐다. ".repeat(60);
+    static final String OFF_TOPIC = "판다가 대나무를 먹었다. ".repeat(40);
 
     String rss = """
         <rss><channel><item><link>https://www.mk.co.kr/news/economy/123?ref=rss</link>
@@ -105,5 +106,19 @@ class MaekyungCrawlerServiceTest {
         assertThat(article.sourceName()).isEqualTo("매일경제");
         assertThat(article.category()).isEqualTo(com.youthletter.domain.news.category.NewsCategoryClassifier
                 .classify(article.title(), article.content()).displayName());
+    }
+
+    @Test void offTopicLifestyleArticleIsSkippedWithoutCountingAsFailure() throws Exception {
+        var crawler = spy(new MaekyungCrawlerService());
+        var feed = Jsoup.parse("<rss><channel><item><link>https://www.mk.co.kr/news/culture/400</link></item>"
+                + "<item><link>https://www.mk.co.kr/news/economy/401</link></item></channel></rss>", "", Parser.xmlParser());
+        doReturn(feed).when(crawler).fetch(anyString(), eq(true));
+        doReturn(Jsoup.parse("<h1>판다 생일</h1><div id='article_body'>" + OFF_TOPIC + "</div>"))
+                .when(crawler).fetch(eq("https://www.mk.co.kr/news/culture/400"), eq(false));
+        doReturn(Jsoup.parse("<h1>금리 인상</h1><div id='article_body'>" + BODY + "</div>"))
+                .when(crawler).fetch(eq("https://www.mk.co.kr/news/economy/401"), eq(false));
+        var result = crawler.crawlResult(url -> false);
+        assertThat(result.articles()).extracting(a -> a.url()).containsExactly("https://www.mk.co.kr/news/economy/401");
+        assertThat(result.failedCount()).isZero();
     }
 }

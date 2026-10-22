@@ -36,6 +36,9 @@ public class MaekyungCrawlerService implements NewsCrawler {
         return java.time.Duration.ofMillis(intervalMs);
     }
 
+    /** 금융·경제 키워드 점수(제목 3점, 본문 1점) 최소값. */
+    static final int MIN_RELEVANCE = 2;
+
     record Section(String feed, String category) {}
     record Entry(String url, String category, java.time.LocalDateTime publishedAt) {}
     private static final List<Section> SECTIONS = List.of(
@@ -71,6 +74,12 @@ public class MaekyungCrawlerService implements NewsCrawler {
                     // 한경과 같은 기준: 유료 미리보기처럼 짧은 본문은 요약·카드뉴스를 만들 수 없어 건너뛴다(실패 아님).
                     if (article.content().length() < HankyungCrawlerService.MIN_BODY_CHARS) {
                         log.info("[Crawler] 매일경제 본문이 짧아 건너뜀({}자): {}", article.content().length(), entry.url());
+                        continue;
+                    }
+                    // 매일경제 피드에는 판다·단풍·게임 같은 생활 기사도 섞인다. 금융·경제 키워드가 거의 없으면 학습 용어를 만들 수 없어 건너뛴다.
+                    int relevance = com.youthletter.domain.news.category.NewsCategoryClassifier.relevance(article.title(), article.content());
+                    if (relevance < MIN_RELEVANCE) {
+                        log.info("[Crawler] 매일경제 금융·경제 무관 기사 건너뜀(점수 {}): {}", relevance, entry.url());
                         continue;
                     }
                     articles.add(article);
