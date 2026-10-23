@@ -46,13 +46,22 @@ services:
     restart: unless-stopped
   backend:
     build: .
-    ports: ["127.0.0.1:${PIPELINE_API_PORT:-18082}:8080"]
+    # 기본은 이 맥에서만 접속. 폰(같은 와이파이)에서 앱으로 붙이려면 .env.pipeline.local에 PIPELINE_API_BIND=0.0.0.0
+    ports: ["${PIPELINE_API_BIND:-127.0.0.1}:${PIPELINE_API_PORT:-18082}:8080"]
     environment:
       SPRING_PROFILES_ACTIVE: local
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/youthletter_pipeline
       DB_USERNAME: youthletter
       DB_PASSWORD: ${PIPELINE_DB_PASSWORD:?}
       JWT_SECRET: ${PIPELINE_JWT_SECRET:?}
+      # 소셜 로그인(값은 .env.pipeline.local). 로그인 후 앱/프론트로 돌아갈 주소가 OAUTH2_REDIRECT_URI
+      OAUTH2_REDIRECT_URI: ${OAUTH2_REDIRECT_URI:-http://localhost:18082/auth/callback.html}
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-your-kakao-client-id}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:-your-kakao-client-secret}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-your-google-client-id}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-your-google-client-secret}
+      GOOGLE_MOBILE_CLIENT_IDS: ${GOOGLE_MOBILE_CLIENT_IDS:-}
+      KAKAO_APP_KEYS: ${KAKAO_APP_KEYS:-}
       SPRING_JPA_HIBERNATE_DDL_AUTO: validate
       SPRING_JPA_SHOW_SQL: "false"
       SPRING_DATA_REDIS_HOST: redis
