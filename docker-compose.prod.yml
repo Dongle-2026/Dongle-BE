@@ -93,7 +93,8 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
     ports:
-      - "8080:8080"
+      # 외부 접속은 같은 서버의 Caddy(443)가 받아 넘긴다. 8080은 서버 자신에게만 연다.
+      - "127.0.0.1:8080:8080"
     depends_on:
       postgres:
         condition: service_healthy
