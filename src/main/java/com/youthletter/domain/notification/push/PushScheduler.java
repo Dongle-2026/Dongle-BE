@@ -50,7 +50,7 @@ public class PushScheduler {
                 """.formatted(KST_DAY);
         int sent = 0;
         for (Long userId : targets("quiz_reminder", condition)) {
-            if (push.send(userId, PushType.QUIZ_REMINDER, "", "퀴즈 풀고 꿀 받기", "오늘 읽은 기사의 퀴즈가 남아 있어요. 맞히면 10꿀!", Map.of()).succeeded() > 0) sent++;
+            if (push.send(userId, PushType.QUIZ_REMINDER, "", "퀴즈 풀고 꿀 받기", "오늘 읽은 기사의 퀴즈가 남아 있어요. 맞히면 " + com.youthletter.domain.quiz.service.HoneyService.QUIZ_CORRECT + "꿀!", Map.of()).succeeded() > 0) sent++;
         }
         log.info("[Push] 퀴즈 리마인더 발송 사용자 {}명", sent);
     }

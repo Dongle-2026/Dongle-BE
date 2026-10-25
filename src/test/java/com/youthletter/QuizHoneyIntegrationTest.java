@@ -76,6 +76,9 @@ class QuizHoneyIntegrationTest {
         assertThat(body.at("/terms/0/category").asText()).isEqualTo("금융");
         assertThat(body.at("/terms/0").has("saved")).isFalse(); // 비로그인
         assertThat(body.get("source").asText()).isEqualTo("한경");
+        assertThat(body.get("tags").size()).isEqualTo(2); // 카테고리 + 본문 용어
+        assertThat(body.at("/tags/0").asText()).isEqualTo("투자");
+        assertThat(body.at("/tags/1").asText()).isEqualTo("ETF" + m);
         mvc.perform(get("/api/news/999999999/body")).andExpect(status().isNotFound());
     }
 
@@ -92,10 +95,10 @@ class QuizHoneyIntegrationTest {
         assertThat(body.at("/quizzes/0/id").asLong()).isEqualTo(q1);
         assertThat(body.at("/quizzes/0/choices/2/id").asText()).isEqualTo("c");
         assertThat(body.at("/quizzes/0/choices/2/text").asText()).isEqualTo("다");
-        assertThat(body.at("/quizzes/0/honey").asInt()).isEqualTo(10);
+        assertThat(body.at("/quizzes/0/honey").asInt()).isEqualTo(3);
         assertThat(body.at("/quizzes/0/myResult/attempts").asInt()).isEqualTo(2);
         assertThat(body.at("/quizzes/0/myResult/solved").asBoolean()).isTrue();
-        assertThat(body.at("/quizzes/0/myResult/earnedHoney").asInt()).isEqualTo(10);
+        assertThat(body.at("/quizzes/0/myResult/earnedHoney").asInt()).isEqualTo(3);
         assertThat(body.at("/quizzes/1/myResult/attempts").asInt()).isZero();
         assertThat(body.at("/terms/0/saved").asBoolean()).isTrue();
         JsonNode other = data(mvc.perform(get("/api/news/" + articleId + "/body").header("Authorization", otherBearer)));
@@ -114,7 +117,7 @@ class QuizHoneyIntegrationTest {
 
         JsonNode right = data(answer(bearer, q, "{\"choiceId\":\"B\"}").andExpect(status().isOk()));
         assertThat(right.get("isCorrect").asBoolean()).isTrue();
-        assertThat(right.get("earnedHoney").asInt()).isEqualTo(10);
+        assertThat(right.get("earnedHoney").asInt()).isEqualTo(3);
         assertThat(right.get("correctIndex").asInt()).isEqualTo(1);
         assertThat(right.get("explanation").asText()).isEqualTo("해설입니다");
         assertThat(right.get("alreadySolved").asBoolean()).isFalse();
@@ -122,12 +125,12 @@ class QuizHoneyIntegrationTest {
         JsonNode again = data(answer(bearer, q, "{\"selectedIndex\":1}").andExpect(status().isOk()));
         assertThat(again.get("earnedHoney").asInt()).isZero();
         assertThat(again.get("alreadySolved").asBoolean()).isTrue();
-        assertThat(right.get("totalHoney").asLong()).isEqualTo(10);
-        assertThat(again.get("totalHoney").asLong()).isEqualTo(10);
+        assertThat(right.get("totalHoney").asLong()).isEqualTo(3);
+        assertThat(again.get("totalHoney").asLong()).isEqualTo(3);
         assertThat(wrong.get("totalHoney").asLong()).isZero();
-        assertThat(ledger(userId)).isEqualTo(10);
+        assertThat(ledger(userId)).isEqualTo(3);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM quiz_attempts WHERE user_id=?", Integer.class, userId)).isEqualTo(3);
-        assertThat(data(answer(otherBearer, q, "{\"selectedIndex\":1}")).get("earnedHoney").asInt()).isEqualTo(10); // 사용자별
+        assertThat(data(answer(otherBearer, q, "{\"selectedIndex\":1}")).get("earnedHoney").asInt()).isEqualTo(3); // 사용자별
     }
 
     @Test void invalidAnswersAreRejected() throws Exception {
@@ -141,9 +144,9 @@ class QuizHoneyIntegrationTest {
         assertThat(jdbc.queryForObject("SELECT count(*) FROM quiz_attempts WHERE quiz_id=?", Integer.class, q)).isZero();
     }
 
-    @Test void readingPaysFiveHoneyOncePerArticlePerDayAndFeedsStatsHeatmapHistory() throws Exception {
+    @Test void readingPaysOneHoneyOncePerArticlePerDayAndFeedsStatsHeatmapHistory() throws Exception {
         for (int i = 0; i < 3; i++) mvc.perform(post("/api/news/" + articleId + "/read").header("Authorization", bearer)).andExpect(status().isOk());
-        assertThat(ledger(userId)).isEqualTo(5);
+        assertThat(ledger(userId)).isEqualTo(1);
         Long q = quiz(articleId, 1, 0);
         answer(bearer, q, "{\"selectedIndex\":0}").andExpect(status().isOk());
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
@@ -151,10 +154,10 @@ class QuizHoneyIntegrationTest {
 
         mvc.perform(get("/api/me/stats").header("Authorization", bearer)).andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.todayCompleted").value(true))
-                .andExpect(jsonPath("$.data.totalHoney").value(60))
+                .andExpect(jsonPath("$.data.totalHoney").value(49))
                 .andExpect(jsonPath("$.data.totalQuizCount").value(1))
                 .andExpect(jsonPath("$.data.readNewsCount").value(1))
-                .andExpect(jsonPath("$.data.todayHoney").value(15)) // 2일 전 45꿀은 제외
+                .andExpect(jsonPath("$.data.todayHoney").value(4)) // 2일 전 45꿀은 제외
                 .andExpect(jsonPath("$.data.correctCount").value(1));
         mvc.perform(get("/api/me/stats").header("Authorization", otherBearer))
                 .andExpect(jsonPath("$.data.todayCompleted").value(false)).andExpect(jsonPath("$.data.totalHoney").value(0));
@@ -162,7 +165,7 @@ class QuizHoneyIntegrationTest {
         JsonNode days = data(mvc.perform(get("/api/me/activity").param("days", "7").header("Authorization", bearer)).andExpect(status().isOk()));
         assertThat(days.size()).isEqualTo(7);
         assertThat(days.get(6).get("date").asText()).isEqualTo(today.toString());
-        assertThat(days.get(6).get("honey").asInt()).isEqualTo(15);
+        assertThat(days.get(6).get("honey").asInt()).isEqualTo(4); // 읽기 1 + 퀴즈 3
         assertThat(days.get(6).get("level").asInt()).isEqualTo(2);
         assertThat(days.get(4).get("honey").asInt()).isEqualTo(45);
         assertThat(days.get(4).get("level").asInt()).isEqualTo(4);
@@ -171,7 +174,7 @@ class QuizHoneyIntegrationTest {
 
         mvc.perform(get("/api/me/read-history").header("Authorization", bearer))
                 .andExpect(jsonPath("$.data.content[0].articleId").value(articleId))
-                .andExpect(jsonPath("$.data.content[0].honey").value(60));
+                .andExpect(jsonPath("$.data.content[0].honey").value(49));
         mvc.perform(get("/api/me/activity")).andExpect(status().isUnauthorized());
     }
 
@@ -220,7 +223,7 @@ class QuizHoneyIntegrationTest {
         Long q2 = quiz(articleId, 2, 1);
         answer(otherBearer, q2, "{\"selectedIndex\":1}");
         mvc.perform(post("/api/quizzes/" + q2 + "/reveal").header("Authorization", otherBearer)).andExpect(status().isOk());
-        assertThat(ledger(otherId)).isEqualTo(10);
+        assertThat(ledger(otherId)).isEqualTo(3);
         assertThat(data(answer(otherBearer, q2, "{\"selectedIndex\":1}")).get("alreadySolved").asBoolean()).isTrue();
         mvc.perform(post("/api/quizzes/" + q + "/reveal")).andExpect(status().isUnauthorized());
         mvc.perform(post("/api/quizzes/999999999/reveal").header("Authorization", bearer)).andExpect(status().isNotFound());

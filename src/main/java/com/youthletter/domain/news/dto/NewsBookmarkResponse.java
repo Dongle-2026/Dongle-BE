@@ -4,13 +4,15 @@ import com.youthletter.domain.news.entity.NewsBookmark;
 
 import java.time.LocalDateTime;
 
+/** 저장한 기사. image: 대표 이미지 URL(없으면 생략). */
 public record NewsBookmarkResponse(
         Long articleId,
         String title,
         String sourceName,
         String category,
         LocalDateTime publishedAt,
-        LocalDateTime bookmarkedAt
+        LocalDateTime bookmarkedAt,
+        String image
 ) {
     public static NewsBookmarkResponse from(NewsBookmark bookmark) {
         return new NewsBookmarkResponse(
@@ -19,7 +21,8 @@ public record NewsBookmarkResponse(
                 bookmark.getArticle().getSourceName(),
                 bookmark.getArticle().getCategory(),
                 bookmark.getArticle().getPublishedAt(),
-                bookmark.getCreatedAt()
+                bookmark.getCreatedAt(),
+                bookmark.getArticle().getThumbnailUrl()
         );
     }
 }

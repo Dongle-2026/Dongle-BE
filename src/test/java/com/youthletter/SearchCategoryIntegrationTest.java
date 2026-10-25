@@ -109,10 +109,45 @@ class SearchCategoryIntegrationTest {
         assertThat(h.get("category").asText()).isEqualTo("investment");
         assertThat(h.get("id").asLong()).isEqualTo(hot);
         assertThat(w.get("articleCount").asLong()).isEqualTo(1);
-        assertThat(find(cards, "keyword", "옛" + m)).isNull(); // 7일 지난 기사만 있는 용어
-        int hi = -1, wi = -1;
-        for (int i = 0; i < cards.size(); i++) { if (cards.get(i) == h) hi = i; if (cards.get(i) == w) wi = i; }
+        JsonNode o = find(cards, "keyword", "옛" + m); // 7일 지난 기사만 있는 용어는 뒤에서 채움
+        assertThat(o.get("articleCount").asLong()).isZero();
+        int hi = -1, wi = -1, oi = -1;
+        for (int i = 0; i < cards.size(); i++) { if (cards.get(i) == h) hi = i; if (cards.get(i) == w) wi = i; if (cards.get(i) == o) oi = i; }
         assertThat(hi).isLessThan(wi);
+        assertThat(wi).isLessThan(oi);
+    }
+
+    @Test void keywordCardsFilterByCategoryAndAlwaysFillWithSeeds() throws Exception {
+        Long saving = term("저축용어" + m), invest = term("투자용어" + m);
+        Long s1 = article("파킹통장 금리 비교 " + m, "저축", "1 hour"), i1 = article("i1", "투자", "1 hour");
+        jdbc.update("UPDATE news_articles SET thumbnail_url='img-park-" + m + "' WHERE id=?", s1);
+        highlight(s1, saving); highlight(i1, invest);
+
+        JsonNode cards = data("/api/keywords?category=saving");
+        assertThat(cards.size()).isEqualTo(10); // 기본 10개
+        assertThat(cards.at("/0/keyword").asText()).isEqualTo("저축용어" + m);
+        assertThat(cards.at("/0/id").asLong()).isEqualTo(saving);
+        assertThat(cards.at("/0/category").asText()).isEqualTo("saving");
+        assertThat(cards.at("/0/articleCount").asLong()).isEqualTo(1);
+        assertThat(find(cards, "keyword", "투자용어" + m)).isNull(); // 다른 카테고리 용어 제외
+        JsonNode park = find(cards, "keyword", "파킹통장"); // 기본 키워드: 제목에 든 기사 썸네일
+        assertThat(park.get("articleCount").asLong()).isZero();
+        assertThat(park.get("category").asText()).isEqualTo("saving");
+        assertThat(park.get("categoryName").asText()).isEqualTo("저축");
+        assertThat(park.get("image").asText()).isEqualTo("img-park-" + m);
+        assertThat(park.hasNonNull("id")).isFalse();
+        assertThat(find(cards, "keyword", "적금").get("image").asText()).isEqualTo("img-park-" + m); // 같은 카테고리 최신 기사
+
+        assertThat(data("/api/keywords?category=저축&limit=3").size()).isEqualTo(3);
+        JsonNode all = data("/api/keywords");
+        assertThat(all.size()).isEqualTo(10);
+        java.util.Set<String> names = new java.util.HashSet<>();
+        for (JsonNode n : all) names.add(n.get("keyword").asText());
+        assertThat(names).hasSize(10); // 중복 없음
+        JsonNode empty = data("/api/keywords?category=job&limit=20"); // 기사 없는 카테고리도 기본 키워드로
+        assertThat(empty.size()).isEqualTo(10); // 기본 키워드는 카테고리당 10개
+        assertThat(empty.at("/0/category").asText()).isEqualTo("job");
+        mvc.perform(get("/api/keywords").param("category", "없는카테고리")).andExpect(status().isBadRequest());
     }
 
     @Test void trendingCountsDistinctUsersAndComparesWithPreviousDay() throws Exception {
@@ -131,6 +166,26 @@ class SearchCategoryIntegrationTest {
         assertThat(tc.get("change").asText()).isEqualTo("up");
         assertThat(tc.get("isNew").asBoolean()).isTrue();
         assertThat(ta.get("isNew").asBoolean()).isFalse();
+    }
+
+    @Test void trendingAlwaysFillsToLimitWithoutDuplicates() throws Exception {
+        String a = "aa" + m;
+        searched(0, a, "1 hour");
+        JsonNode list = data("/api/search/trending"); // 기본 8개
+        assertThat(list.size()).isEqualTo(8);
+        assertThat(list.at("/0/keyword").asText()).isEqualTo(a); // 실제 검색어가 먼저
+        assertThat(list.at("/0/change").asText()).isEqualTo("up");
+        java.util.Set<String> names = new java.util.HashSet<>();
+        for (int i = 0; i < list.size(); i++) {
+            assertThat(list.get(i).get("rank").asInt()).isEqualTo(i + 1);
+            names.add(list.get(i).get("keyword").asText());
+            if (i > 0) {
+                assertThat(list.get(i).get("change").asText()).isEqualTo("same");
+                assertThat(list.get(i).get("isNew").asBoolean()).isFalse();
+            }
+        }
+        assertThat(names).hasSize(8);
+        assertThat(data("/api/search/trending?limit=3").size()).isEqualTo(3);
     }
 
     @Test void searchesAreRecordedOnlyForSignedInFirstPage() throws Exception {

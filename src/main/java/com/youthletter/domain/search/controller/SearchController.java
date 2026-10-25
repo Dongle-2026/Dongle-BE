@@ -27,15 +27,20 @@ public class SearchController {
         return GlobalResponse.ok(searchService.categories());
     }
 
-    @Operation(summary = "검색 탭 키워드 카드", description = "최근 7일 기사에 많이 나온 금융 용어")
+    @Operation(summary = "검색 탭 키워드 카드",
+            description = "기사에 많이 나온 금융 용어(최근 7일 우선). category(id 또는 이름)를 주면 그 카테고리만. "
+                    + "데이터가 모자라면 카테고리별 기본 키워드(10개)로 채운다. limit 기본 10, 최대 20. articleCount는 최근 7일 기사 수")
     @GetMapping("/api/keywords")
-    public GlobalResponse<List<KeywordCardResponse>> keywords(@RequestParam(defaultValue = "8") int limit) {
-        return GlobalResponse.ok(searchService.keywordCards(limit));
+    public GlobalResponse<List<KeywordCardResponse>> keywords(@RequestParam(required = false) String category,
+                                                              @RequestParam(defaultValue = "10") int limit) {
+        return GlobalResponse.ok(searchService.keywordCards(category, limit));
     }
 
-    @Operation(summary = "실시간 트렌드", description = "최근 24시간 검색 사용자 수 순위")
+    @Operation(summary = "실시간 트렌드",
+            description = "최근 24시간 검색 사용자 수 순위. 검색 기록이 모자라면 기사에 많이 나온 용어로 채워 항상 limit개"
+                    + "(기본 8, 최대 20). change: up|down|same")
     @GetMapping("/api/search/trending")
-    public GlobalResponse<List<TrendingKeywordResponse>> trending(@RequestParam(defaultValue = "10") int limit) {
+    public GlobalResponse<List<TrendingKeywordResponse>> trending(@RequestParam(defaultValue = "8") int limit) {
         return GlobalResponse.ok(searchService.trending(limit));
     }
 

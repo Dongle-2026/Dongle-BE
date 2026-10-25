@@ -148,8 +148,13 @@ class ProfileImageIntegrationTest {
         mvc.perform(patchProfile().param("avatarId", "../etc")).andExpect(status().isBadRequest());
         mvc.perform(patchProfile().param("bio", "가".repeat(101))).andExpect(status().isBadRequest());
         mvc.perform(patchProfile().param("nickname", "a")).andExpect(status().isBadRequest());
-        mvc.perform(patch("/api/me/profile").header("Authorization", bearer).contentType("application/json").content("{}"))
-                .andExpect(status().isBadRequest());
+        mvc.perform(patch("/api/me/profile").header("Authorization", bearer).contentType("application/json").content("{\"nickname\":\"a\"}"))
+                .andExpect(status().isBadRequest()); // JSON 본문도 같은 검증
+        mvc.perform(patchProfile().param("image", "[object Object]")) // 파일이 아니라 텍스트로 온 image
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.status").value(4108))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("uri, name, type")));
+        mvc.perform(patchProfile().file(file(new byte[0], "image/jpeg")))
+                .andExpect(status().isBadRequest()).andExpect(jsonPath("$.status").value(4108));
         mvc.perform(multipart(HttpMethod.PATCH, "/api/me/profile").param("bio", "x")).andExpect(status().isUnauthorized());
         assertThat(jdbc.queryForObject("SELECT count(*) FROM profile_images WHERE user_id=?", Integer.class, userId)).isZero();
         assertThat(jdbc.queryForObject("SELECT bio FROM users WHERE id=?", String.class, userId)).isNull();
@@ -177,6 +182,30 @@ class ProfileImageIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.profileImageUrl").doesNotExist());
         em.flush();
         assertThat(jdbc.queryForObject("SELECT count(*) FROM profile_images WHERE user_id=?", Integer.class, userId)).isZero();
+    }
+
+    @Test void acceptsQueryParamsJsonAndQueryPlusMultipartImage() throws Exception {
+        String nick = "쿼리" + key.substring(key.length() - 8);
+        // 텍스트만 쿼리로, 본문 없이
+        mvc.perform(patch("/api/me/profile").header("Authorization", bearer).param("nickname", nick).param("bio", "쿼리 소개"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.nickname").value(nick))
+                .andExpect(jsonPath("$.data.bio").value("쿼리 소개"));
+        // JSON 본문
+        mvc.perform(patch("/api/me/profile").header("Authorization", bearer).contentType("application/json")
+                        .content("{\"bio\":\"제이슨 소개\",\"avatarId\":\"bee_3\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.bio").value("제이슨 소개"))
+                .andExpect(jsonPath("$.data.avatarId").value("bee_3"))
+                .andExpect(jsonPath("$.data.nickname").value(nick));
+        // 프론트 방식: 텍스트는 쿼리, 사진만 multipart
+        mvc.perform(multipart(HttpMethod.PATCH, "/api/me/profile?bio={bio}", "사진과 함께")
+                        .file(file(jpeg(40, 40), "image/jpeg")).header("Authorization", bearer))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.bio").value("사진과 함께"))
+                .andExpect(jsonPath("$.data.profileImageUrl").isNotEmpty());
+        mvc.perform(patch("/api/me/profile").header("Authorization", bearer).contentType("application/json").content("{\"removeImage\":true}"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.profileImageUrl").doesNotExist());
     }
 
     @Test void duplicateNicknameAndUnknownImage() throws Exception {

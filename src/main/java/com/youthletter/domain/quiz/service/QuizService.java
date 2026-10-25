@@ -31,6 +31,15 @@ import java.util.*;
 public class QuizService {
     private static final List<String> CHOICE_IDS = List.of("a", "b", "c", "d");
     private static final int SENTENCES_PER_SECTION = 3;
+    private static final int MAX_TAGS = 5;
+    /**
+     * 본문 맨 앞 사진·그래픽 출처 표기("사진=연합뉴스", "자료=게티이미지뱅크", "사진=chat gpt",
+     * "사진은 기사와 관련 없음. 사진=…"). 예전 크롤러로 저장된 기사에 남아 있어 화면용 문단에서만 뗀다.
+     */
+    private static final java.util.regex.Pattern LEADING_CAPTION = java.util.regex.Pattern.compile(
+            "^\\s*(?:사진은 기사(?:와|의 내용과) (?:관련|무관)[^.]*\\.?\\s*)?"
+                    + "(?:(?:사진|그래픽|자료|이미지|일러스트)\\s*=\\s*(?:chat\\s*gpt|[^\\s]+)\\s*)+",
+            java.util.regex.Pattern.CASE_INSENSITIVE);
     private static final Map<String, String> TERM_CATEGORY = Map.of(
             "finance", "금융", "economy", "경제", "policy", "정책", "startup", "창업");
 
@@ -63,7 +72,7 @@ public class QuizService {
         String status = stored.isEmpty() ? requestGeneration(articleId) : "READY";
 
         return new NewsBodyResponse(detail.id(), detail.title(), intro, detail.sourceName(), detail.publishedAt(),
-                sections(detail.content()), terms, status, quizzes, List.of());
+                sections(detail.content()), terms, status, quizzes, tags(detail.category(), terms));
     }
 
     @Transactional
@@ -166,7 +175,23 @@ public class QuizService {
     }
 
     /** 원문 줄바꿈 문단을 그대로 쓰고, 문단 구분이 없으면 3문장씩 묶는다. */
-    static List<NewsBodyResponse.Section> sections(String content) {
+    /** 태그: 기사 카테고리 + 본문에 나온 용어(등장 순), 최대 5개, 중복 없음. */
+    static List<String> tags(String category, List<NewsBodyResponse.Term> terms) {
+        LinkedHashSet<String> out = new LinkedHashSet<>();
+        if (category != null && !category.isBlank()) out.add(category);
+        for (NewsBodyResponse.Term t : terms) {
+            if (out.size() >= MAX_TAGS) break;
+            if (t.term() != null && !t.term().isBlank()) out.add(t.term());
+        }
+        return List.copyOf(out);
+    }
+
+    static String stripLeadingCaption(String content) {
+        return content == null ? null : LEADING_CAPTION.matcher(content).replaceFirst("");
+    }
+
+    static List<NewsBodyResponse.Section> sections(String rawContent) {
+        String content = stripLeadingCaption(rawContent);
         if (content == null || content.isBlank()) return List.of();
         List<String> paragraphs = Arrays.stream(content.split("\\n\\s*\\n|\\n")).map(String::strip).filter(p -> !p.isEmpty()).toList();
         if (paragraphs.size() <= 1) {
