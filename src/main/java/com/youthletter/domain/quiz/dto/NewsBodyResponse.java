@@ -5,9 +5,9 @@ import java.util.List;
 
 /**
  * 뉴스 본문 학습 화면.
- * intro: AI 요약(없으면 null). sections: 원문 문단(소제목은 만들지 않으므로 subtitle=null).
+ * intro: AI 요약(없으면 null). sections: 원문 문단(맨 앞 사진 출처 표기 제외, 소제목은 만들지 않으므로 subtitle=null).
  * quizStatus: READY | GENERATING(AI 생성 중, 잠시 후 다시 조회) | UNAVAILABLE.
- * tags: 기사 태그 데이터가 없어 현재는 빈 배열.
+ * tags: 기사 카테고리 + 본문 용어(최대 5개).
  */
 public record NewsBodyResponse(
         Long newsId, String title, String intro, String source, LocalDateTime publishedAt,

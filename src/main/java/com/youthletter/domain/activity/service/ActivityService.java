@@ -44,7 +44,7 @@ public class ActivityService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.ARTICLE_NOT_FOUND));
 
         readingHistoryRepository.insertDailyReading(user.getId(), article.getId(), durationSeconds);
-        honeyService.awardRead(user.getId(), article.getId()); // 기사당 하루 1회 5꿀
+        honeyService.awardRead(user.getId(), article.getId()); // 기사당 하루 1회 1꿀
     }
 
     /**

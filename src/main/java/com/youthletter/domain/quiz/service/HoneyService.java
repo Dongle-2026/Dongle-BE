@@ -6,14 +6,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * 꿀 지급 규칙(확정): 퀴즈 문제당 첫 정답 10꿀, 기사 읽음 기사당 하루(한국 날짜) 1회 5꿀.
+ * 꿀 지급 규칙: 퀴즈 문제당 첫 정답 3꿀, 기사 읽음 기사당 하루(한국 날짜) 1회 1꿀.
+ * 하루 10꿀이면 히트맵 최고 단계(ActivityDayResponse.level).
  * 중복 지급은 honey_ledger 부분 유니크 인덱스 + ON CONFLICT DO NOTHING으로 막는다(재시도·동시 요청 안전).
  */
 @Service
 @RequiredArgsConstructor
 public class HoneyService {
-    public static final int QUIZ_CORRECT = 10;
-    public static final int ARTICLE_READ = 5;
+    public static final int QUIZ_CORRECT = 3;
+    public static final int ARTICLE_READ = 1;
     private static final String TODAY_KST = "(statement_timestamp() AT TIME ZONE 'Asia/Seoul')::date";
     private final JdbcTemplate jdbc;
 

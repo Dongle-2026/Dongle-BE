@@ -68,12 +68,16 @@ class NewsThumbnailSavedIntegrationTest {
         assertThat(find(searched, withImage).get("isSaved").asBoolean()).isTrue();
 
         mvc.perform(get("/api/news/" + withImage)).andExpect(jsonPath("$.data.image").value("http://img.test/" + m + ".jpg"));
+        mvc.perform(get("/api/me/saved-news").header("Authorization", bearer))
+                .andExpect(jsonPath("$.data.content[0].articleId").value(withImage))
+                .andExpect(jsonPath("$.data.content[0].image").value("http://img.test/" + m + ".jpg"));
     }
 
     @Test void readHistoryAndKeywordCardsUseThumbnail() throws Exception {
         mvc.perform(post("/api/news/" + withImage + "/read").header("Authorization", bearer)).andExpect(status().isOk());
         mvc.perform(get("/api/me/read-history").header("Authorization", bearer))
-                .andExpect(jsonPath("$.data.content[0].thumbnail").value("http://img.test/" + m + ".jpg"));
+                .andExpect(jsonPath("$.data.content[0].thumbnail").value("http://img.test/" + m + ".jpg"))
+                .andExpect(jsonPath("$.data.content[0].image").value("http://img.test/" + m + ".jpg"));
         Long term = jdbc.queryForObject("INSERT INTO financial_terms(name,path,definition,simple_definition) VALUES (?,'t','d','s') RETURNING id", Long.class, "썸" + m);
         jdbc.update("INSERT INTO article_term_highlights(article_id,term_id,position_start,position_end) VALUES (?,?,0,1),(?,?,0,1)", without, term, withImage, term);
         JsonNode cards = json.readTree(mvc.perform(get("/api/keywords").param("limit", "20")).andReturn().getResponse().getContentAsString()).get("data");

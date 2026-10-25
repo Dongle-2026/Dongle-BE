@@ -27,7 +27,7 @@ public class QuizController {
         return GlobalResponse.ok(quizService.body(articleId, principal == null ? null : principal.getUserId()));
     }
 
-    @Operation(summary = "퀴즈 제출", description = "재도전 가능. 꿀은 문제당 첫 정답 10꿀. 오답이면 정답·해설 비공개")
+    @Operation(summary = "퀴즈 제출", description = "재도전 가능. 꿀은 문제당 첫 정답 3꿀. 오답이면 정답·해설 비공개")
     @PostMapping("/api/quizzes/{quizId}/answer")
     public GlobalResponse<QuizAnswerResponse> answer(@AuthenticationPrincipal CustomUserPrincipal principal,
                                                      @PathVariable Long quizId, @RequestBody QuizAnswerRequest request) {
