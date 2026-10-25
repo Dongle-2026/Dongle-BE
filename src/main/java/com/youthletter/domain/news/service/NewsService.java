@@ -57,8 +57,13 @@ public class NewsService {
         return getNewsList(category, keyword, date, pageable, null);
     }
 
-    /** userId가 있으면 각 기사에 내 저장 여부(isSaved)를 붙인다. */
+    /**
+     * userId가 있으면 각 기사에 내 저장 여부(isSaved)를 붙인다.
+     * 검색어가 없는 목록(홈)은 AI 요약 있는 기사를 먼저 보여 주고, 그 안에서 요청한 정렬(기본 최신순)을 따른다.
+     * 검색 결과는 요청한 정렬 그대로.
+     */
     public Page<NewsListResponse> getNewsList(String category, String keyword, LocalDate date, Pageable pageable, Long userId) {
+        boolean summaryFirst = keyword == null || keyword.isBlank();
         Page<NewsArticle> articles = articleRepository.search(
                 category == null || category.isBlank() ? null
                         : com.youthletter.domain.news.category.NewsCategory.resolve(category.trim())
@@ -66,7 +71,7 @@ public class NewsService {
                                 .orElse(category.trim()), // 앱 id(youth)·표시명(청년) 모두 허용, 그 외 값은 기존처럼 그대로 비교
                 keyword == null || keyword.isBlank() ? null : keyword.trim(),
                 date == null ? null : date.atStartOfDay(),
-                date == null ? null : date.plusDays(1).atStartOfDay(), pageable);
+                date == null ? null : date.plusDays(1).atStartOfDay(), pageable, summaryFirst);
 
         return articles.map(article -> {
             String summary = summaryRepository
