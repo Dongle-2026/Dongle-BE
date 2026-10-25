@@ -34,3 +34,16 @@ python3 scripts/import_content.py --target-container 대상_postgres_컨테이�
 ```
 
 대상 DB는 이 저장소 마이그레이션(V28까지)이 적용돼 있어야 한다. 배포 절차는 `docs/LOCAL_TEST_AND_DEPLOY.md` 9절.
+
+## 앱(Expo)에서 이 서버로 카카오 로그인 시험
+
+`.env.pipeline.local`에 아래를 넣고 `./run-pipeline`(또는 backend만 재기동)한다. 키 값은 Git에 올리지 않는다.
+
+```
+PIPELINE_API_BIND=0.0.0.0                      # 같은 와이파이의 폰에서 접속(DB는 계속 이 맥에서만)
+OAUTH2_REDIRECT_URI=exp://<Expo 주소>/--/oauth/kakao   # 로그인 후 앱으로 돌아갈 주소
+KAKAO_CLIENT_ID=...
+KAKAO_CLIENT_SECRET=...
+```
+
+카카오 개발자 콘솔의 Redirect URI에는 백엔드 주소 `http://<맥IP>:18082/login/oauth2/code/kakao`를 등록한다(와이파이가 바뀌면 맥 IP도 바뀐다). 앱은 `http://<맥IP>:18082/oauth2/authorization/kakao`를 열면 되고, 로그인 후 `exp://…?accessToken=…&refreshToken=…`로 돌아온다.
