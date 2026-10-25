@@ -83,6 +83,9 @@ server:
   port: 8080
   servlet:
     context-path: /
+  # HTTPS 프록시(Caddy·터널) 뒤에서 X-Forwarded-Proto/Host를 읽어 OAuth 콜백 주소를 https://도메인으로 만든다.
+  # native(Tomcat RemoteIpValve)는 내부망(127/8, 10/8, 172.16/12, 192.168/16) 프록시의 헤더만 믿고 외부 클라이언트가 보낸 값은 무시한다.
+  forward-headers-strategy: native
 
 ---
 # ============================================
